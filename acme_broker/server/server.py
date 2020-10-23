@@ -59,6 +59,17 @@ class AcmeCA:
 
         self._nonces = set()
 
+    @staticmethod
+    async def runner(hostname='localhost', port=8000):
+        ca = AcmeCA()
+        runner = web.AppRunner(ca.app)
+        await runner.setup()
+
+        site = web.TCPSite(runner, hostname, port)
+        await site.start()
+
+        return runner
+
     def run(self, port=8000):
         logger.info('Starting ACME CA on port %i', port)
         web.run_app(self.app, port=port)
