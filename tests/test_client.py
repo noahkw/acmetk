@@ -1,7 +1,6 @@
 import asyncio
 import collections
 import logging
-import logging.config
 import shlex
 import shutil
 import unittest
@@ -10,7 +9,7 @@ from pathlib import Path
 import acme_broker.util
 from acme_broker import AcmeCA
 
-log = logging.getLogger('lee.test_client')
+log = logging.getLogger('acme_broker.test_client')
 
 DEFAULT_NETWORK_TIMEOUT = 45
 
@@ -18,15 +17,15 @@ ClientData = collections.namedtuple('data', ['key', 'csr', 'path'])
 
 
 class TestClient(unittest.IsolatedAsyncioTestCase):
-    directory = 'http://localhost:8000/directory'
+    DIRECTORY = 'http://localhost:8000/directory'
 
     @property
     def name(self):
         return self.__class__.__name__[4:]
 
     def setUp(self) -> None:
-        self.log = logging.getLogger(f'lee.tests.{self.name}')
-        self.contact = f'koetter+{self.name}@luis.uni-hannover.de'
+        self.log = logging.getLogger(f'acme_broker.tests.{self.name}')
+        self.contact = f'woehler+{self.name}@luis.uni-hannover.de'
         dir_ = Path('./tmp') / self.name
         if not dir_.exists():
             dir_.mkdir(parents=True)
@@ -93,5 +92,5 @@ class TestAcmetiny(TestClient):
         self.assertTrue(csr_path.exists())
 
         await self._run_acmetiny(
-            f'--directory-url {self.directory} --disable-check --contact {self.contact} --account-key '
+            f'--directory-url {self.DIRECTORY} --disable-check --contact {self.contact} --account-key '
             f'{account_key_path} --csr {csr_path} --acme-dir {self.data.path}/challenge ')
