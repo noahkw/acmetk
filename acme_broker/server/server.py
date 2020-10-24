@@ -48,6 +48,7 @@ class AcmeCA:
         self.app.router.add_route('GET', '/directory', self._get_directory)
         self.app.router.add_route('POST', '/acme/new-account', self._new_account)
         self.app.router.add_route('HEAD', '/acme/new-nonce', self._new_nonce)
+        self.app.router.add_route('GET', '/acme/new-nonce', self._new_nonce)
         self.app.router.add_route('GET', '/{tail:.*}', handle_get)
 
         self.directory = acme.messages.Directory({
@@ -88,6 +89,21 @@ class AcmeCA:
         else:
             raise acme.messages.errors.BadNonce(nonce, 'This nonce was not issued')
 
+    async def _verify_request(self, request):
+        data = await request.text()
+        jws = acme.jws.JWS.json_loads(data)
+
+        sig = jws.signature
+
+        protected = json.loads(sig.protected)
+        nonce = protected['nonce']
+
+        # TODO: send error if verification unsuccessful
+        self._verify_nonce(nonce)
+        jws.verify(jws.signature.combined.jwk)
+
+        return jws
+
     async def _get_directory(self, request):
         return AcmeResponse.json(self.directory.to_json(), nonce=self._issue_nonce())
 
@@ -97,22 +113,8 @@ class AcmeCA:
         }, nonce=self._issue_nonce())
 
     async def _new_account(self, request):
-        data = await request.text()
-
-        b = acme.jws.JWS.json_loads(data)
-        payload = b.payload
-        sig = b.signature
-
-        protected = json.loads(sig.protected)
-        nonce = protected['nonce']
-
-        # TODO: send error if verification unsuccessful
-        self._verify_nonce(nonce)
-
-        reg = acme.messages.Registration.json_loads(payload)
-
-        # TODO: Does this actually verify the signature?
-        assert b.verify(b.signature.combined.jwk)
+        jws = await self._verify_request(request)
+        reg = acme.messages.Registration.json_loads(jws.payload)
 
         return AcmeResponse.json({
             "status": "valid",
@@ -122,7 +124,7 @@ class AcmeCA:
             ],
             "termsOfServiceAgreed": True,
             "orders": "https://example.com/acme/orders/rzGoeA"
-        }, status=400, nonce=self._issue_nonce())
+        }, status=200, nonce=self._issue_nonce())
 
 
 class AcmeProxy(AcmeCA):

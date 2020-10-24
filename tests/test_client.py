@@ -64,7 +64,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         await self.runner.cleanup()
 
     async def test_run(self):
-        # await asyncio.sleep(30)
+        await asyncio.sleep(600)
         pass
 
 
