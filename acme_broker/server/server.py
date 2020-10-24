@@ -40,30 +40,34 @@ class AcmeResponse(web.Response):
 
 
 class AcmeCA:
-    def __init__(self, base_directory='http://localhost:8000/acme'):
-        self._base_directory = base_directory
+    def __init__(self, host, base_route='/acme'):
+        self._host = host
+        self._base_route = base_route
 
-        self._routes = web.RouteTableDef()
-        self.app = web.Application()
-        self.app.router.add_route('GET', '/directory', self._get_directory)
-        self.app.router.add_route('POST', '/acme/new-account', self._new_account)
-        self.app.router.add_route('HEAD', '/acme/new-nonce', self._new_nonce)
-        self.app.router.add_route('GET', '/acme/new-nonce', self._new_nonce)
-        self.app.router.add_route('GET', '/{tail:.*}', handle_get)
+        self.main_app = web.Application()
+        self.ca_app = web.Application()
 
-        self.directory = acme.messages.Directory({
-            'newAccount': f'{self._base_directory}/new-account',
-            'newNonce': f'{self._base_directory}/new-nonce',
-            'newOrder': f'{self._base_directory}/new-order',
-            'revokeCert': f'{self._base_directory}/revoke-cert',
-        })
+        self.ca_app.add_routes([
+            web.post('/new-account', self._new_account),
+            web.head('/new-nonce', self._new_nonce),
+            # catch-all get
+            web.get('/{tail:.*}', handle_get),
+        ])
+        self.ca_app.router.add_route('GET', '/new-nonce', self._new_nonce)
+
+        self.main_app.add_routes([
+            web.get('/directory', self._get_directory),
+            # catch-all get
+            # web.get('/{tail:.*}', handle_get),
+        ])
+        self.main_app.add_subapp(base_route, self.ca_app)
 
         self._nonces = set()
 
     @staticmethod
     async def runner(hostname='localhost', port=8000):
-        ca = AcmeCA()
-        runner = web.AppRunner(ca.app)
+        ca = AcmeCA(host=f'http://{hostname}:{port}', base_route='/acme')
+        runner = web.AppRunner(ca.main_app)
         await runner.setup()
 
         site = web.TCPSite(runner, hostname, port)
@@ -73,7 +77,10 @@ class AcmeCA:
 
     def run(self, port=8000):
         logger.info('Starting ACME CA on port %i', port)
-        web.run_app(self.app, port=port)
+        web.run_app(self.main_app, port=port)
+
+    def url_for(self, request, route: str):
+        return f'{self._host}{self._base_route}/{route}'
 
     def _issue_nonce(self):
         nonce = generate_nonce()
@@ -105,7 +112,14 @@ class AcmeCA:
         return jws
 
     async def _get_directory(self, request):
-        return AcmeResponse.json(self.directory.to_json(), nonce=self._issue_nonce())
+        directory = acme.messages.Directory({
+            'newAccount': self.url_for(request, 'new-account'),
+            'newNonce': self.url_for(request, 'new-nonce'),
+            'newOrder': self.url_for(request, 'new-order'),
+            'revokeCert': self.url_for(request, 'revoke-cert'),
+        })
+
+        return AcmeResponse.json(directory.to_json(), nonce=self._issue_nonce())
 
     async def _new_nonce(self, request):
         return AcmeResponse(status=204, headers={
@@ -136,5 +150,5 @@ class AcmeBroker(AcmeCA):
 
 
 def create_app():
-    acme_ca_ = AcmeCA()
-    return acme_ca_.app
+    acme_ca = AcmeCA(host=f'http://localhost:8000', base_route='/acme')
+    return acme_ca.main_app
