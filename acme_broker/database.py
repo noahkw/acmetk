@@ -24,21 +24,14 @@ class Database:
     def session(self):
         return AsyncSession(self.engine)
 
-    async def get_account(self):
-        # TODO: remove debugging code
+    async def get_account(self, key):
         async with self.session() as session:
-            statement = select(Account)
-            result = await session.execute(statement)
-
-        for instance in result:
-            print(instance)
+            statement = select(Account).filter(Account.key == key)
+            result = (await session.execute(statement)).first()
 
         return result
 
-    async def add_account(self):
-        # TODO: remove debugging code
+    async def add_account(self, account):
         async with self.session() as session:
-            session.add(Account(key='secret', status=AccountStatus.VALID, contact='ex@example.com',
-                                termsOfServiceAgreed=True))
-
+            session.add(account)
             await session.commit()

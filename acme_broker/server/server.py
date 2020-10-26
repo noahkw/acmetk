@@ -1,5 +1,6 @@
 import json
 import logging
+import typing
 from typing import Any, Optional
 
 import acme.messages
@@ -7,6 +8,7 @@ from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.typedefs import JSONEncoder, LooseHeaders
 
+from acme_broker import models
 from acme_broker.database import Database
 from acme_broker.util import generate_nonce
 
@@ -67,7 +69,7 @@ class AcmeCA:
 
         self._nonces = set()
 
-        self._db = None
+        self._db: typing.Optional[Database] = None
         self._session = None
 
     @classmethod
@@ -145,8 +147,6 @@ class AcmeCA:
         return jws
 
     async def _get_directory(self, request):
-        acc = await self._db.add_account()
-
         directory = acme.messages.Directory({
             'newAccount': self.url_for(request, 'new-account'),
             'newNonce': self.url_for(request, 'new-nonce'),
@@ -157,8 +157,6 @@ class AcmeCA:
         return AcmeResponse.json(directory.to_json(), nonce=self._issue_nonce())
 
     async def _new_nonce(self, request):
-        accs = await self._db.get_account()
-
         return AcmeResponse(status=204, headers={
             'Cache-Control': 'no-store',
         }, nonce=self._issue_nonce())
@@ -167,15 +165,29 @@ class AcmeCA:
         jws = await self._verify_request(request)
         reg = acme.messages.Registration.json_loads(jws.payload)
 
-        return AcmeResponse.json({
-            "status": "valid",
-            "contact": [
-                "mailto:cert-admin@example.org",
-                "mailto:admin@example.org"
-            ],
-            "termsOfServiceAgreed": True,
-            "orders": "https://example.com/acme/orders/rzGoeA"
-        }, status=200, nonce=self._issue_nonce())
+        key = jws.signature.combined.jwk.key
+
+        account = await self._db.get_account(key)
+
+        if account:
+            pass
+        else:
+            if reg.only_return_existing:
+                msg = acme.messages.Error.with_code('accountDoesNotExist')
+                return AcmeResponse.json(msg.to_json(), status=400, nonce=self._issue_nonce(),
+                                         headers={'Cache-Control': 'no-store'})
+            else:  # create new account
+                async with self._session() as session:
+                    new_account = models.Account(key=key, status=models.AccountStatus.VALID,
+                                                 contact=json.dumps(reg.contact),
+                                                 termsOfServiceAgreed=reg.terms_of_service_agreed)
+                    serialized = new_account.serialize()
+                    session.add(account)
+
+                    await session.commit()
+                    return AcmeResponse.json(serialized, nonce=self._issue_nonce(), headers={
+                        'Cache-Control': 'no-store', 'Location': self.url_for(request, '/acme')
+                    })
 
 
 class AcmeProxy(AcmeCA):

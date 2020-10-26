@@ -32,11 +32,28 @@ def generate_rsa_key(path: Path):
     return private_key
 
 
-def save_key(pk, filename):
-    pem = pk.private_bytes(
+def serialize_key(pk):
+    return pk.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption()
     )
+
+
+def serialize_pubkey(pubkey):
+    bytes = pubkey.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+
+    return bytes
+
+
+def deserialize_pubkey(pem):
+    return serialization.load_pem_public_key(pem)
+
+
+def save_key(pk, filename):
+    pem = serialize_key(pk)
     with open(filename, 'wb') as pem_out:
         pem_out.write(pem)
