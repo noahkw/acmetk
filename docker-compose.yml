@@ -1,0 +1,12 @@
+version: "2.1"
+services:
+  db:
+    image: postgres
+    volumes:
+      - ./db_data:/var/lib/postgresql/data
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${ACME_BROKER_PG_PW}
+      POSTGRES_USER: acme-broker
+    ports:
+      - "5432:5432"

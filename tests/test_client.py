@@ -6,6 +6,8 @@ import shutil
 import unittest
 from pathlib import Path
 
+from configobj import ConfigObj
+
 import acme_broker.util
 from acme_broker import AcmeCA
 
@@ -54,9 +56,8 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
-        runner = await AcmeCA.runner()
-        #  logging.basicConfig(filename='test_client.log', level=logging.DEBUG)
-        logging.basicConfig(level=logging.DEBUG)
+        config = ConfigObj('../debug.ini', unrepr=True)
+        runner = await AcmeCA.runner(**config)
         self.runner = runner
 
     async def asyncTearDown(self) -> None:

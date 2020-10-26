@@ -147,3 +147,5 @@ dmypy.json
 # profiling data
 .prof
 
+# config
+config.ini

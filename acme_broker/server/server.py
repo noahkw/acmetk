@@ -7,6 +7,7 @@ from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.typedefs import JSONEncoder, LooseHeaders
 
+from acme_broker.database import Database
 from acme_broker.util import generate_nonce
 
 logger = logging.getLogger(__name__)
@@ -50,10 +51,12 @@ class AcmeCA:
         self.ca_app.add_routes([
             web.post('/new-account', self._new_account),
             web.head('/new-nonce', self._new_nonce),
-            # catch-all get
-            web.get('/{tail:.*}', handle_get),
+
         ])
         self.ca_app.router.add_route('GET', '/new-nonce', self._new_nonce)
+
+        # catch-all get
+        self.ca_app.router.add_route('GET', '/{tail:.*}', handle_get),
 
         self.main_app.add_routes([
             web.get('/directory', self._get_directory),
@@ -64,9 +67,43 @@ class AcmeCA:
 
         self._nonces = set()
 
-    @staticmethod
-    async def runner(hostname='localhost', port=8000):
+        self._db = None
+        self._session = None
+
+    @classmethod
+    async def runner(cls, hostname='localhost', **kwargs):
+        log_level = logging.getLevelName(kwargs.pop('log_level', logging.INFO))
+        log_file = kwargs.pop('log_file', None)
+        port = kwargs.pop('port', 8000)
+        debug = kwargs.pop('debug', False)
+        db_user = kwargs.pop('db_user')
+        db_pass = kwargs.pop('db_pass')
+        db_host = kwargs.pop('db_host')
+        db_port = kwargs.pop('db_port', 5432)
+        db_database = kwargs.pop('db_database')
+
+        logging.basicConfig(filename=log_file, level=log_level)
+        logging.debug("""Passed Args: Log level '%s'
+                                Log file '%s', 
+                                Port %d, 
+                                Debug '%s',
+                                DB-user '%s',
+                                DB-pass %s,
+                                DB-host '%s',
+                                DB-port %d,
+                                DB-database '%s'""", log_level, log_file, port,
+                      debug, db_user,
+                      '***' if db_pass else None,
+                      db_host, db_port, db_database)
+
         ca = AcmeCA(host=f'http://{hostname}:{port}', base_route='/acme')
+        db = Database(db_user, db_pass, db_host, db_port, db_database, echo=log_level == logging.DEBUG)
+
+        await db.begin()
+
+        ca._db = db
+        ca._session = db.session
+
         runner = web.AppRunner(ca.main_app)
         await runner.setup()
 
@@ -74,10 +111,6 @@ class AcmeCA:
         await site.start()
 
         return runner
-
-    def run(self, port=8000):
-        logger.info('Starting ACME CA on port %i', port)
-        web.run_app(self.main_app, port=port)
 
     def url_for(self, request, route: str):
         return f'{self._host}{self._base_route}/{route}'
@@ -112,6 +145,8 @@ class AcmeCA:
         return jws
 
     async def _get_directory(self, request):
+        acc = await self._db.add_account()
+
         directory = acme.messages.Directory({
             'newAccount': self.url_for(request, 'new-account'),
             'newNonce': self.url_for(request, 'new-nonce'),
@@ -122,6 +157,8 @@ class AcmeCA:
         return AcmeResponse.json(directory.to_json(), nonce=self._issue_nonce())
 
     async def _new_nonce(self, request):
+        accs = await self._db.get_account()
+
         return AcmeResponse(status=204, headers={
             'Cache-Control': 'no-store',
         }, nonce=self._issue_nonce())
@@ -147,8 +184,3 @@ class AcmeProxy(AcmeCA):
 
 class AcmeBroker(AcmeCA):
     pass
-
-
-def create_app():
-    acme_ca = AcmeCA(host=f'http://localhost:8000', base_route='/acme')
-    return acme_ca.main_app
