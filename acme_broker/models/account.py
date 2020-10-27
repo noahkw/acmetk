@@ -1,7 +1,7 @@
 import enum
 
 import josepy
-from sqlalchemy import Column, Enum, String, Boolean, types
+from sqlalchemy import Column, Enum, String, types
 
 from .base import Base, Serializer
 from ..util import serialize_pubkey, deserialize_pubkey
@@ -27,13 +27,14 @@ class ComparableRSAKeyType(types.TypeDecorator):
 class Account(Base, Serializer):
     __tablename__ = 'accounts'
 
-    key = Column(ComparableRSAKeyType, primary_key=True)
+    key = Column(ComparableRSAKeyType)
+    kid = Column(String, primary_key=True)
     status = Column('status', Enum(AccountStatus))
     contact = Column(String)
 
     def __repr__(self):
-        return f'<Account(key="{self.key}", status="{self.status}", contact="{self.contact}")>'
+        return f'<Account(kid="{self.kid}", key="{self.key}", status="{self.status}", contact="{self.contact}")>'
 
-    def serialize(self, ignore=['key']):
+    def serialize(self, ignore=['key', 'kid']):
         d = Serializer.serialize(self, ignore=ignore)
         return d

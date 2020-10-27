@@ -11,7 +11,7 @@ import josepy
 from configobj import ConfigObj
 
 import acme_broker.util
-from acme_broker import AcmeCA, models
+from acme_broker import AcmeCA, models, util
 
 log = logging.getLogger('acme_broker.test_client')
 
@@ -79,7 +79,10 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         pubkey = acme_broker.util.deserialize_pubkey(b)
 
         async with self.ca._session() as session:
-            account = models.Account(key=josepy.util.ComparableRSAKey(pubkey), status=models.AccountStatus.VALID,
+            wrapped_key = josepy.util.ComparableRSAKey(pubkey)
+            account = models.Account(key=wrapped_key,
+                                     kid=util.sha256_hex_digest(util.serialize_pubkey(wrapped_key)),
+                                     status=models.AccountStatus.VALID,
                                      contact=json.dumps(()))
             session.add(account)
 

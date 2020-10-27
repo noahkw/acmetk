@@ -22,8 +22,10 @@ class Database:
     def session(self):
         return AsyncSession(self.engine)
 
-    async def get_account(self, session, key):
-        statement = select(Account).filter(Account.key == key)
+    async def get_account(self, session, key=None, kid=None):
+        statement = select(Account).filter(
+            (Account.key == key) | (Account.kid == kid)
+        )
         result = (await session.execute(statement)).first()
 
         return result[0] if result else None

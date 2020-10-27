@@ -12,7 +12,7 @@ from cryptography.exceptions import InvalidSignature
 
 from acme_broker import models
 from acme_broker.database import Database
-from acme_broker.util import generate_nonce
+from acme_broker.util import generate_nonce, sha256_hex_digest, serialize_pubkey
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,7 @@ class AcmeCA:
             web.head('/new-nonce', self._new_nonce, name='new-nonce'),
             web.post('/new-order', self._new_order, name='new-order'),
             web.post('/revoke-cert', self._revoke_cert, name='revoke-cert'),
+            web.post('/accounts/{kid}', self._accounts, name='accounts'),
 
         ])
         self.ca_app.router.add_route('GET', '/new-nonce', self._new_nonce)
@@ -158,7 +159,7 @@ class AcmeCA:
         self._verify_nonce(nonce)
 
         assert (sig.combined.jwk is not None) ^ (
-                    sig.combined.kid is not None)  # Check whether we have *either* a jwk or a kid
+                sig.combined.kid is not None)  # Check whether we have *either* a jwk or a kid
         logger.debug('Request has a %s', 'jwk' if sig.combined.jwk else 'kid')
 
         if key_auth:
@@ -196,7 +197,11 @@ class AcmeCA:
             account = await self._db.get_account(session, key)
 
             if account:
-                pass
+                if account.status != models.AccountStatus.VALID:
+                    raise acme.messages.Error.with_code('unauthorized')
+                else:
+                    return AcmeResponse.json(account.serialize(), nonce=self._issue_nonce(),
+                                             headers={'Location': url_for(request, 'accounts', account=account)})
             else:
                 if reg.only_return_existing:
                     raise acme.messages.Error.with_code('accountDoesNotExist')
@@ -205,15 +210,37 @@ class AcmeCA:
                     raise acme.messages.Error(typ='urn:ietf:params:acme:error:termsOfServiceNotAgreed',
                                               title='The client must agree to the terms of service.')
                 else:  # create new account
-                    new_account = models.Account(key=key, status=models.AccountStatus.VALID,
+                    new_account = models.Account(key=key, kid=sha256_hex_digest(serialize_pubkey(key)),
+                                                 status=models.AccountStatus.VALID,
                                                  contact=json.dumps(reg.contact))
                     serialized = new_account.serialize()
                     session.add(new_account)
-
+                    kid = new_account.kid
                     await session.commit()
                     return AcmeResponse.json(serialized, status=201, nonce=self._issue_nonce(), headers={
-                        'Location': url_for(request, 'new-nonce')
+                        'Location': url_for(request, 'accounts', kid=kid)
                     })
+
+    async def _accounts(self, request):
+        jws = await self._verify_request(request)
+        kid = request.match_info['kid']
+
+        assert url_for(request, 'accounts', kid=kid) == jws.signature.combined.kid
+
+        async with self._session() as session:
+            account = await self._db.get_account(session, kid=kid)
+            if not account:
+                raise acme.messages.Error.with_code('accountDoesNotExist')
+
+            upd = acme.messages.Registration.json_loads(jws.payload)
+
+            if contact := upd.contact:
+                account.contact = json.dumps(contact)
+
+            serialized = account.serialize()
+
+            await session.commit()
+            return AcmeResponse.json(serialized, status=200, nonce=self._issue_nonce())
 
     async def _new_order(self, request):
         jws = await self._verify_request(request)

@@ -55,3 +55,9 @@ def save_key(pk, filename):
     pem = serialize_key(pk)
     with open(filename, 'wb') as pem_out:
         pem_out.write(pem)
+
+
+def sha256_hex_digest(data):
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(data)
+    return digest.finalize().hex()
