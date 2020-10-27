@@ -22,7 +22,7 @@ async def handle_get(request):
 class AcmeResponse(web.Response):
     def __init__(self, *args, nonce, **kwargs):
         super().__init__(*args, **kwargs)
-        self.headers.update({'Replay-Nonce': nonce})
+        self.headers.update({'Replay-Nonce': nonce, 'Cache-Control': 'no-store'})
 
     @staticmethod
     def json(data: Any = sentinel, *, nonce=None,
@@ -175,18 +175,21 @@ class AcmeCA:
             else:
                 if reg.only_return_existing:
                     msg = acme.messages.Error.with_code('accountDoesNotExist')
-                    return AcmeResponse.json(msg.to_json(), status=400, nonce=self._issue_nonce(),
-                                             headers={'Cache-Control': 'no-store'})
+                    return AcmeResponse.json(msg.to_json(), status=400, nonce=self._issue_nonce())
+                elif not reg.terms_of_service_agreed:
+                    # TODO: make available and link to ToS
+                    msg = acme.messages.Error(typ='urn:ietf:params:acme:error:termsOfServiceNotAgreed',
+                                              title='The client must agree to the terms of service.')
+                    return AcmeResponse.json(msg.to_json(), status=403, nonce=self._issue_nonce())
                 else:  # create new account
                     new_account = models.Account(key=key, status=models.AccountStatus.VALID,
-                                                 contact=json.dumps(reg.contact),
-                                                 termsOfServiceAgreed=reg.terms_of_service_agreed)
+                                                 contact=json.dumps(reg.contact))
                     serialized = new_account.serialize()
                     session.add(new_account)
 
                     await session.commit()
-                    return AcmeResponse.json(serialized, nonce=self._issue_nonce(), headers={
-                        'Cache-Control': 'no-store', 'Location': self.url_for(request, 'acme')
+                    return AcmeResponse.json(serialized, status=201, nonce=self._issue_nonce(), headers={
+                        'Location': self.url_for(request, 'acme')
                     })
 
 

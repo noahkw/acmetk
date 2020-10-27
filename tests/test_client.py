@@ -79,8 +79,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
 
         async with self.ca._session() as session:
             account = models.Account(key=josepy.util.ComparableRSAKey(pubkey), status=models.AccountStatus.VALID,
-                                     contact=json.dumps(()),
-                                     termsOfServiceAgreed=True)
+                                     contact=json.dumps(()))
             session.add(account)
 
             result = await self.ca._db.get_account(session, pubkey)

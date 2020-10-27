@@ -30,11 +30,9 @@ class Account(Base, Serializer):
     key = Column(ComparableRSAKeyType, primary_key=True)
     status = Column('status', Enum(AccountStatus))
     contact = Column(String)
-    termsOfServiceAgreed = Column(Boolean)
 
     def __repr__(self):
-        return f'<Account(key="{self.key}", status="{self.status}", contact="{self.contact}", ' \
-               f'termsOfServiceAgreed="{self.termsOfServiceAgreed}")>'
+        return f'<Account(key="{self.key}", status="{self.status}", contact="{self.contact}")>'
 
     def serialize(self, ignore=['key']):
         d = Serializer.serialize(self, ignore=ignore)
