@@ -42,6 +42,19 @@ class AcmeResponse(web.Response):
                             headers=headers, content_type=content_type, nonce=nonce)
 
 
+def build_url(r, app, p, **kwargs):
+    return str(r.url.with_path(str(app.router[p].url_for(**kwargs))))
+
+
+def url_for(r, p, **kwargs):
+    try:
+        return build_url(r, r.app, p, **kwargs)
+    except KeyError:
+        # search subapps for route
+        for subapp in r.app._subapps:
+            return build_url(r, subapp, p, **kwargs)
+
+
 class AcmeCA:
     def __init__(self, host, base_route='/acme'):
         self._host = host
@@ -51,8 +64,10 @@ class AcmeCA:
         self.ca_app = web.Application()
 
         self.ca_app.add_routes([
-            web.post('/new-account', self._new_account),
-            web.head('/new-nonce', self._new_nonce),
+            web.post('/new-account', self._new_account, name='new-account'),
+            web.head('/new-nonce', self._new_nonce, name='new-nonce'),
+            web.post('/new-order', handle_get, name='new-order'),
+            web.post('/revoke-cert', handle_get, name='revoke-cert'),
 
         ])
         self.ca_app.router.add_route('GET', '/new-nonce', self._new_nonce)
@@ -61,7 +76,7 @@ class AcmeCA:
         self.ca_app.router.add_route('GET', '/{tail:.*}', handle_get),
 
         self.main_app.add_routes([
-            web.get('/directory', self._get_directory),
+            web.get('/directory', self._get_directory, name='directory'),
             # catch-all get
             # web.get('/{tail:.*}', handle_get),
         ])
@@ -114,9 +129,6 @@ class AcmeCA:
 
         return runner, ca
 
-    def url_for(self, request, route: str):
-        return f'{self._host}{self._base_route}/{route}'
-
     def _issue_nonce(self):
         nonce = generate_nonce()
         logger.debug('Storing new nonce %s', nonce)
@@ -148,10 +160,10 @@ class AcmeCA:
 
     async def _get_directory(self, request):
         directory = acme.messages.Directory({
-            'newAccount': self.url_for(request, 'new-account'),
-            'newNonce': self.url_for(request, 'new-nonce'),
-            'newOrder': self.url_for(request, 'new-order'),
-            'revokeCert': self.url_for(request, 'revoke-cert'),
+            'newAccount': url_for(request, 'new-account'),
+            'newNonce': url_for(request, 'new-nonce'),
+            'newOrder': url_for(request, 'new-order'),
+            'revokeCert': url_for(request, 'revoke-cert'),
         })
 
         return AcmeResponse.json(directory.to_json(), nonce=self._issue_nonce())
@@ -189,7 +201,7 @@ class AcmeCA:
 
                     await session.commit()
                     return AcmeResponse.json(serialized, status=201, nonce=self._issue_nonce(), headers={
-                        'Location': self.url_for(request, 'acme')
+                        'Location': url_for(request, 'new-nonce')
                     })
 
 
