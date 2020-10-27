@@ -2,7 +2,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
 from acme_broker.models import Account
-from acme_broker.models.account import AccountStatus
 from acme_broker.models.base import Base
 
 
@@ -24,14 +23,8 @@ class Database:
     def session(self):
         return AsyncSession(self.engine)
 
-    async def get_account(self, key):
-        async with self.session() as session:
-            statement = select(Account).filter(Account.key == key)
-            result = (await session.execute(statement)).first()
+    async def get_account(self, session, key):
+        statement = select(Account).filter(Account.key == key)
+        result = (await session.execute(statement)).first()
 
-        return result
-
-    async def add_account(self, account):
-        async with self.session() as session:
-            session.add(account)
-            await session.commit()
+        return result[0] if result else None

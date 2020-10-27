@@ -112,7 +112,7 @@ class AcmeCA:
         site = web.TCPSite(runner, hostname, port)
         await site.start()
 
-        return runner
+        return runner, ca
 
     def url_for(self, request, route: str):
         return f'{self._host}{self._base_route}/{route}'
@@ -167,17 +167,17 @@ class AcmeCA:
 
         key = jws.signature.combined.jwk.key
 
-        account = await self._db.get_account(key)
+        async with self._session() as session:
+            account = await self._db.get_account(session, key)
 
-        if account:
-            pass
-        else:
-            if reg.only_return_existing:
-                msg = acme.messages.Error.with_code('accountDoesNotExist')
-                return AcmeResponse.json(msg.to_json(), status=400, nonce=self._issue_nonce(),
-                                         headers={'Cache-Control': 'no-store'})
-            else:  # create new account
-                async with self._session() as session:
+            if account:
+                pass
+            else:
+                if reg.only_return_existing:
+                    msg = acme.messages.Error.with_code('accountDoesNotExist')
+                    return AcmeResponse.json(msg.to_json(), status=400, nonce=self._issue_nonce(),
+                                             headers={'Cache-Control': 'no-store'})
+                else:  # create new account
                     new_account = models.Account(key=key, status=models.AccountStatus.VALID,
                                                  contact=json.dumps(reg.contact),
                                                  termsOfServiceAgreed=reg.terms_of_service_agreed)

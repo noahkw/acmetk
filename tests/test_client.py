@@ -1,15 +1,17 @@
 import asyncio
 import collections
+import json
 import logging
 import shlex
 import shutil
 import unittest
 from pathlib import Path
 
+import josepy
 from configobj import ConfigObj
 
 import acme_broker.util
-from acme_broker import AcmeCA
+from acme_broker import AcmeCA, models
 
 log = logging.getLogger('acme_broker.test_client')
 
@@ -57,16 +59,37 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
         config = ConfigObj('../debug.ini', unrepr=True)
-        runner = await AcmeCA.runner(**config)
+        runner, ca = await AcmeCA.runner(**config)
         self.runner = runner
+        self.ca = ca
 
     async def asyncTearDown(self) -> None:
         await self.runner.shutdown()
         await self.runner.cleanup()
 
     async def test_run(self):
-        await asyncio.sleep(600)
+        # await asyncio.sleep(600)
         pass
+
+    async def test_add_account(self):
+        with open(r'test_account.pub', 'rb') as pem:
+            b = pem.read()
+
+        pubkey = acme_broker.util.deserialize_pubkey(b)
+
+        async with self.ca._session() as session:
+            account = models.Account(key=josepy.util.ComparableRSAKey(pubkey), status=models.AccountStatus.VALID,
+                                     contact=json.dumps(()),
+                                     termsOfServiceAgreed=True)
+            session.add(account)
+
+            result = await self.ca._db.get_account(session, pubkey)
+
+            assert acme_broker.util.serialize_pubkey(result.key) == acme_broker.util.serialize_pubkey(account.key)
+            assert result.key == account.key
+            assert account.serialize() == result.serialize()
+
+            await session.commit()
 
 
 class TestAcmetiny(TestClient):

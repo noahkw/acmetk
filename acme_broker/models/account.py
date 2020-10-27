@@ -1,5 +1,6 @@
 import enum
 
+import josepy
 from sqlalchemy import Column, Enum, String, Boolean, types
 
 from .base import Base, Serializer
@@ -20,7 +21,7 @@ class ComparableRSAKeyType(types.TypeDecorator):
         return serialize_pubkey(value)
 
     def process_result_value(self, value, dialect):
-        return deserialize_pubkey(value)
+        return josepy.util.ComparableRSAKey(deserialize_pubkey(value))
 
 
 class Account(Base, Serializer):
