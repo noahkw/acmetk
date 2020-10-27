@@ -7,6 +7,8 @@ import acme.messages
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.typedefs import JSONEncoder, LooseHeaders
+from aiohttp.web_middlewares import middleware
+from cryptography.exceptions import InvalidSignature
 
 from acme_broker import models
 from acme_broker.database import Database
@@ -61,13 +63,13 @@ class AcmeCA:
         self._base_route = base_route
 
         self.main_app = web.Application()
-        self.ca_app = web.Application()
+        self.ca_app = web.Application(middlewares=[self._error_middleware])
 
         self.ca_app.add_routes([
             web.post('/new-account', self._new_account, name='new-account'),
             web.head('/new-nonce', self._new_nonce, name='new-nonce'),
-            web.post('/new-order', handle_get, name='new-order'),
-            web.post('/revoke-cert', handle_get, name='revoke-cert'),
+            web.post('/new-order', self._new_order, name='new-order'),
+            web.post('/revoke-cert', self._revoke_cert, name='revoke-cert'),
 
         ])
         self.ca_app.router.add_route('GET', '/new-nonce', self._new_nonce)
@@ -136,25 +138,36 @@ class AcmeCA:
         return nonce
 
     def _verify_nonce(self, nonce):
-        logger.debug('Verifying nonce %s', nonce)
         if nonce in self._nonces:
             logger.debug('Successfully verified nonce %s', nonce)
             self._nonces.remove(nonce)
         else:
-            raise acme.messages.errors.BadNonce(nonce, 'This nonce was not issued')
+            raise acme.messages.Error.with_code('badNonce', detail=nonce)
 
-    async def _verify_request(self, request):
+    async def _verify_request(self, request, key_auth=False):
+        logger.debug('Verifying request')
+
         data = await request.text()
         jws = acme.jws.JWS.json_loads(data)
-
         sig = jws.signature
 
-        protected = json.loads(sig.protected)
-        nonce = protected['nonce']
-
         # TODO: send error if verification unsuccessful
+        protected = json.loads(sig.protected)
+
+        nonce = protected.get('nonce', None)
         self._verify_nonce(nonce)
-        jws.verify(jws.signature.combined.jwk)
+
+        assert (sig.combined.jwk is not None) ^ (
+                    sig.combined.kid is not None)  # Check whether we have *either* a jwk or a kid
+        logger.debug('Request has a %s', 'jwk' if sig.combined.jwk else 'kid')
+
+        if key_auth:
+            try:
+                jws.verify(sig.combined.jwk)
+            except InvalidSignature:
+                raise acme.messages.Error.with_code('badPublicKey')
+        else:
+            pass
 
         return jws
 
@@ -174,7 +187,7 @@ class AcmeCA:
         }, nonce=self._issue_nonce())
 
     async def _new_account(self, request):
-        jws = await self._verify_request(request)
+        jws = await self._verify_request(request, key_auth=True)
         reg = acme.messages.Registration.json_loads(jws.payload)
 
         key = jws.signature.combined.jwk.key
@@ -186,13 +199,11 @@ class AcmeCA:
                 pass
             else:
                 if reg.only_return_existing:
-                    msg = acme.messages.Error.with_code('accountDoesNotExist')
-                    return AcmeResponse.json(msg.to_json(), status=400, nonce=self._issue_nonce())
+                    raise acme.messages.Error.with_code('accountDoesNotExist')
                 elif not reg.terms_of_service_agreed:
                     # TODO: make available and link to ToS
-                    msg = acme.messages.Error(typ='urn:ietf:params:acme:error:termsOfServiceNotAgreed',
+                    raise acme.messages.Error(typ='urn:ietf:params:acme:error:termsOfServiceNotAgreed',
                                               title='The client must agree to the terms of service.')
-                    return AcmeResponse.json(msg.to_json(), status=403, nonce=self._issue_nonce())
                 else:  # create new account
                     new_account = models.Account(key=key, status=models.AccountStatus.VALID,
                                                  contact=json.dumps(reg.contact))
@@ -203,6 +214,26 @@ class AcmeCA:
                     return AcmeResponse.json(serialized, status=201, nonce=self._issue_nonce(), headers={
                         'Location': url_for(request, 'new-nonce')
                     })
+
+    async def _new_order(self, request):
+        jws = await self._verify_request(request)
+
+        return AcmeResponse(nonce=self._issue_nonce(), status=404)
+
+    async def _revoke_cert(self, request):
+        jws = await self._verify_request(request, key_auth=True)
+
+        return AcmeResponse(nonce=self._issue_nonce(), status=404)
+
+    @middleware
+    async def _error_middleware(self, request, handler):
+        try:
+            response = await handler(request)
+        except acme.messages.errors.Error as error:
+            return AcmeResponse.json(error.json_dumps(), status=400, nonce=self._issue_nonce(),
+                                     content_type='application/problem+json')
+        else:
+            return response
 
 
 class AcmeProxy(AcmeCA):
