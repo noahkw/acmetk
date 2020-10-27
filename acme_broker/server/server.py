@@ -85,7 +85,7 @@ class AcmeCA:
         db_database = kwargs.pop('db_database')
 
         logging.basicConfig(filename=log_file, level=log_level)
-        logging.debug("""Passed Args: Log level '%s'
+        logger.debug("""Passed Args: Log level '%s'
                                 Log file '%s', 
                                 Port %d, 
                                 Debug '%s',
@@ -94,12 +94,12 @@ class AcmeCA:
                                 DB-host '%s',
                                 DB-port %d,
                                 DB-database '%s'""", log_level, log_file, port,
-                      debug, db_user,
-                      '***' if db_pass else None,
-                      db_host, db_port, db_database)
+                     debug, db_user,
+                     '***' if db_pass else None,
+                     db_host, db_port, db_database)
 
         ca = AcmeCA(host=f'http://{hostname}:{port}', base_route='/acme')
-        db = Database(db_user, db_pass, db_host, db_port, db_database, echo=log_level == logging.DEBUG)
+        db = Database(db_user, db_pass, db_host, db_port, db_database)
 
         await db.begin()
 

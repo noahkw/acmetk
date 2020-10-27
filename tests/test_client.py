@@ -29,6 +29,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
         self.log = logging.getLogger(f'acme_broker.tests.{self.name}')
+        logging.getLogger('asyncio').setLevel(logging.INFO)
         self.contact = f'woehler+{self.name}@luis.uni-hannover.de'
         dir_ = Path('./tmp') / self.name
         if not dir_.exists():
