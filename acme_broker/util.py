@@ -41,12 +41,10 @@ def serialize_key(pk):
 
 
 def serialize_pubkey(pubkey):
-    bytes = pubkey.public_bytes(
+    return pubkey.public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
-
-    return bytes
 
 
 def deserialize_pubkey(pem):

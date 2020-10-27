@@ -6,7 +6,8 @@ from .base import Base, Serializer
 from ..util import serialize_pubkey, deserialize_pubkey
 
 
-class AccountStatus(enum.Enum):
+class AccountStatus(str, enum.Enum):
+    # subclassing str simplifies json serialization using json.dumps
     VALID = 'valid'
     DEACTIVATED = 'deactivated'
     REVOKED = 'revoked'
@@ -34,7 +35,6 @@ class Account(Base, Serializer):
         return f'<Account(key="{self.key}", status="{self.status}", contact="{self.contact}", ' \
                f'termsOfServiceAgreed="{self.termsOfServiceAgreed}")>'
 
-    def serialize(self):
-        d = Serializer.serialize(self)
-        del d['key']
+    def serialize(self, ignore=['key']):
+        d = Serializer.serialize(self, ignore=ignore)
         return d

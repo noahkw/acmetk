@@ -182,11 +182,11 @@ class AcmeCA:
                                                  contact=json.dumps(reg.contact),
                                                  termsOfServiceAgreed=reg.terms_of_service_agreed)
                     serialized = new_account.serialize()
-                    session.add(account)
+                    session.add(new_account)
 
                     await session.commit()
                     return AcmeResponse.json(serialized, nonce=self._issue_nonce(), headers={
-                        'Cache-Control': 'no-store', 'Location': self.url_for(request, '/acme')
+                        'Cache-Control': 'no-store', 'Location': self.url_for(request, 'acme')
                     })
 
 
