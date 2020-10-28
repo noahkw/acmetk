@@ -5,6 +5,7 @@ import logging
 import shlex
 import shutil
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 import josepy
@@ -92,6 +93,42 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
             assert result.key == account.key
             assert account.serialize() == result.serialize()
 
+            await session.commit()
+
+    async def test_add_order(self):
+        with open(r'test_account.pub', 'rb') as pem:
+            b = pem.read()
+
+        pubkey = acme_broker.util.deserialize_pubkey(b)
+
+        async with self.ca._session() as session:
+            wrapped_key = josepy.util.ComparableRSAKey(pubkey)
+            account = models.Account(key=wrapped_key,
+                                     kid=util.sha256_hex_digest(util.serialize_pubkey(wrapped_key)),
+                                     status=models.AccountStatus.VALID,
+                                     contact=json.dumps(()))
+            # session.add(account)
+
+            identifiers = [
+                models.Identifier(
+                    type=models.IdentifierType.DNS,
+                    value='test.uni-hannover.de'
+                ),
+                models.Identifier(
+                    type=models.IdentifierType.DNS,
+                    value='test2.uni-hannover.de'
+                ),
+            ]
+
+            order = models.Order(status=models.OrderStatus.PENDING,
+                                 expires=datetime(2020, 11, 20),
+                                 identifiers=identifiers,
+                                 notBefore=datetime(2020, 10, 28),
+                                 notAfter=datetime(2020, 12, 31),
+                                 account=account)
+            session.add(order)
+
+            assert len(account.orders[0].identifiers) == 2
             await session.commit()
 
 

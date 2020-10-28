@@ -254,6 +254,10 @@ class AcmeCA:
 
     @middleware
     async def _error_middleware(self, request, handler):
+        """
+        Converts errors thrown in handlers to ACME compliant JSON and
+        attaches the specified status code to the response.
+        """
         try:
             response = await handler(request)
         except acme.messages.errors.Error as error:

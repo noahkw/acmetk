@@ -2,6 +2,7 @@ import enum
 
 import josepy
 from sqlalchemy import Column, Enum, String, types
+from sqlalchemy.orm import relationship
 
 from .base import Base, Serializer
 from ..util import serialize_pubkey, deserialize_pubkey
@@ -31,10 +32,11 @@ class Account(Base, Serializer):
     kid = Column(String, primary_key=True)
     status = Column('status', Enum(AccountStatus))
     contact = Column(String)
+    orders = relationship('Order', cascade='all, delete', back_populates='account')
 
     def __repr__(self):
         return f'<Account(kid="{self.kid}", key="{self.key}", status="{self.status}", contact="{self.contact}")>'
 
-    def serialize(self, ignore=['key', 'kid']):
+    def serialize(self, ignore=['key', 'kid', 'orders']):
         d = Serializer.serialize(self, ignore=ignore)
         return d
