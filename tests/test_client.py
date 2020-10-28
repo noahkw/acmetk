@@ -45,6 +45,11 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
 
         self._rmtree = ['the.csr']
 
+        with open(r'test_account.pub', 'rb') as pem:
+            b = pem.read()
+
+        self.pubkey = josepy.util.ComparableRSAKey(acme_broker.util.deserialize_pubkey(b))
+
     def tearDown(self):
         for i in self._rmtree:
             if Path(i).is_absolute():
@@ -74,20 +79,14 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         pass
 
     async def test_add_account(self):
-        with open(r'test_account.pub', 'rb') as pem:
-            b = pem.read()
-
-        pubkey = acme_broker.util.deserialize_pubkey(b)
-
         async with self.ca._session() as session:
-            wrapped_key = josepy.util.ComparableRSAKey(pubkey)
-            account = models.Account(key=wrapped_key,
-                                     kid=util.sha256_hex_digest(util.serialize_pubkey(wrapped_key)),
+            account = models.Account(key=self.pubkey,
+                                     kid=util.sha256_hex_digest(util.serialize_pubkey(self.pubkey)),
                                      status=models.AccountStatus.VALID,
                                      contact=json.dumps(()))
             session.add(account)
 
-            result = await self.ca._db.get_account(session, pubkey)
+            result = await self.ca._db.get_account(session, self.pubkey)
 
             assert acme_broker.util.serialize_pubkey(result.key) == acme_broker.util.serialize_pubkey(account.key)
             assert result.key == account.key
@@ -95,16 +94,10 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
 
             await session.commit()
 
-    async def test_add_order(self):
-        with open(r'test_account.pub', 'rb') as pem:
-            b = pem.read()
-
-        pubkey = acme_broker.util.deserialize_pubkey(b)
-
+    async def test_add_order_authz(self):
         async with self.ca._session() as session:
-            wrapped_key = josepy.util.ComparableRSAKey(pubkey)
-            account = models.Account(key=wrapped_key,
-                                     kid=util.sha256_hex_digest(util.serialize_pubkey(wrapped_key)),
+            account = models.Account(key=self.pubkey,
+                                     kid=util.sha256_hex_digest(util.serialize_pubkey(self.pubkey)),
                                      status=models.AccountStatus.VALID,
                                      contact=json.dumps(()))
             # session.add(account)
@@ -112,11 +105,17 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
             identifiers = [
                 models.Identifier(
                     type=models.IdentifierType.DNS,
-                    value='test.uni-hannover.de'
+                    value='test.uni-hannover.de',
+                    authorizations=[
+                        models.Authorization(status=models.AuthorizationStatus.PENDING, wildcard=False),
+                    ],
                 ),
                 models.Identifier(
                     type=models.IdentifierType.DNS,
-                    value='test2.uni-hannover.de'
+                    value='test2.uni-hannover.de',
+                    authorizations=[
+                        models.Authorization(status=models.AuthorizationStatus.VALID, wildcard=False),
+                    ],
                 ),
             ]
 
@@ -128,7 +127,8 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
                                  account=account)
             session.add(order)
 
-            assert len(account.orders[0].identifiers) == 2
+            self.assertEqual(len(account.orders[0].identifiers), 2)
+            self.assertFalse(account.orders[0].identifiers[1].authorizations[0].wildcard)
             await session.commit()
 
 

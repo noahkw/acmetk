@@ -230,11 +230,13 @@ class AcmeCA:
         async with self._session() as session:
             account = await self._db.get_account(session, kid=kid)
             if not account:
+                logger.info('Could not find account with kid %s', kid)
                 raise acme.messages.Error.with_code('accountDoesNotExist')
 
             upd = acme.messages.Registration.json_loads(jws.payload)
 
             if contact := upd.contact:
+                logger.debug('Updating contact info for account %s: %s', kid, contact)
                 account.contact = json.dumps(contact)
 
             serialized = account.serialize()
