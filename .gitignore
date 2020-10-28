@@ -149,3 +149,6 @@ dmypy.json
 
 # config
 config.ini
+
+# db
+db_data/
