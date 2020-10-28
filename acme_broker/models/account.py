@@ -27,6 +27,7 @@ class ComparableRSAKeyType(types.TypeDecorator):
 
 class Account(Base, Serializer):
     __tablename__ = 'accounts'
+    IGNORE = ['key', 'kid', 'orders']
 
     key = Column(ComparableRSAKeyType)
     kid = Column(String, primary_key=True)
@@ -37,6 +38,6 @@ class Account(Base, Serializer):
     def __repr__(self):
         return f'<Account(kid="{self.kid}", key="{self.key}", status="{self.status}", contact="{self.contact}")>'
 
-    def serialize(self, ignore=['key', 'kid', 'orders']):
-        d = Serializer.serialize(self, ignore=ignore)
+    def serialize(self):
+        d = Serializer.serialize(self)
         return d

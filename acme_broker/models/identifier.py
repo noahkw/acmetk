@@ -14,6 +14,7 @@ class IdentifierType(str, enum.Enum):
 
 class Identifier(Base, Serializer):
     __tablename__ = 'identifiers'
+    IGNORE = ['id', 'order', 'order_id', 'authorizations']
 
     id = Column(Integer, primary_key=True)
     type = Column('type', Enum(IdentifierType))
@@ -25,3 +26,15 @@ class Identifier(Base, Serializer):
     def __repr__(self):
         return f'<Identifier(id="{self.id}", type="{self.type}", value="{self.value}", ' \
                f'order="{self.order}", authorizations="{self.authorizations}")>'
+
+    def serialize(self):
+        d = Serializer.serialize(self)
+        # d['authorizations'] = Serializer.serialize_list(self.authorizations)
+        return d
+
+    @classmethod
+    def from_obj(cls, obj):
+        return cls(
+            type=IdentifierType(obj.typ.name),
+            value=obj.value
+        )

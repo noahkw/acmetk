@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
-from acme_broker.models import Account
+from acme_broker.models import Account, Identifier, Order, Authorization
 from acme_broker.models.base import Base
 
 
@@ -26,6 +26,16 @@ class Database:
         statement = select(Account).filter(
             (Account.key == key) | (Account.kid == kid)
         )
+        result = (await session.execute(statement)).first()
+
+        return result[0] if result else None
+
+    async def get_authz(self, session, kid, authz_id):
+        statement = select(Authorization) \
+            .join(Identifier) \
+            .join(Order) \
+            .join(Account) \
+            .filter((kid == Account.kid) & (Authorization.id == authz_id))
         result = (await session.execute(statement)).first()
 
         return result[0] if result else None

@@ -137,6 +137,10 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(account.orders[0].identifiers[1].authorizations[0].wildcard)
             self.assertEqual(account.orders[0].identifiers[0].authorizations[0].challenges[0].type,
                              models.ChallengeType.HTTP_01)
+
+            await session.flush()
+            self.assertIsNotNone(account.orders[0].identifiers[1].authorizations[0].id)
+
             await session.commit()
 
 

@@ -5,8 +5,10 @@ Base = declarative_base()
 
 
 class Serializer(object):
-    def serialize(self, ignore=None):
-        return {c: getattr(self, c) for c in inspect(self).attrs.keys() if c not in ignore}
+    IGNORE = []
+
+    def serialize(self):
+        return {c: getattr(self, c) for c in inspect(self).attrs.keys() if c not in self.IGNORE}
 
     @staticmethod
     def serialize_list(l):

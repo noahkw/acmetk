@@ -61,3 +61,16 @@ def sha256_hex_digest(data):
     digest = hashes.Hash(hashes.SHA256())
     digest.update(data)
     return digest.finalize().hex()
+
+
+def build_url(r, app, p, **kwargs):
+    return str(r.url.with_path(str(app.router[p].url_for(**kwargs))))
+
+
+def url_for(r, p, **kwargs):
+    try:
+        return build_url(r, r.app, p, **kwargs)
+    except KeyError:
+        # search subapps for route
+        for subapp in r.app._subapps:
+            return build_url(r, subapp, p, **kwargs)

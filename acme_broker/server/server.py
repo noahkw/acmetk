@@ -12,7 +12,7 @@ from cryptography.exceptions import InvalidSignature
 
 from acme_broker import models
 from acme_broker.database import Database
-from acme_broker.util import generate_nonce, sha256_hex_digest, serialize_pubkey
+from acme_broker.util import generate_nonce, sha256_hex_digest, serialize_pubkey, url_for
 
 logger = logging.getLogger(__name__)
 
@@ -44,19 +44,6 @@ class AcmeResponse(web.Response):
                             headers=headers, content_type=content_type, nonce=nonce)
 
 
-def build_url(r, app, p, **kwargs):
-    return str(r.url.with_path(str(app.router[p].url_for(**kwargs))))
-
-
-def url_for(r, p, **kwargs):
-    try:
-        return build_url(r, r.app, p, **kwargs)
-    except KeyError:
-        # search subapps for route
-        for subapp in r.app._subapps:
-            return build_url(r, subapp, p, **kwargs)
-
-
 class AcmeCA:
     def __init__(self, host, base_route='/acme'):
         self._host = host
@@ -71,6 +58,8 @@ class AcmeCA:
             web.post('/new-order', self._new_order, name='new-order'),
             web.post('/revoke-cert', self._revoke_cert, name='revoke-cert'),
             web.post('/accounts/{kid}', self._accounts, name='accounts'),
+            web.post('/authz/{id}', self._authz, name='authz'),
+            web.post('/challenge/{id}', self._challenge, name='challenge'),
 
         ])
         self.ca_app.router.add_route('GET', '/new-nonce', self._new_nonce)
@@ -167,10 +156,14 @@ class AcmeCA:
                 jws.verify(sig.combined.jwk)
             except InvalidSignature:
                 raise acme.messages.Error.with_code('badPublicKey')
+            else:
+                kid = None
+        elif sig.combined.kid:
+            kid = sig.combined.kid.split('/')[-1]
         else:
-            pass
+            raise acme.messages.Error.with_code('malformed')
 
-        return jws
+        return jws, kid
 
     async def _get_directory(self, request):
         directory = acme.messages.Directory({
@@ -188,7 +181,7 @@ class AcmeCA:
         }, nonce=self._issue_nonce())
 
     async def _new_account(self, request):
-        jws = await self._verify_request(request, key_auth=True)
+        jws, _ = await self._verify_request(request, key_auth=True)
         reg = acme.messages.Registration.json_loads(jws.payload)
 
         key = jws.signature.combined.jwk.key
@@ -222,7 +215,7 @@ class AcmeCA:
                     })
 
     async def _accounts(self, request):
-        jws = await self._verify_request(request)
+        jws, kid = await self._verify_request(request)
         kid = request.match_info['kid']
 
         assert url_for(request, 'accounts', kid=kid) == jws.signature.combined.kid
@@ -245,12 +238,40 @@ class AcmeCA:
             return AcmeResponse.json(serialized, status=200, nonce=self._issue_nonce())
 
     async def _new_order(self, request):
-        jws = await self._verify_request(request)
+        jws, kid = await self._verify_request(request)
+        obj = acme.messages.NewOrder.json_loads(jws.payload)
 
+        async with self._session() as session:
+            account = await self._db.get_account(session, kid=kid)
+            order = models.Order.from_obj(account, obj)
+            session.add(order)
+
+            for identifier in order.identifiers:
+                authorization = models.Authorization.from_identifier(identifier)
+                session.add(authorization)
+
+            await session.flush()
+            serialized = order.serialize(request=request)
+
+            await session.commit()
+
+        return AcmeResponse.json(serialized, status=201, nonce=self._issue_nonce())
+
+    async def _authz(self, request):
+        jws, kid = await self._verify_request(request)
+        authz_id = request.match_info['id']
+
+        async with self._session() as session:
+            authorization = await self._db.get_authz(session, kid, authz_id)
+            serialized = authorization.serialize()
+
+        return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
+
+    async def _challenge(self, request):
         return AcmeResponse(nonce=self._issue_nonce(), status=404)
 
     async def _revoke_cert(self, request):
-        jws = await self._verify_request(request, key_auth=True)
+        jws, kid = await self._verify_request(request, key_auth=True)
 
         return AcmeResponse(nonce=self._issue_nonce(), status=404)
 
