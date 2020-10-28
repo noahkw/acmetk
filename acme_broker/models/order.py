@@ -31,4 +31,5 @@ class Order(Base, Serializer):
 
     def __repr__(self):
         return f'<Order(id="{self.id}", status="{self.status}", expires="{self.expires}", ' \
-               f'identifiers="{self.identifiers}", notBefore="{self.notBefore}", notAfter="{self.notAfter}")>'
+               f'identifiers="{self.identifiers}", notBefore="{self.notBefore}", notAfter="{self.notAfter}", ' \
+               f'accounts="{self.account}")>'

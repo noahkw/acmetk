@@ -27,7 +27,9 @@ class Authorization(Base, Serializer):
     status = Column('status', Enum(AuthorizationStatus), nullable=False)
     expires = Column(DateTime)
     wildcard = Column(Boolean, nullable=False)
+    challenges = relationship('Challenge', cascade='all, delete', back_populates='authorization')
 
     def __repr__(self):
         return f'<Authorization(id="{self.id}", status="{self.status}", expires="{self.expires}", ' \
-               f'identifier="{self.identifier}", order="{self.order}", wildcard="{self.wildcard}")>'
+               f'identifier="{self.identifier}", order="{self.order}", wildcard="{self.wildcard}, ' \
+               f'challenges="{self.challenges}")>'

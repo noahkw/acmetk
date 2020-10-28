@@ -21,3 +21,7 @@ class Identifier(Base, Serializer):
     order_id = Column(UUID(as_uuid=True), ForeignKey('orders.id'), nullable=False)
     order = relationship('Order', back_populates='identifiers')
     authorizations = relationship('Authorization', cascade='all, delete', back_populates='identifier')
+
+    def __repr__(self):
+        return f'<Identifier(id="{self.id}", type="{self.type}", value="{self.value}", ' \
+               f'order="{self.order}", authorizations="{self.authorizations}")>'
