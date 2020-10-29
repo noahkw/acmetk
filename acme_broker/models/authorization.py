@@ -29,9 +29,9 @@ class Authorization(Base, Serializer):
     status = Column('status', Enum(AuthorizationStatus), nullable=False)
     expires = Column(DateTime)
     wildcard = Column(Boolean, nullable=False)
-    challenges = relationship('Challenge', cascade='all, delete', back_populates='authorization')
+    challenges = relationship('Challenge', cascade='all, delete', back_populates='authorization', lazy='joined')
 
-    def url(self, request=None):
+    def url(self, request):
         return url_for(request, 'authz', id=str(self.id))
 
     def __repr__(self):
@@ -39,9 +39,9 @@ class Authorization(Base, Serializer):
                f'identifier="{self.identifier}", order="{self.order}", wildcard="{self.wildcard}, ' \
                f'challenges="{self.challenges}")>'
 
-    def serialize(self):
+    def serialize(self, request=None):
         d = Serializer.serialize(self)
-        # d['challenges'] = Serializer.serialize_list(self.challenges)
+        d['challenges'] = Serializer.serialize_list(self.challenges, request=request)
         d['identifier'] = self.identifier.serialize()
         return d
 

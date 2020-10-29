@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import typing
@@ -56,6 +57,7 @@ class AcmeCA:
             web.post('/new-account', self._new_account, name='new-account'),
             web.head('/new-nonce', self._new_nonce, name='new-nonce'),
             web.post('/new-order', self._new_order, name='new-order'),
+            web.post('/order/{id}/finalize', self._finalize_order, name='finalize-order'),
             web.post('/revoke-cert', self._revoke_cert, name='revoke-cert'),
             web.post('/accounts/{kid}', self._accounts, name='accounts'),
             web.post('/authz/{id}', self._authz, name='authz'),
@@ -248,6 +250,7 @@ class AcmeCA:
 
             for identifier in order.identifiers:
                 authorization = models.Authorization.from_identifier(identifier)
+                challenges = models.Challenge.all_challenges_from_authz(authorization)
                 session.add(authorization)
 
             await session.flush()
@@ -263,14 +266,30 @@ class AcmeCA:
 
         async with self._session() as session:
             authorization = await self._db.get_authz(session, kid, authz_id)
-            serialized = authorization.serialize()
+            serialized = authorization.serialize(request=request)
 
         return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
 
     async def _challenge(self, request):
-        return AcmeResponse(nonce=self._issue_nonce(), status=404)
+        jws, kid = await self._verify_request(request)
+        challenge_id = request.match_info['id']
+
+        async with self._session() as session:
+            challenge = await self._db.get_challenge(session, kid, challenge_id)
+            # TODO: validate challenge, simulate HTTP request by sleeping
+            await asyncio.sleep(1)
+            challenge.status = models.ChallengeStatus.VALID
+            serialized = challenge.serialize(request=request)
+            await session.commit()
+
+        return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
 
     async def _revoke_cert(self, request):
+        jws, kid = await self._verify_request(request, key_auth=True)
+
+        return AcmeResponse(nonce=self._issue_nonce(), status=404)
+
+    async def _finalize_order(self, request):
         jws, kid = await self._verify_request(request, key_auth=True)
 
         return AcmeResponse(nonce=self._issue_nonce(), status=404)

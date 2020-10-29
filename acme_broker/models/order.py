@@ -42,7 +42,7 @@ class Order(Base, Serializer):
 
         authorizations = []
         for identifier in self.identifiers:
-            authorizations.extend([authorization.url(request=request) for authorization in identifier.authorizations])
+            authorizations.extend([authorization.url(request) for authorization in identifier.authorizations])
 
         d['authorizations'] = authorizations
         return d

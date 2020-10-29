@@ -27,7 +27,7 @@ class Identifier(Base, Serializer):
         return f'<Identifier(id="{self.id}", type="{self.type}", value="{self.value}", ' \
                f'order="{self.order}", authorizations="{self.authorizations}")>'
 
-    def serialize(self):
+    def serialize(self, request=None):
         d = Serializer.serialize(self)
         # d['authorizations'] = Serializer.serialize_list(self.authorizations)
         return d

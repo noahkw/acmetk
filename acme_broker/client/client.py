@@ -26,17 +26,16 @@ Workflow:
 """
 from contextlib import contextmanager
 
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric import rsa
-import josepy as jose
 import OpenSSL
-
+import josepy as jose
 from acme import challenges
 from acme import client
 from acme import crypto_util
 from acme import errors
 from acme import messages
 from acme import standalone
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 # Constants:
 

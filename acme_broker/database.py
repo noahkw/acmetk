@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 
-from acme_broker.models import Account, Identifier, Order, Authorization
+from acme_broker.models import Account, Identifier, Order, Authorization, Challenge
 from acme_broker.models.base import Base
 
 
@@ -36,6 +36,17 @@ class Database:
             .join(Order) \
             .join(Account) \
             .filter((kid == Account.kid) & (Authorization.id == authz_id))
+        result = (await session.execute(statement)).first()
+
+        return result[0] if result else None
+
+    async def get_challenge(self, session, kid, challenge_id):
+        statement = select(Challenge) \
+            .join(Authorization) \
+            .join(Identifier) \
+            .join(Order) \
+            .join(Account) \
+            .filter((kid == Account.kid) & (Challenge.id == challenge_id))
         result = (await session.execute(statement)).first()
 
         return result[0] if result else None

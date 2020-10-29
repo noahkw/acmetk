@@ -125,6 +125,21 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
                 ),
             ]
 
+            identifier = models.Identifier(type=models.IdentifierType.DNS, value='test3.uni-hannover.de')
+            authorization = models.Authorization.from_identifier(identifier)
+            challenges = [
+                models.Challenge.from_authorization(authorization, models.ChallengeType.HTTP_01),
+                models.Challenge.from_authorization(authorization, models.ChallengeType.DNS_01),
+            ]
+
+            identifiers.append(identifier)
+
+            identifier2 = models.Identifier(type=models.IdentifierType.DNS, value='test4.uni-hannover.de')
+            authorization = models.Authorization.from_identifier(identifier2)
+            challenges = models.Challenge.all_challenges_from_authz(authorization)
+
+            identifiers.append(identifier2)
+
             order = models.Order(status=models.OrderStatus.PENDING,
                                  expires=datetime(2020, 11, 20),
                                  identifiers=identifiers,
@@ -133,13 +148,15 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
                                  account=account)
             session.add(order)
 
-            self.assertEqual(len(account.orders[0].identifiers), 2)
+            self.assertEqual(len(account.orders[0].identifiers), 4)
             self.assertFalse(account.orders[0].identifiers[1].authorizations[0].wildcard)
             self.assertEqual(account.orders[0].identifiers[0].authorizations[0].challenges[0].type,
                              models.ChallengeType.HTTP_01)
 
             await session.flush()
             self.assertIsNotNone(account.orders[0].identifiers[1].authorizations[0].id)
+            self.assertNotEqual(account.orders[0].identifiers[3].authorizations[0].challenges[0].type,
+                                account.orders[0].identifiers[3].authorizations[0].challenges[1].type)
 
             await session.commit()
 

@@ -38,6 +38,6 @@ class Account(Base, Serializer):
     def __repr__(self):
         return f'<Account(kid="{self.kid}", key="{self.key}", status="{self.status}", contact="{self.contact}")>'
 
-    def serialize(self):
+    def serialize(self, request=None):
         d = Serializer.serialize(self)
         return d
