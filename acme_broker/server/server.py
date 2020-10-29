@@ -14,7 +14,8 @@ from cryptography.exceptions import InvalidSignature
 
 from acme_broker import models
 from acme_broker.database import Database
-from acme_broker.util import generate_nonce, sha256_hex_digest, serialize_pubkey, url_for
+from acme_broker.util import generate_nonce, sha256_hex_digest, serialize_pubkey, url_for, generate_root_cert, \
+    generate_cert_from_csr, serialize_cert
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,7 @@ class AcmeCA:
             web.post('/accounts/{kid}', self._accounts, name='accounts'),
             web.post('/authz/{id}', self._authz, name='authz'),
             web.post('/challenge/{id}', self._challenge, name='challenge'),
+            web.post('/certificate/{id}', self._certificate, name='certificate'),
 
         ])
         self.ca_app.router.add_route('GET', '/new-nonce', self._new_nonce)
@@ -82,6 +84,9 @@ class AcmeCA:
 
         self._db: typing.Optional[Database] = None
         self._session = None
+
+        # TODO: add possibility to persist/load root cert
+        self.root_cert, self.root_key = generate_root_cert('DE', 'Lower Saxony', 'Hanover', 'Acme Broker', 'AB CA')
 
     @classmethod
     async def runner(cls, hostname='localhost', **kwargs):
@@ -198,7 +203,7 @@ class AcmeCA:
                     raise acme.messages.Error.with_code('unauthorized')
                 else:
                     return AcmeResponse.json(account.serialize(), nonce=self._issue_nonce(),
-                                             headers={'Location': url_for(request, 'accounts', account=account)})
+                                             headers={'Location': url_for(request, 'accounts', kid=account.kid)})
             else:
                 if reg.only_return_existing:
                     raise acme.messages.Error.with_code('accountDoesNotExist')
@@ -257,10 +262,11 @@ class AcmeCA:
 
             await session.flush()
             serialized = order.serialize(request=request)
-
+            order_id = order.id
             await session.commit()
 
-        return AcmeResponse.json(serialized, status=201, nonce=self._issue_nonce())
+        return AcmeResponse.json(serialized, status=201, nonce=self._issue_nonce(),
+                                 headers={'Location': url_for(request, 'order', id=str(order_id))})
 
     async def _authz(self, request):
         jws, kid = await self._verify_request(request)
@@ -315,15 +321,30 @@ class AcmeCA:
             order = await self._db.get_order(session, kid, order_id)
             status = await order.finalize(session)
 
-            if status != models.OrderStatus.READY:
+            if status != models.OrderStatus.VALID:
                 raise acme.messages.Error.with_code('orderNotReady')
 
+            obj = json.loads(jws.payload)
+            csr = josepy.decode_csr(obj['csr'])
+
+            cert = generate_cert_from_csr(csr, self.root_cert, self.root_key)
+            order.certificate = serialize_cert(cert)
+
+            serialized = order.serialize(request=request)
             await session.commit()
 
-        obj = json.loads(jws.payload)
-        csr = josepy.decode_csr(obj['csr'])
+        return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200,
+                                 headers={'Location': url_for(request, 'order', id=order_id)})
 
-        return AcmeResponse(nonce=self._issue_nonce(), status=404)
+    async def _certificate(self, request):
+        jws, kid = await self._verify_request(request, key_auth=False)
+        certificate_id = request.match_info['id']
+
+        async with self._session() as session:
+            order = await self._db.get_order(session, kid, certificate_id)
+            certificate = order.certificate
+
+        return AcmeResponse(text=certificate.decode(), nonce=self._issue_nonce(), status=200)
 
     @middleware
     async def _error_middleware(self, request, handler):

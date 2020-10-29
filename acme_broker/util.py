@@ -1,5 +1,6 @@
 import typing
 import uuid
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from cryptography import x509
@@ -74,3 +75,50 @@ def url_for(r, p, **kwargs):
         # search subapps for route
         for subapp in r.app._subapps:
             return build_url(r, subapp, p, **kwargs)
+
+
+def serialize_cert(cert):
+    return cert.public_bytes(serialization.Encoding.PEM)
+
+
+def generate_cert_from_csr(csr, root_cert, root_key):
+    if getattr(csr, 'wrapped'):
+        csr = csr.wrapped.to_cryptography()
+
+    cert = x509.CertificateBuilder() \
+        .subject_name(csr.subject) \
+        .issuer_name(root_cert.issuer) \
+        .public_key(csr.public_key()) \
+        .serial_number(x509.random_serial_number()) \
+        .not_valid_before(datetime.utcnow()) \
+        .not_valid_after(datetime.utcnow() + timedelta(days=180)) \
+        .sign(root_key, hashes.SHA256())
+
+    # .add_extension(x509.SubjectAlternativeName([x509.DNSName(name) for name in csr.subject.rdns]), critical=False) \
+
+    return cert
+
+
+def generate_root_cert(country, state, locality, org_name, common_name):
+    root_key = generate_rsa_key(Path('root.key'))
+
+    subject = x509.Name([
+        x509.NameAttribute(NameOID.COUNTRY_NAME, country),
+        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, state),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, locality),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, org_name),
+        x509.NameAttribute(NameOID.LOCALITY_NAME, common_name),
+    ])
+
+    root_cert_builder = x509.CertificateBuilder() \
+        .subject_name(subject) \
+        .issuer_name(subject) \
+        .public_key(root_key.public_key()) \
+        .serial_number(x509.random_serial_number()) \
+        .not_valid_before(datetime.utcnow()) \
+        .not_valid_after(datetime.utcnow() + timedelta(days=365 * 4)) \
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+
+    root_cert = root_cert_builder.sign(root_key, hashes.SHA256())
+
+    return root_cert, root_key

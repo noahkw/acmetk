@@ -1,7 +1,7 @@
 import enum
 import uuid
 
-from sqlalchemy import Column, Enum, DateTime, String, ForeignKey
+from sqlalchemy import Column, Enum, DateTime, String, ForeignKey, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -21,7 +21,7 @@ class OrderStatus(str, enum.Enum):
 
 class Order(Base, Serializer):
     __tablename__ = 'orders'
-    IGNORE = ['id', 'account', 'account_kid', 'identifiers']
+    IGNORE = ['id', 'account', 'account_kid', 'identifiers', 'certificate']
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True)
     status = Column('status', Enum(OrderStatus), nullable=False)
@@ -31,9 +31,13 @@ class Order(Base, Serializer):
     notAfter = Column(DateTime)
     account_kid = Column(String, ForeignKey('accounts.kid'), nullable=False)
     account = relationship('Account', back_populates='orders')
+    certificate = Column(LargeBinary)
 
     def finalize_url(self, request):
         return url_for(request, 'finalize-order', id=str(self.id))
+
+    def certificate_url(self, request):
+        return url_for(request, 'certificate', id=str(self.id))
 
     async def finalize(self, session):
         all_valid = True
@@ -44,7 +48,7 @@ class Order(Base, Serializer):
                     all_valid = False
                     break
 
-        self.status = OrderStatus.READY if all_valid else self.status
+        self.status = OrderStatus.VALID if all_valid else self.status
         return self.status
 
     def __repr__(self):
@@ -63,6 +67,10 @@ class Order(Base, Serializer):
 
         d['authorizations'] = authorizations
         d['finalize'] = self.finalize_url(request)
+
+        if self.status == OrderStatus.VALID:
+            d['certificate'] = self.certificate_url(request)
+
         return d
 
     @classmethod
