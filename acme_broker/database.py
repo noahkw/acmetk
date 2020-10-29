@@ -50,3 +50,11 @@ class Database:
         result = (await session.execute(statement)).first()
 
         return result[0] if result else None
+
+    async def get_order(self, session, kid, order_id):
+        statement = select(Order) \
+            .join(Account) \
+            .filter((kid == Account.kid) & (order_id == Order.id))
+        result = (await session.execute(statement)).first()
+
+        return result[0] if result else None

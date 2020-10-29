@@ -1,10 +1,11 @@
 import enum
 import uuid
 
-from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer, Boolean
+from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer, Boolean, delete
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
+from . import ChallengeStatus, Challenge
 from .base import Base, Serializer
 from ..util import url_for
 
@@ -33,6 +34,21 @@ class Authorization(Base, Serializer):
 
     def url(self, request):
         return url_for(request, 'authz', id=str(self.id))
+
+    async def finalize(self, session):
+        # check whether at least one challenge is valid
+        for challenge in self.challenges:
+            if challenge.status == ChallengeStatus.VALID:
+                self.status = AuthorizationStatus.VALID
+                break
+
+        # delete all other challenges
+        if self.status == AuthorizationStatus.VALID:
+            statement = delete(Challenge) \
+                .filter((Challenge.authorization_id == self.id) & (Challenge.status != ChallengeStatus.VALID))
+            await session.execute(statement)
+
+        return self.status
 
     def __repr__(self):
         return f'<Authorization(id="{self.id}", status="{self.status}", expires="{self.expires}", ' \

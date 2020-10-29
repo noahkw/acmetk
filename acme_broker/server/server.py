@@ -5,6 +5,7 @@ import typing
 from typing import Any, Optional
 
 import acme.messages
+import josepy
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.typedefs import JSONEncoder, LooseHeaders
@@ -57,6 +58,7 @@ class AcmeCA:
             web.post('/new-account', self._new_account, name='new-account'),
             web.head('/new-nonce', self._new_nonce, name='new-nonce'),
             web.post('/new-order', self._new_order, name='new-order'),
+            web.post('/order/{id}', self._order, name='order'),
             web.post('/order/{id}/finalize', self._finalize_order, name='finalize-order'),
             web.post('/revoke-cert', self._revoke_cert, name='revoke-cert'),
             web.post('/accounts/{kid}', self._accounts, name='accounts'),
@@ -266,7 +268,9 @@ class AcmeCA:
 
         async with self._session() as session:
             authorization = await self._db.get_authz(session, kid, authz_id)
+            await authorization.finalize(session)
             serialized = authorization.serialize(request=request)
+            await session.commit()
 
         return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
 
@@ -289,8 +293,35 @@ class AcmeCA:
 
         return AcmeResponse(nonce=self._issue_nonce(), status=404)
 
+    async def _order(self, request):
+        jws, kid = await self._verify_request(request, key_auth=False)
+        order_id = request.match_info['id']
+
+        async with self._session() as session:
+            order = await self._db.get_order(session, kid, order_id)
+            _ = await order.finalize(session)
+            serialized = order.serialize(request)
+
+            await session.commit()
+
+        return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
+
     async def _finalize_order(self, request):
-        jws, kid = await self._verify_request(request, key_auth=True)
+        jws, kid = await self._verify_request(request, key_auth=False)
+        order_id = request.match_info['id']
+        # obj = acme.messages.CertificateRequest.json_loads(jws.payload)
+
+        async with self._session() as session:
+            order = await self._db.get_order(session, kid, order_id)
+            status = await order.finalize(session)
+
+            if status != models.OrderStatus.READY:
+                raise acme.messages.Error.with_code('orderNotReady')
+
+            await session.commit()
+
+        obj = json.loads(jws.payload)
+        csr = josepy.decode_csr(obj['csr'])
 
         return AcmeResponse(nonce=self._issue_nonce(), status=404)
 
@@ -303,7 +334,11 @@ class AcmeCA:
         try:
             response = await handler(request)
         except acme.messages.errors.Error as error:
-            return AcmeResponse.json(error.json_dumps(), status=400, nonce=self._issue_nonce(),
+            status = 400
+            if error.code == 'orderNotReady':
+                status = 403
+
+            return AcmeResponse.json(error.json_dumps(), status=status, nonce=self._issue_nonce(),
                                      content_type='application/problem+json')
         else:
             return response

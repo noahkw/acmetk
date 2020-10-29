@@ -6,7 +6,6 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 
-from . import Authorization, AuthorizationStatus
 from .base import Base, Serializer
 from ..util import url_for
 
@@ -44,8 +43,8 @@ class Challenge(Base, Serializer):
     @status.setter
     def status(self, new_status: ChallengeStatus):
         self._status = new_status
-        if new_status == ChallengeStatus.VALID:
-            self.authorization.status = AuthorizationStatus.VALID
+        # if new_status == ChallengeStatus.VALID:
+        #     self.authorization.status = AuthorizationStatus.VALID
 
     def url(self, request):
         return url_for(request, 'challenge', id=str(self.id))
@@ -61,7 +60,7 @@ class Challenge(Base, Serializer):
         return d
 
     @classmethod
-    def from_authorization(cls, authorization: Authorization, type: ChallengeType):
+    def from_authorization(cls, authorization, type: ChallengeType):
         return cls(
             authorization=authorization,
             type=type,
@@ -69,7 +68,7 @@ class Challenge(Base, Serializer):
         )
 
     @classmethod
-    def all_challenges_from_authz(cls, authorization: Authorization):
+    def all_challenges_from_authz(cls, authorization):
         return [
             cls(authorization=authorization, type=type_, status=ChallengeStatus.PENDING) for type_ in ChallengeType
         ]
