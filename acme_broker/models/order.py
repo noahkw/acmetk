@@ -21,7 +21,7 @@ class OrderStatus(str, enum.Enum):
 
 class Order(Base, Serializer):
     __tablename__ = 'orders'
-    IGNORE = ['id', 'account', 'account_kid', 'identifiers', 'certificate']
+    __serialize__ = ['status', 'expires', 'notBefore', 'notAfter']
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True)
     status = Column('status', Enum(OrderStatus), nullable=False)
@@ -50,11 +50,6 @@ class Order(Base, Serializer):
 
         self.status = OrderStatus.VALID if all_valid else self.status
         return self.status
-
-    def __repr__(self):
-        return f'<Order(id="{self.id}", status="{self.status}", expires="{self.expires}", ' \
-               f'identifiers="{self.identifiers}", notBefore="{self.notBefore}", notAfter="{self.notAfter}", ' \
-               f'accounts="{self.account}")>'
 
     def serialize(self, request=None):
         d = Serializer.serialize(self)

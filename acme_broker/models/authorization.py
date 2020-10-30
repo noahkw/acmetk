@@ -22,7 +22,7 @@ class AuthorizationStatus(str, enum.Enum):
 
 class Authorization(Base, Serializer):
     __tablename__ = 'authorizations'
-    IGNORE = ['id', 'identifier', 'identifier_id', 'challenges']
+    __serialize__ = ['status', 'expires', 'wildcard']
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
     identifier_id = Column(Integer, ForeignKey('identifiers.id'), nullable=False)
@@ -49,11 +49,6 @@ class Authorization(Base, Serializer):
             await session.execute(statement)
 
         return self.status
-
-    def __repr__(self):
-        return f'<Authorization(id="{self.id}", status="{self.status}", expires="{self.expires}", ' \
-               f'identifier="{self.identifier}", order="{self.order}", wildcard="{self.wildcard}, ' \
-               f'challenges="{self.challenges}")>'
 
     def serialize(self, request=None):
         d = Serializer.serialize(self)

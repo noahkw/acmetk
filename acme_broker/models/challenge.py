@@ -26,7 +26,7 @@ class ChallengeType(str, enum.Enum):
 
 class Challenge(Base, Serializer):
     __tablename__ = 'challenges'
-    IGNORE = ['id', 'authorization', 'authorization_id', 'token']
+    __serialize__ = ['type', 'validated', 'token']
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True)
     authorization_id = Column(UUID(as_uuid=True), ForeignKey('authorizations.id'), nullable=False)
@@ -48,10 +48,6 @@ class Challenge(Base, Serializer):
 
     def url(self, request):
         return url_for(request, 'challenge', id=str(self.id))
-
-    def __repr__(self):
-        return f'<Challenge(id="{self.id}", status="{self.status}", validated="{self.validated}", ' \
-               f'authorization="{self.authorization}", type="{self.type}", token="{self.token}")>'
 
     def serialize(self, request=None):
         d = Serializer.serialize(self)
