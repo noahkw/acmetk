@@ -5,7 +5,7 @@ from sqlalchemy import Column, Enum, DateTime, String, ForeignKey, LargeBinary
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from . import Identifier, AuthorizationStatus
+from . import Identifier, AuthorizationStatus, Authorization, Challenge
 from .base import Base, Serializer
 from ..util import url_for
 
@@ -70,9 +70,16 @@ class Order(Base, Serializer):
 
     @classmethod
     def from_obj(cls, account, obj):
-        return Order(
-            expires=obj.expires,
-            identifiers=[Identifier.from_obj(identifier) for identifier in obj.identifiers],
-            status=obj.status or OrderStatus.PROCESSING,
-            account=account
-        )
+        identifiers = [Identifier.from_obj(identifier) for identifier in obj.identifiers]
+        for identifier in identifiers:
+            identifier.authorizations = Authorization.create_all(identifier)
+
+            for authorization in identifier.authorizations:
+                authorization.challenges = Challenge.create_all()
+
+        order = Order(expires=obj.expires,
+                      status=obj.status or OrderStatus.PROCESSING,
+                      account=account,
+                      identifiers=identifiers)
+
+        return order

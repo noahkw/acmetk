@@ -57,10 +57,7 @@ class Authorization(Base, Serializer):
         return d
 
     @classmethod
-    def from_identifier(cls, identifier):
-        return cls(
-            identifier=identifier,
-            status=AuthorizationStatus.PENDING,
-            wildcard=identifier.value.startswith('*'),
-            challenges=[]
-        )
+    def create_all(cls, identifier):
+        return [
+            cls(status=AuthorizationStatus.PENDING, wildcard=identifier.value.startswith('*'))
+        ]

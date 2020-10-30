@@ -75,7 +75,7 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         await self.runner.cleanup()
 
     async def test_run(self):
-        await asyncio.sleep(600)
+        # await asyncio.sleep(600)
         pass
 
     async def test_add_account(self):
@@ -125,20 +125,14 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
                 ),
             ]
 
-            identifier = models.Identifier(type=models.IdentifierType.DNS, value='test3.uni-hannover.de')
-            authorization = models.Authorization.from_identifier(identifier)
-            challenges = [
-                models.Challenge.from_authorization(authorization, models.ChallengeType.HTTP_01),
-                models.Challenge.from_authorization(authorization, models.ChallengeType.DNS_01),
-            ]
+            identifiers_ = [models.Identifier(type=models.IdentifierType.DNS, value='test3.uni-hannover.de'), models.Identifier(type=models.IdentifierType.DNS, value='test4.uni-hannover.de')]
+            for identifier in identifiers_:
+                identifier.authorizations = models.Authorization.create_all(identifier)
 
-            identifiers.append(identifier)
+                for authorization in identifier.authorizations:
+                    authorization.challenges = models.Challenge.create_all()
 
-            identifier2 = models.Identifier(type=models.IdentifierType.DNS, value='test4.uni-hannover.de')
-            authorization = models.Authorization.from_identifier(identifier2)
-            challenges = models.Challenge.all_challenges_from_authz(authorization)
-
-            identifiers.append(identifier2)
+            identifiers.extend(identifiers_)
 
             order = models.Order(status=models.OrderStatus.PENDING,
                                  expires=datetime(2020, 11, 20),

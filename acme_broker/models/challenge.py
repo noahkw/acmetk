@@ -56,15 +56,5 @@ class Challenge(Base, Serializer):
         return d
 
     @classmethod
-    def from_authorization(cls, authorization, type: ChallengeType):
-        return cls(
-            authorization=authorization,
-            type=type,
-            status=ChallengeStatus.PENDING
-        )
-
-    @classmethod
-    def all_challenges_from_authz(cls, authorization):
-        return [
-            cls(authorization=authorization, type=type_, status=ChallengeStatus.PENDING) for type_ in ChallengeType
-        ]
+    def create_all(cls):
+        return [cls(type=type_, status=ChallengeStatus.PENDING) for type_ in ChallengeType]

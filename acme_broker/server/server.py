@@ -252,11 +252,6 @@ class AcmeCA:
             order = models.Order.from_obj(account, obj)
             session.add(order)
 
-            for identifier in order.identifiers:
-                authorization = models.Authorization.from_identifier(identifier)
-                challenges = models.Challenge.all_challenges_from_authz(authorization)
-                session.add(authorization)
-
             await session.flush()
             serialized = order.serialize(request=request)
             order_id = order.id
@@ -284,7 +279,7 @@ class AcmeCA:
 
             challenge = await self._db.get_challenge(session, account.kid, challenge_id)
             # TODO: validate challenge, simulate HTTP request by sleeping
-            await asyncio.sleep(1)
+            # await asyncio.sleep(1)
             challenge.status = models.ChallengeStatus.VALID
             serialized = challenge.serialize(request=request)
             await session.commit()
