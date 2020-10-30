@@ -131,8 +131,10 @@ class AcmeCA:
         nonce = protected.get('nonce', None)
         self._verify_nonce(nonce)
 
-        assert (sig.combined.jwk is not None) ^ (
-                sig.combined.kid is not None)  # Check whether we have *either* a jwk or a kid
+        # Check whether we have *either* a jwk or a kid
+        if not ((sig.combined.jwk is not None) ^ (sig.combined.kid is not None)):
+            raise acme.messages.Error.with_code('malformed')
+
         logger.debug('Request has a %s', 'jwk' if sig.combined.jwk else 'kid')
 
         if key_auth:
@@ -145,9 +147,10 @@ class AcmeCA:
         elif sig.combined.kid:
             kid = sig.combined.kid.split('/')[-1]
 
-            assert url_for(request, 'accounts', kid=kid) == jws.signature.combined.kid
-            if 'kid' in request.match_info:
-                assert request.match_info['kid'] == kid
+            if url_for(request, 'accounts', kid=kid) != jws.signature.combined.kid:
+                raise acme.messages.Error.with_code('malformed')
+            elif 'kid' in request.match_info and request.match_info['kid'] != kid:
+                raise acme.messages.Error.with_code('malformed')
 
             account = await self._db.get_account(session, kid=kid)
 
