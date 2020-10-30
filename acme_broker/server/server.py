@@ -143,7 +143,7 @@ class AcmeCA:
         else:
             raise acme.messages.Error.with_code('badNonce', detail=nonce)
 
-    async def _verify_request(self, request, key_auth=False):
+    async def _verify_request(self, request, session, key_auth=False):
         logger.debug('Verifying request')
 
         data = await request.text()
@@ -166,13 +166,23 @@ class AcmeCA:
             except InvalidSignature:
                 raise acme.messages.Error.with_code('badPublicKey')
             else:
-                kid = None
+                account = await self._db.get_account(session, key=sig.combined.jwk.key)
         elif sig.combined.kid:
             kid = sig.combined.kid.split('/')[-1]
+
+            assert url_for(request, 'accounts', kid=kid) == jws.signature.combined.kid
+            if 'kid' in request.match_info:
+                assert request.match_info['kid'] == kid
+
+            account = await self._db.get_account(session, kid=kid)
+
+            if not account:
+                logger.info('Could not find account with kid %s', kid)
+                raise acme.messages.Error.with_code('accountDoesNotExist')
         else:
             raise acme.messages.Error.with_code('malformed')
 
-        return jws, kid
+        return jws, account
 
     async def _get_directory(self, request):
         directory = acme.messages.Directory({
@@ -190,13 +200,10 @@ class AcmeCA:
         }, nonce=self._issue_nonce())
 
     async def _new_account(self, request):
-        jws, _ = await self._verify_request(request, key_auth=True)
-        reg = acme.messages.Registration.json_loads(jws.payload)
-
-        key = jws.signature.combined.jwk.key
-
         async with self._session() as session:
-            account = await self._db.get_account(session, key)
+            jws, account = await self._verify_request(request, session, key_auth=True)
+            reg = acme.messages.Registration.json_loads(jws.payload)
+            key = jws.signature.combined.jwk.key
 
             if account:
                 if account.status != models.AccountStatus.VALID:
@@ -224,21 +231,12 @@ class AcmeCA:
                     })
 
     async def _accounts(self, request):
-        jws, kid = await self._verify_request(request)
-        kid = request.match_info['kid']
-
-        assert url_for(request, 'accounts', kid=kid) == jws.signature.combined.kid
-
         async with self._session() as session:
-            account = await self._db.get_account(session, kid=kid)
-            if not account:
-                logger.info('Could not find account with kid %s', kid)
-                raise acme.messages.Error.with_code('accountDoesNotExist')
-
+            jws, account = await self._verify_request(request, session)
             upd = acme.messages.Registration.json_loads(jws.payload)
 
             if contact := upd.contact:
-                logger.debug('Updating contact info for account %s: %s', kid, contact)
+                logger.debug('Updating contact info for account %s: %s', account.kid, contact)
                 account.contact = json.dumps(contact)
 
             serialized = account.serialize()
@@ -247,11 +245,10 @@ class AcmeCA:
             return AcmeResponse.json(serialized, status=200, nonce=self._issue_nonce())
 
     async def _new_order(self, request):
-        jws, kid = await self._verify_request(request)
-        obj = acme.messages.NewOrder.json_loads(jws.payload)
-
         async with self._session() as session:
-            account = await self._db.get_account(session, kid=kid)
+            jws, account = await self._verify_request(request, session)
+            obj = acme.messages.NewOrder.json_loads(jws.payload)
+
             order = models.Order.from_obj(account, obj)
             session.add(order)
 
@@ -269,11 +266,11 @@ class AcmeCA:
                                  headers={'Location': url_for(request, 'order', id=str(order_id))})
 
     async def _authz(self, request):
-        jws, kid = await self._verify_request(request)
-        authz_id = request.match_info['id']
-
         async with self._session() as session:
-            authorization = await self._db.get_authz(session, kid, authz_id)
+            jws, account = await self._verify_request(request, session)
+            authz_id = request.match_info['id']
+
+            authorization = await self._db.get_authz(session, account.kid, authz_id)
             await authorization.finalize(session)
             serialized = authorization.serialize(request=request)
             await session.commit()
@@ -281,11 +278,11 @@ class AcmeCA:
         return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
 
     async def _challenge(self, request):
-        jws, kid = await self._verify_request(request)
-        challenge_id = request.match_info['id']
-
         async with self._session() as session:
-            challenge = await self._db.get_challenge(session, kid, challenge_id)
+            jws, account = await self._verify_request(request, session)
+            challenge_id = request.match_info['id']
+
+            challenge = await self._db.get_challenge(session, account.kid, challenge_id)
             # TODO: validate challenge, simulate HTTP request by sleeping
             await asyncio.sleep(1)
             challenge.status = models.ChallengeStatus.VALID
@@ -295,16 +292,17 @@ class AcmeCA:
         return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
 
     async def _revoke_cert(self, request):
-        jws, kid = await self._verify_request(request, key_auth=True)
+        async with self._session() as session:
+            jws, account = await self._verify_request(request, session, key_auth=True)
 
         return AcmeResponse(nonce=self._issue_nonce(), status=404)
 
     async def _order(self, request):
-        jws, kid = await self._verify_request(request, key_auth=False)
-        order_id = request.match_info['id']
-
         async with self._session() as session:
-            order = await self._db.get_order(session, kid, order_id)
+            jws, account = await self._verify_request(request, session, key_auth=False)
+            order_id = request.match_info['id']
+
+            order = await self._db.get_order(session, account.kid, order_id)
             _ = await order.finalize(session)
             serialized = order.serialize(request)
 
@@ -313,12 +311,12 @@ class AcmeCA:
         return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
 
     async def _finalize_order(self, request):
-        jws, kid = await self._verify_request(request, key_auth=False)
-        order_id = request.match_info['id']
-        # obj = acme.messages.CertificateRequest.json_loads(jws.payload)
-
         async with self._session() as session:
-            order = await self._db.get_order(session, kid, order_id)
+            jws, account = await self._verify_request(request, session, key_auth=False)
+            order_id = request.match_info['id']
+            # obj = acme.messages.CertificateRequest.json_loads(jws.payload)
+
+            order = await self._db.get_order(session, account.kid, order_id)
             status = await order.finalize(session)
 
             if status != models.OrderStatus.VALID:
@@ -337,11 +335,11 @@ class AcmeCA:
                                  headers={'Location': url_for(request, 'order', id=order_id)})
 
     async def _certificate(self, request):
-        jws, kid = await self._verify_request(request, key_auth=False)
-        certificate_id = request.match_info['id']
-
         async with self._session() as session:
-            order = await self._db.get_order(session, kid, certificate_id)
+            jws, account = await self._verify_request(request, session, key_auth=False)
+            certificate_id = request.match_info['id']
+
+            order = await self._db.get_order(session, account.kid, certificate_id)
             certificate = order.certificate
 
         return AcmeResponse(text=certificate.decode(), nonce=self._issue_nonce(), status=200)
