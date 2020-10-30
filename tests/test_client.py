@@ -1,18 +1,15 @@
 import asyncio
 import collections
-import json
 import logging
 import shlex
 import shutil
 import unittest
-from datetime import datetime
 from pathlib import Path
 
-import josepy
 from configobj import ConfigObj
 
 import acme_broker.util
-from acme_broker import AcmeCA, models, util
+from acme_broker import AcmeCA
 
 log = logging.getLogger('acme_broker.test_client')
 
@@ -21,7 +18,7 @@ DEFAULT_NETWORK_TIMEOUT = 45
 ClientData = collections.namedtuple('data', ['key', 'csr', 'path'])
 
 
-class TestClient(unittest.IsolatedAsyncioTestCase):
+class TestClient:
     DIRECTORY = 'http://localhost:8000/directory'
 
     @property
@@ -44,11 +41,6 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         self.data = ClientData(key, csr, dir_)
 
         self._rmtree = ['the.csr']
-
-        with open(r'test_account.pub', 'rb') as pem:
-            b = pem.read()
-
-        self.pubkey = josepy.util.ComparableRSAKey(acme_broker.util.deserialize_pubkey(b))
 
     def tearDown(self):
         for i in self._rmtree:
@@ -74,88 +66,14 @@ class TestClient(unittest.IsolatedAsyncioTestCase):
         await self.runner.shutdown()
         await self.runner.cleanup()
 
+
+class TestRunClient(TestClient, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
-        # await asyncio.sleep(600)
+        await asyncio.sleep(600)
         pass
 
-    async def test_add_account(self):
-        async with self.ca._session() as session:
-            account = models.Account(key=self.pubkey,
-                                     kid=util.sha256_hex_digest(util.serialize_pubkey(self.pubkey)),
-                                     status=models.AccountStatus.VALID,
-                                     contact=json.dumps(()))
-            session.add(account)
 
-            result = await self.ca._db.get_account(session, self.pubkey)
-
-            assert acme_broker.util.serialize_pubkey(result.key) == acme_broker.util.serialize_pubkey(account.key)
-            assert result.key == account.key
-            assert account.serialize() == result.serialize()
-
-            await session.commit()
-
-    async def test_add_order_authz_chall(self):
-        async with self.ca._session() as session:
-            account = models.Account(key=self.pubkey,
-                                     kid=util.sha256_hex_digest(util.serialize_pubkey(self.pubkey)),
-                                     status=models.AccountStatus.VALID,
-                                     contact=json.dumps(()))
-            # session.add(account)
-
-            identifiers = [
-                models.Identifier(
-                    type=models.IdentifierType.DNS,
-                    value='test.uni-hannover.de',
-                    authorizations=[
-                        models.Authorization(status=models.AuthorizationStatus.PENDING, wildcard=False, challenges=[
-                            models.Challenge(type=models.ChallengeType.HTTP_01,
-                                             status=models.ChallengeStatus.PENDING)
-                        ]),
-                    ],
-                ),
-                models.Identifier(
-                    type=models.IdentifierType.DNS,
-                    value='test2.uni-hannover.de',
-                    authorizations=[
-                        models.Authorization(status=models.AuthorizationStatus.VALID, wildcard=False, challenges=[
-                            models.Challenge(type=models.ChallengeType.DNS_01,
-                                             status=models.ChallengeStatus.INVALID)
-                        ]),
-                    ],
-                ),
-            ]
-
-            identifiers_ = [models.Identifier(type=models.IdentifierType.DNS, value='test3.uni-hannover.de'), models.Identifier(type=models.IdentifierType.DNS, value='test4.uni-hannover.de')]
-            for identifier in identifiers_:
-                identifier.authorizations = models.Authorization.create_all(identifier)
-
-                for authorization in identifier.authorizations:
-                    authorization.challenges = models.Challenge.create_all()
-
-            identifiers.extend(identifiers_)
-
-            order = models.Order(status=models.OrderStatus.PENDING,
-                                 expires=datetime(2020, 11, 20),
-                                 identifiers=identifiers,
-                                 notBefore=datetime(2020, 10, 28),
-                                 notAfter=datetime(2020, 12, 31),
-                                 account=account)
-            session.add(order)
-
-            self.assertEqual(len(account.orders[0].identifiers), 4)
-            self.assertFalse(account.orders[0].identifiers[1].authorizations[0].wildcard)
-            self.assertEqual(account.orders[0].identifiers[0].authorizations[0].challenges[0].type,
-                             models.ChallengeType.HTTP_01)
-
-            await session.flush()
-            self.assertIsNotNone(account.orders[0].identifiers[1].authorizations[0].id)
-            self.assertNotEqual(account.orders[0].identifiers[3].authorizations[0].challenges[0].type,
-                                account.orders[0].identifiers[3].authorizations[0].challenges[1].type)
-
-            await session.commit()
-
-
-class TestAcmetiny(TestClient):
+class TestAcmetiny(TestClient, unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         TestClient.setUp(self)
         path = self.data.path
