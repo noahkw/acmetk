@@ -41,9 +41,9 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 # This is the staging point for ACME-V2 within Let's Encrypt.
 # DIRECTORY_URL = 'https://acme-staging-v02.api.letsencrypt.org/directory'
-DIRECTORY_URL = 'http://localhost:8000/directory'
+DIRECTORY_URL = "http://localhost:8000/directory"
 
-USER_AGENT = 'python-acme-example'
+USER_AGENT = "python-acme-example"
 
 # Account key size
 ACC_KEY_BITS = 2048
@@ -52,7 +52,7 @@ ACC_KEY_BITS = 2048
 CERT_PKEY_BITS = 2048
 
 # Domain name for the certificate.
-DOMAIN = 'client.example.com'
+DOMAIN = "client.example.com"
 
 # If you are running Boulder locally, it is possible to configure any port
 # number to execute the challenge, but real CA servers will always use port
@@ -69,8 +69,7 @@ def new_csr_comp(domain_name, pkey_pem=None):
         # Create private key.
         pkey = OpenSSL.crypto.PKey()
         pkey.generate_key(OpenSSL.crypto.TYPE_RSA, CERT_PKEY_BITS)
-        pkey_pem = OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_PEM,
-                                                  pkey)
+        pkey_pem = OpenSSL.crypto.dump_privatekey(OpenSSL.crypto.FILETYPE_PEM, pkey)
     csr_pem = crypto_util.make_csr(pkey_pem, [domain_name])
     return pkey_pem, csr_pem
 
@@ -89,7 +88,7 @@ def select_http01_chall(orderr):
             if isinstance(i.chall, challenges.HTTP01):
                 return i
 
-    raise Exception('HTTP-01 challenge was not offered by the CA server.')
+    raise Exception("HTTP-01 challenge was not offered by the CA server.")
 
 
 @contextmanager
@@ -97,10 +96,9 @@ def challenge_server(http_01_resources):
     """Manage standalone server set up and shutdown."""
 
     # Setting up a fake server that binds at PORT and any address.
-    address = ('', PORT)
+    address = ("", PORT)
     try:
-        servers = standalone.HTTP01DualNetworkedServers(address,
-                                                        http_01_resources)
+        servers = standalone.HTTP01DualNetworkedServers(address, http_01_resources)
         # Start client standalone web server.
         servers.serve_forever()
         yield servers
@@ -115,7 +113,8 @@ def perform_http01(client_acme, challb, orderr):
     response, validation = challb.response_and_validation(client_acme.net.key)
 
     resource = standalone.HTTP01RequestHandler.HTTP01Resource(
-        chall=challb.chall, response=response, validation=validation)
+        chall=challb.chall, response=response, validation=validation
+    )
 
     with challenge_server({resource}):
         # Let the CA server know that we are ready for the challenge.
@@ -153,9 +152,10 @@ def example_http():
     # Create account key
 
     acc_key = jose.JWKRSA(
-        key=rsa.generate_private_key(public_exponent=65537,
-                                     key_size=ACC_KEY_BITS,
-                                     backend=default_backend()))
+        key=rsa.generate_private_key(
+            public_exponent=65537, key_size=ACC_KEY_BITS, backend=default_backend()
+        )
+    )
 
     # Register account and accept TOS
 
@@ -166,10 +166,10 @@ def example_http():
     # Terms of Service URL is in client_acme.directory.meta.terms_of_service
     # Registration Resource: regr
     # Creates account with contact information.
-    email = 'test@test.de'
+    email = "test@test.de"
     regr = client_acme.new_account(
-        messages.NewRegistration.from_data(
-            email=email, terms_of_service_agreed=True))
+        messages.NewRegistration.from_data(email=email, terms_of_service_agreed=True)
+    )
 
     # Create domain private key and CSR
     pkey_pem, csr_pem = new_csr_comp(DOMAIN)
@@ -198,8 +198,8 @@ def example_http():
     # Revoke certificate
 
     fullchain_com = jose.ComparableX509(
-        OpenSSL.crypto.load_certificate(
-            OpenSSL.crypto.FILETYPE_PEM, fullchain_pem))
+        OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, fullchain_pem)
+    )
 
     try:
         client_acme.revoke(fullchain_com, 0)  # revocation reason = 0
@@ -212,21 +212,19 @@ def example_http():
     try:
         regr = client_acme.query_registration(regr)
     except errors.Error as err:
-        if err.typ == messages.OLD_ERROR_PREFIX + 'unauthorized' \
-                or err.typ == messages.ERROR_PREFIX + 'unauthorized':
+        if (
+            err.typ == messages.OLD_ERROR_PREFIX + "unauthorized"
+            or err.typ == messages.ERROR_PREFIX + "unauthorized"
+        ):
             # Status is deactivated.
             pass
         raise
 
     # Change contact information
 
-    email = 'newfake@example.com'
+    email = "newfake@example.com"
     regr = client_acme.update_registration(
-        regr.update(
-            body=regr.body.update(
-                contact=('mailto:' + email,)
-            )
-        )
+        regr.update(body=regr.body.update(contact=("mailto:" + email,)))
     )
 
     # Deactivate account/registration

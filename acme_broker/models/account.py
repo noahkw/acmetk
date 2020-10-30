@@ -10,9 +10,9 @@ from ..util import serialize_pubkey, deserialize_pubkey
 
 class AccountStatus(str, enum.Enum):
     # subclassing str simplifies json serialization using json.dumps
-    VALID = 'valid'
-    DEACTIVATED = 'deactivated'
-    REVOKED = 'revoked'
+    VALID = "valid"
+    DEACTIVATED = "deactivated"
+    REVOKED = "revoked"
 
 
 class ComparableRSAKeyType(types.TypeDecorator):
@@ -26,14 +26,14 @@ class ComparableRSAKeyType(types.TypeDecorator):
 
 
 class Account(Base, Serializer):
-    __tablename__ = 'accounts'
-    __serialize__ = ['status', 'contact']
+    __tablename__ = "accounts"
+    __serialize__ = ["status", "contact"]
 
     key = Column(ComparableRSAKeyType)
     kid = Column(String, primary_key=True)
-    status = Column('status', Enum(AccountStatus))
+    status = Column("status", Enum(AccountStatus))
     contact = Column(JSON)
-    orders = relationship('Order', cascade='all, delete', back_populates='account')
+    orders = relationship("Order", cascade="all, delete", back_populates="account")
 
     def serialize(self, request=None):
         d = Serializer.serialize(self)

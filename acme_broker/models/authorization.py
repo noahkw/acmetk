@@ -12,28 +12,41 @@ from ..util import url_for
 
 class AuthorizationStatus(str, enum.Enum):
     # subclassing str simplifies json serialization using json.dumps
-    PENDING = 'pending'
-    VALID = 'valid'
-    INVALID = 'invalid'
-    DEACTIVATED = 'deactivated'
-    EXPIRED = 'expired'
-    REVOKED = 'revoked'
+    PENDING = "pending"
+    VALID = "valid"
+    INVALID = "invalid"
+    DEACTIVATED = "deactivated"
+    EXPIRED = "expired"
+    REVOKED = "revoked"
 
 
 class Authorization(Base, Serializer):
-    __tablename__ = 'authorizations'
-    __serialize__ = ['status', 'expires', 'wildcard']
+    __tablename__ = "authorizations"
+    __serialize__ = ["status", "expires", "wildcard"]
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True, nullable=False)
-    identifier_id = Column(Integer, ForeignKey('identifiers.id'), nullable=False)
-    identifier = relationship('Identifier', back_populates='authorizations', lazy='joined')
-    status = Column('status', Enum(AuthorizationStatus), nullable=False)
+    id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        unique=True,
+        nullable=False,
+    )
+    identifier_id = Column(Integer, ForeignKey("identifiers.id"), nullable=False)
+    identifier = relationship(
+        "Identifier", back_populates="authorizations", lazy="joined"
+    )
+    status = Column("status", Enum(AuthorizationStatus), nullable=False)
     expires = Column(DateTime)
     wildcard = Column(Boolean, nullable=False)
-    challenges = relationship('Challenge', cascade='all, delete', back_populates='authorization', lazy='joined')
+    challenges = relationship(
+        "Challenge",
+        cascade="all, delete",
+        back_populates="authorization",
+        lazy="joined",
+    )
 
     def url(self, request):
-        return url_for(request, 'authz', id=str(self.id))
+        return url_for(request, "authz", id=str(self.id))
 
     async def finalize(self, session):
         # check whether at least one challenge is valid
@@ -44,20 +57,25 @@ class Authorization(Base, Serializer):
 
         # delete all other challenges
         if self.status == AuthorizationStatus.VALID:
-            statement = delete(Challenge) \
-                .filter((Challenge.authorization_id == self.id) & (Challenge.status != ChallengeStatus.VALID))
+            statement = delete(Challenge).filter(
+                (Challenge.authorization_id == self.id)
+                & (Challenge.status != ChallengeStatus.VALID)
+            )
             await session.execute(statement)
 
         return self.status
 
     def serialize(self, request=None):
         d = Serializer.serialize(self)
-        d['challenges'] = Serializer.serialize_list(self.challenges, request=request)
-        d['identifier'] = self.identifier.serialize()
+        d["challenges"] = Serializer.serialize_list(self.challenges, request=request)
+        d["identifier"] = self.identifier.serialize()
         return d
 
     @classmethod
     def create_all(cls, identifier):
         return [
-            cls(status=AuthorizationStatus.PENDING, wildcard=identifier.value.startswith('*'))
+            cls(
+                status=AuthorizationStatus.PENDING,
+                wildcard=identifier.value.startswith("*"),
+            )
         ]

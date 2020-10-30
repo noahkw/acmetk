@@ -12,27 +12,31 @@ from ..util import url_for
 
 class ChallengeStatus(str, enum.Enum):
     # subclassing str simplifies json serialization using json.dumps
-    PENDING = 'pending'
-    PROCESSING = 'processing'
-    VALID = 'valid'
-    INVALID = 'invalid'
+    PENDING = "pending"
+    PROCESSING = "processing"
+    VALID = "valid"
+    INVALID = "invalid"
 
 
 class ChallengeType(str, enum.Enum):
     # subclassing str simplifies json serialization using json.dumps
-    HTTP_01 = 'http-01'
-    DNS_01 = 'dns-01'
+    HTTP_01 = "http-01"
+    DNS_01 = "dns-01"
 
 
 class Challenge(Base, Serializer):
-    __tablename__ = 'challenges'
-    __serialize__ = ['type', 'validated', 'token']
+    __tablename__ = "challenges"
+    __serialize__ = ["type", "validated", "token"]
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True)
-    authorization_id = Column(UUID(as_uuid=True), ForeignKey('authorizations.id'), nullable=False)
-    authorization = relationship('Authorization', back_populates='challenges', lazy='joined')
-    type = Column('type', Enum(ChallengeType), nullable=False)
-    _status = Column('status', Enum(ChallengeStatus), nullable=False)
+    authorization_id = Column(
+        UUID(as_uuid=True), ForeignKey("authorizations.id"), nullable=False
+    )
+    authorization = relationship(
+        "Authorization", back_populates="challenges", lazy="joined"
+    )
+    type = Column("type", Enum(ChallengeType), nullable=False)
+    _status = Column("status", Enum(ChallengeStatus), nullable=False)
     validated = Column(DateTime)
     token = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True)
 
@@ -47,14 +51,16 @@ class Challenge(Base, Serializer):
         #     self.authorization.status = AuthorizationStatus.VALID
 
     def url(self, request):
-        return url_for(request, 'challenge', id=str(self.id))
+        return url_for(request, "challenge", id=str(self.id))
 
     def serialize(self, request=None):
         d = Serializer.serialize(self)
-        d['token'] = str(self.token)
-        d['url'] = self.url(request)
+        d["token"] = str(self.token)
+        d["url"] = self.url(request)
         return d
 
     @classmethod
     def create_all(cls):
-        return [cls(type=type_, status=ChallengeStatus.PENDING) for type_ in ChallengeType]
+        return [
+            cls(type=type_, status=ChallengeStatus.PENDING) for type_ in ChallengeType
+        ]

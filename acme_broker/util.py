@@ -14,13 +14,20 @@ def generate_nonce():
     return uuid.uuid4().hex
 
 
-def generate_csr(CN: str, private_key: rsa.RSAPrivateKey, path: Path, names: typing.List[str]):
-    csr = x509.CertificateSigningRequestBuilder() \
-        .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, CN)])) \
-        .add_extension(x509.SubjectAlternativeName([x509.DNSName(name) for name in names]), critical=False) \
+def generate_csr(
+    CN: str, private_key: rsa.RSAPrivateKey, path: Path, names: typing.List[str]
+):
+    csr = (
+        x509.CertificateSigningRequestBuilder()
+        .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, CN)]))
+        .add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(name) for name in names]),
+            critical=False,
+        )
         .sign(private_key, hashes.SHA256())
+    )
 
-    with open(path, 'wb') as pem_out:
+    with open(path, "wb") as pem_out:
         pem_out.write(csr.public_bytes(serialization.Encoding.PEM))
 
     return csr
@@ -37,14 +44,14 @@ def serialize_key(pk):
     return pk.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption()
+        encryption_algorithm=serialization.NoEncryption(),
     )
 
 
 def serialize_pubkey(pubkey):
     return pubkey.public_bytes(
         encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )
 
 
@@ -54,7 +61,7 @@ def deserialize_pubkey(pem):
 
 def save_key(pk, filename):
     pem = serialize_key(pk)
-    with open(filename, 'wb') as pem_out:
+    with open(filename, "wb") as pem_out:
         pem_out.write(pem)
 
 
@@ -82,17 +89,19 @@ def serialize_cert(cert):
 
 
 def generate_cert_from_csr(csr, root_cert, root_key):
-    if getattr(csr, 'wrapped'):
+    if getattr(csr, "wrapped"):
         csr = csr.wrapped.to_cryptography()
 
-    cert = x509.CertificateBuilder() \
-        .subject_name(csr.subject) \
-        .issuer_name(root_cert.issuer) \
-        .public_key(csr.public_key()) \
-        .serial_number(x509.random_serial_number()) \
-        .not_valid_before(datetime.utcnow()) \
-        .not_valid_after(datetime.utcnow() + timedelta(days=180)) \
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(csr.subject)
+        .issuer_name(root_cert.issuer)
+        .public_key(csr.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.utcnow())
+        .not_valid_after(datetime.utcnow() + timedelta(days=180))
         .sign(root_key, hashes.SHA256())
+    )
 
     # .add_extension(x509.SubjectAlternativeName([x509.DNSName(name) for name in csr.subject.rdns]), critical=False) \
 
@@ -100,24 +109,28 @@ def generate_cert_from_csr(csr, root_cert, root_key):
 
 
 def generate_root_cert(country, state, locality, org_name, common_name):
-    root_key = generate_rsa_key(Path('root.key'))
+    root_key = generate_rsa_key(Path("root.key"))
 
-    subject = x509.Name([
-        x509.NameAttribute(NameOID.COUNTRY_NAME, country),
-        x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, state),
-        x509.NameAttribute(NameOID.LOCALITY_NAME, locality),
-        x509.NameAttribute(NameOID.ORGANIZATION_NAME, org_name),
-        x509.NameAttribute(NameOID.LOCALITY_NAME, common_name),
-    ])
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, country),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, state),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, locality),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, org_name),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, common_name),
+        ]
+    )
 
-    root_cert_builder = x509.CertificateBuilder() \
-        .subject_name(subject) \
-        .issuer_name(subject) \
-        .public_key(root_key.public_key()) \
-        .serial_number(x509.random_serial_number()) \
-        .not_valid_before(datetime.utcnow()) \
-        .not_valid_after(datetime.utcnow() + timedelta(days=365 * 4)) \
+    root_cert_builder = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(subject)
+        .public_key(root_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.utcnow())
+        .not_valid_after(datetime.utcnow() + timedelta(days=365 * 4))
         .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+    )
 
     root_cert = root_cert_builder.sign(root_key, hashes.SHA256())
 

@@ -9,9 +9,7 @@ from acme_broker.models.base import Base
 class Database:
     def __init__(self, connection_string, pool_size=5, **kwargs):
         self.engine = create_async_engine(
-            connection_string,
-            pool_size=pool_size,
-            **kwargs
+            connection_string, pool_size=pool_size, **kwargs
         )
 
         self.session = sessionmaker(bind=self.engine, class_=AsyncSession)
@@ -23,38 +21,42 @@ class Database:
             await conn.run_sync(Base.metadata.create_all)
 
     async def get_account(self, session, key=None, kid=None):
-        statement = select(Account).filter(
-            (Account.key == key) | (Account.kid == kid)
-        )
+        statement = select(Account).filter((Account.key == key) | (Account.kid == kid))
         result = (await session.execute(statement)).first()
 
         return result[0] if result else None
 
     async def get_authz(self, session, kid, authz_id):
-        statement = select(Authorization) \
-            .join(Identifier) \
-            .join(Order) \
-            .join(Account) \
+        statement = (
+            select(Authorization)
+            .join(Identifier)
+            .join(Order)
+            .join(Account)
             .filter((kid == Account.kid) & (Authorization.id == authz_id))
+        )
         result = (await session.execute(statement)).first()
 
         return result[0] if result else None
 
     async def get_challenge(self, session, kid, challenge_id):
-        statement = select(Challenge) \
-            .join(Authorization) \
-            .join(Identifier) \
-            .join(Order) \
-            .join(Account) \
+        statement = (
+            select(Challenge)
+            .join(Authorization)
+            .join(Identifier)
+            .join(Order)
+            .join(Account)
             .filter((kid == Account.kid) & (Challenge.id == challenge_id))
+        )
         result = (await session.execute(statement)).first()
 
         return result[0] if result else None
 
     async def get_order(self, session, kid, order_id):
-        statement = select(Order) \
-            .join(Account) \
+        statement = (
+            select(Order)
+            .join(Account)
             .filter((kid == Account.kid) & (order_id == Order.id))
+        )
         result = (await session.execute(statement)).first()
 
         return result[0] if result else None

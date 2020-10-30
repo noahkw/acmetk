@@ -11,6 +11,7 @@ chardet==3.0.4
 click==7.1.2
 cryptography==3.1.1
 devtools==0.6
+git+https://github.com/sqlalchemy/sqlalchemy.git@8d588b06d984cb053be53e779cfa11b1d5166f03
 greenlet==0.4.17
 idna==2.10
 josepy==1.4.0
@@ -24,7 +25,6 @@ PyYAML==5.3.1
 requests==2.24.0
 requests-toolbelt==0.9.1
 six==1.15.0
-git+https://github.com/sqlalchemy/sqlalchemy.git@8d588b06d984cb053be53e779cfa11b1d5166f03
 urllib3==1.25.11
 watchgod==0.6
 yarl==1.5.1
