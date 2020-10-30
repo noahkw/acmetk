@@ -39,7 +39,10 @@ class Order(Base, Serializer):
     def certificate_url(self, request):
         return url_for(request, 'certificate', id=str(self.id))
 
-    async def finalize(self, session):
+    async def finalize(self):
+        if self.status != OrderStatus.PENDING:
+            return self.status
+
         all_valid = True
 
         for identifier in self.identifiers:
@@ -48,7 +51,7 @@ class Order(Base, Serializer):
                     all_valid = False
                     break
 
-        self.status = OrderStatus.VALID if all_valid else self.status
+        self.status = OrderStatus.READY if all_valid else self.status
         return self.status
 
     def serialize(self, request=None):
@@ -78,7 +81,7 @@ class Order(Base, Serializer):
                 authorization.challenges = Challenge.create_all()
 
         order = Order(expires=obj.expires,
-                      status=obj.status or OrderStatus.PROCESSING,
+                      status=obj.status or OrderStatus.PENDING,
                       account=account,
                       identifiers=identifiers)
 

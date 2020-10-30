@@ -1,5 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 from acme_broker.models import Account, Identifier, Order, Authorization, Challenge
 from acme_broker.models.base import Base
@@ -13,14 +14,13 @@ class Database:
             **kwargs
         )
 
+        self.session = sessionmaker(bind=self.engine, class_=AsyncSession)
+
     async def begin(self):
         async with self.engine.begin() as conn:
             # TODO: don't drop_all in prod
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
-
-    def session(self):
-        return AsyncSession(self.engine)
 
     async def get_account(self, session, key=None, kid=None):
         statement = select(Account).filter(

@@ -298,7 +298,7 @@ class AcmeCA:
             order_id = request.match_info['id']
 
             order = await self._db.get_order(session, account.kid, order_id)
-            _ = await order.finalize(session)
+            _ = await order.finalize()
             serialized = order.serialize(request)
 
             await session.commit()
@@ -312,10 +312,14 @@ class AcmeCA:
             # obj = acme.messages.CertificateRequest.json_loads(jws.payload)
 
             order = await self._db.get_order(session, account.kid, order_id)
-            status = await order.finalize(session)
+            status = await order.finalize()
 
-            if status != models.OrderStatus.VALID:
+            if status != models.OrderStatus.READY:
                 raise acme.messages.Error.with_code('orderNotReady')
+
+            order.status = models.OrderStatus.PROCESSING
+            session.add(order)
+            asyncio.ensure_future(self._handle_order_finalize(account.kid, order.id))
 
             obj = json.loads(jws.payload)
             csr = josepy.decode_csr(obj['csr'])
@@ -338,6 +342,16 @@ class AcmeCA:
             certificate = order.certificate
 
         return AcmeResponse(text=certificate.decode(), nonce=self._issue_nonce(), status=200)
+
+    async def _handle_order_finalize(self, kid, order_id):
+        await asyncio.sleep(3)
+        logger.debug('Finalizing order %s', order_id)
+
+        async with self._session() as session:
+            order = await self._db.get_order(session, kid, order_id)
+            order.status = models.OrderStatus.VALID
+            session.add(order)
+            await session.commit()
 
     @middleware
     async def _error_middleware(self, request, handler):
