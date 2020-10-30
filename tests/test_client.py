@@ -6,10 +6,9 @@ import shutil
 import unittest
 from pathlib import Path
 
-from configobj import ConfigObj
-
 import acme_broker.util
 from acme_broker import AcmeCA
+from acme_broker.main import load_config
 
 log = logging.getLogger('acme_broker.test_client')
 
@@ -57,8 +56,8 @@ class TestClient:
 
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
-        config = ConfigObj('../debug.ini', unrepr=True)
-        runner, ca = await AcmeCA.runner(**config)
+        config = load_config('../debug.yml')
+        runner, ca = await AcmeCA.runner(*config['ca'].values())
         self.runner = runner
         self.ca = ca
 
@@ -69,7 +68,7 @@ class TestClient:
 
 class TestRunClient(TestClient, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
-        await asyncio.sleep(600)
+        # await asyncio.sleep(600)
         pass
 
 

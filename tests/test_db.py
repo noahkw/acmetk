@@ -4,10 +4,10 @@ import unittest
 from datetime import datetime
 
 import josepy
-from configobj import ConfigObj
 
 from acme_broker import models, util
 from acme_broker.database import Database
+from acme_broker.main import load_config
 
 
 class TestDatabase(unittest.IsolatedAsyncioTestCase):
@@ -15,21 +15,15 @@ class TestDatabase(unittest.IsolatedAsyncioTestCase):
         import os
         cwd = os.getcwd()
 
-        with open(r'tests/test_account.pub', 'rb') as pem:
+        with open(r'test_account.pub', 'rb') as pem:
             b = pem.read()
 
         self.pubkey = josepy.util.ComparableRSAKey(util.deserialize_pubkey(b))
 
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
-        config = ConfigObj('debug.ini', unrepr=True)
-        db_user = config.pop('db_user')
-        db_pass = config.pop('db_pass')
-        db_host = config.pop('db_host')
-        db_port = config.pop('db_port', 5432)
-        db_database = config.pop('db_database')
-
-        db = Database(db_user, db_pass, db_host, db_port, db_database)
+        config = load_config('../debug.yml')
+        db = Database(config['ca']['db'])
 
         await db.begin()
         self.db = db

@@ -148,7 +148,6 @@ dmypy.json
 .prof
 
 # config
-config.ini
 *.key
 
 # db

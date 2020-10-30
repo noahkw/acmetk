@@ -1,0 +1,91 @@
+ca:
+  hostname: 'localhost'
+  port: 8000
+  db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
+logging:
+  version: 1
+  formatters:
+    simple:
+      format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    simple_root:
+      format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  handlers:
+    console:
+      class: logging.StreamHandler
+      level: DEBUG
+      formatter: simple
+      stream: ext://sys.stdout
+    root_console:
+      class: logging.StreamHandler
+      level: DEBUG
+      formatter: simple_root
+      stream: ext://sys.stdout
+  loggers:
+    asyncio:
+      level: ERROR
+      handlers: [console]
+      propagate: no
+    acme_tiny:
+      level: DEBUG
+      handlers: [console]
+      propagate: no
+    certbot:
+      level: DEBUG
+      handlers: [console]
+      propagate: no
+    certbot._internal.plugins.selection:
+      level: INFO
+      handlers: [console]
+      propagate: no
+    certbot._internal.cli:
+      level: INFO
+      handlers: [console]
+      propagate: no
+    certbot._internal.reporter:
+      level: INFO
+      handlers: [console]
+      propagate: no
+    certbot.ocsp:
+      level: WARNING
+      handlers: [console]
+      propagate: no
+    acme_broker:
+      level: DEBUG
+      handlers: [console]
+      propagate: no
+    urllib3.connectionpool:
+      level: INFO
+      handlers: [console]
+      propagate: no
+    acme.client:
+      level: INFO
+      handlers: [console]
+      propagate: no
+    aiohttp.access:
+      level: DEBUG
+      handlers: [console]
+      propagate: no
+    aiohttp.client:
+      level: DEBUG
+      handlers: [console]
+      propagate: no
+    aiohttp.internal:
+      level: DEBUG
+      handlers: [console]
+      propagate: no
+    aiohttp.server:
+      level: DEBUG
+      handlers: [console]
+      propagate: no
+    aiohttp.web:
+      level: DEBUG
+      handlers: [console]
+      propagate: no
+    aiohttp.websocket:
+      level: DEBUG
+      handlers: [console]
+      propagate: no
+  root:
+    level: DEBUG
+    handlers: [root_console]
+  disable_existing_loggers: no

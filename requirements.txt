@@ -9,8 +9,6 @@ certifi==2020.6.20
 cffi==1.14.3
 chardet==3.0.4
 click==7.1.2
-click-config-file==0.6.0
-configobj==5.0.6
 cryptography==3.1.1
 devtools==0.6
 greenlet==0.4.17
@@ -22,6 +20,7 @@ Pygments==2.7.1
 pyOpenSSL==19.1.0
 pyRFC3339==1.1
 pytz==2020.1
+PyYAML==5.3.1
 requests==2.24.0
 requests-toolbelt==0.9.1
 six==1.15.0

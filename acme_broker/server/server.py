@@ -89,34 +89,9 @@ class AcmeCA:
         self.root_cert, self.root_key = generate_root_cert('DE', 'Lower Saxony', 'Hanover', 'Acme Broker', 'AB CA')
 
     @classmethod
-    async def runner(cls, hostname='localhost', **kwargs):
-        log_level = logging.getLevelName(kwargs.pop('log_level', logging.INFO))
-        log_file = kwargs.pop('log_file', None)
-        port = kwargs.pop('port', 8000)
-        debug = kwargs.pop('debug', False)
-        db_user = kwargs.pop('db_user')
-        db_pass = kwargs.pop('db_pass')
-        db_host = kwargs.pop('db_host')
-        db_port = kwargs.pop('db_port', 5432)
-        db_database = kwargs.pop('db_database')
-
-        logging.basicConfig(filename=log_file, level=log_level)
-        logger.debug("""Passed Args: Log level '%s'
-                                Log file '%s', 
-                                Port %d, 
-                                Debug '%s',
-                                DB-user '%s',
-                                DB-pass %s,
-                                DB-host '%s',
-                                DB-port %d,
-                                DB-database '%s'""", log_level, log_file, port,
-                     debug, db_user,
-                     '***' if db_pass else None,
-                     db_host, db_port, db_database)
-
+    async def runner(cls, hostname, port, db_connection_string):
         ca = AcmeCA(host=f'http://{hostname}:{port}', base_route='/acme')
-        db = Database(db_user, db_pass, db_host, db_port, db_database)
-
+        db = Database(db_connection_string)
         await db.begin()
 
         ca._db = db

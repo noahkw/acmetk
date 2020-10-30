@@ -7,9 +7,9 @@ from acme_broker.models.base import Base
 
 
 class Database:
-    def __init__(self, username, password, host, port, db, pool_size=5, **kwargs):
+    def __init__(self, connection_string, pool_size=5, **kwargs):
         self.engine = create_async_engine(
-            f'postgresql+asyncpg://{username}:{password}@{host}:{port}/{db}',
+            connection_string,
             pool_size=pool_size,
             **kwargs
         )
