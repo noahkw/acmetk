@@ -1,7 +1,7 @@
 import enum
 
 import josepy
-from sqlalchemy import Column, Enum, String, types
+from sqlalchemy import Column, Enum, String, types, JSON
 from sqlalchemy.orm import relationship
 
 from .base import Base, Serializer
@@ -32,7 +32,7 @@ class Account(Base, Serializer):
     key = Column(ComparableRSAKeyType)
     kid = Column(String, primary_key=True)
     status = Column('status', Enum(AccountStatus))
-    contact = Column(String)
+    contact = Column(JSON)
     orders = relationship('Order', cascade='all, delete', back_populates='account')
 
     def serialize(self, request=None):
