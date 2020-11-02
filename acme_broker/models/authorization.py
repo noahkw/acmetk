@@ -24,14 +24,16 @@ class Authorization(Base, Serializer):
     __tablename__ = "authorizations"
     __serialize__ = ["status", "expires", "wildcard"]
 
-    id = Column(
+    authorization_id = Column(
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
         unique=True,
         nullable=False,
     )
-    identifier_id = Column(Integer, ForeignKey("identifiers.id"), nullable=False)
+    identifier_id = Column(
+        Integer, ForeignKey("identifiers.identifier_id"), nullable=False
+    )
     identifier = relationship(
         "Identifier", back_populates="authorizations", lazy="joined"
     )
@@ -46,7 +48,7 @@ class Authorization(Base, Serializer):
     )
 
     def url(self, request):
-        return url_for(request, "authz", id=str(self.id))
+        return url_for(request, "authz", id=str(self.authorization_id))
 
     async def finalize(self, session):
         # check whether at least one challenge is valid
@@ -58,7 +60,7 @@ class Authorization(Base, Serializer):
         # delete all other challenges
         if self.status == AuthorizationStatus.VALID:
             statement = delete(Challenge).filter(
-                (Challenge.authorization_id == self.id)
+                (Challenge.authorization_id == self.authorization_id)
                 & (Challenge.status != ChallengeStatus.VALID)
             )
             await session.execute(statement)

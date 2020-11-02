@@ -32,7 +32,7 @@ class Database:
             .join(Identifier)
             .join(Order)
             .join(Account)
-            .filter((kid == Account.kid) & (Authorization.id == authz_id))
+            .filter((kid == Account.kid) & (Authorization.authorization_id == authz_id))
         )
         result = (await session.execute(statement)).first()
 
@@ -45,7 +45,7 @@ class Database:
             .join(Identifier)
             .join(Order)
             .join(Account)
-            .filter((kid == Account.kid) & (Challenge.id == challenge_id))
+            .filter((kid == Account.kid) & (Challenge.challenge_id == challenge_id))
         )
         result = (await session.execute(statement)).first()
 
@@ -55,7 +55,7 @@ class Database:
         statement = (
             select(Order)
             .join(Account)
-            .filter((kid == Account.kid) & (order_id == Order.id))
+            .filter((kid == Account.kid) & (order_id == Order.order_id))
         )
         result = (await session.execute(statement)).first()
 

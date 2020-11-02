@@ -23,7 +23,9 @@ class Order(Base, Serializer):
     __tablename__ = "orders"
     __serialize__ = ["status", "expires", "notBefore", "notAfter"]
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True)
+    order_id = Column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
+    )
     status = Column("status", Enum(OrderStatus), nullable=False)
     expires = Column(DateTime)
     identifiers = relationship("Identifier", cascade="all, delete", lazy="joined")
@@ -34,10 +36,10 @@ class Order(Base, Serializer):
     certificate = Column(LargeBinary)
 
     def finalize_url(self, request):
-        return url_for(request, "finalize-order", id=str(self.id))
+        return url_for(request, "finalize-order", id=str(self.order_id))
 
     def certificate_url(self, request):
-        return url_for(request, "certificate", id=str(self.id))
+        return url_for(request, "certificate", id=str(self.order_id))
 
     async def finalize(self):
         if self.status != OrderStatus.PENDING:

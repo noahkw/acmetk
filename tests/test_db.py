@@ -127,7 +127,9 @@ class TestDatabase(unittest.IsolatedAsyncioTestCase):
             )
 
             await session.flush()
-            self.assertIsNotNone(account.orders[0].identifiers[1].authorizations[0].id)
+            self.assertIsNotNone(
+                account.orders[0].identifiers[1].authorizations[0].authorization_id
+            )
             self.assertNotEqual(
                 account.orders[0].identifiers[3].authorizations[0].challenges[0].type,
                 account.orders[0].identifiers[3].authorizations[0].challenges[1].type,

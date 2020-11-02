@@ -28,9 +28,13 @@ class Challenge(Base, Serializer):
     __tablename__ = "challenges"
     __serialize__ = ["type", "validated", "token"]
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True)
+    challenge_id = Column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
+    )
     authorization_id = Column(
-        UUID(as_uuid=True), ForeignKey("authorizations.id"), nullable=False
+        UUID(as_uuid=True),
+        ForeignKey("authorizations.authorization_id"),
+        nullable=False,
     )
     authorization = relationship(
         "Authorization", back_populates="challenges", lazy="joined"
@@ -51,7 +55,7 @@ class Challenge(Base, Serializer):
         #     self.authorization.status = AuthorizationStatus.VALID
 
     def url(self, request):
-        return url_for(request, "challenge", id=str(self.id))
+        return url_for(request, "challenge", id=str(self.challenge_id))
 
     def serialize(self, request=None):
         d = Serializer.serialize(self)

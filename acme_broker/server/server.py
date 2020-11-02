@@ -278,7 +278,7 @@ class AcmeCA:
 
             await session.flush()
             serialized = order.serialize(request=request)
-            order_id = order.id
+            order_id = order.order_id
             await session.commit()
 
         return AcmeResponse.json(
@@ -347,7 +347,9 @@ class AcmeCA:
 
             order.status = models.OrderStatus.PROCESSING
             session.add(order)
-            asyncio.ensure_future(self._handle_order_finalize(account.kid, order.id))
+            asyncio.ensure_future(
+                self._handle_order_finalize(account.kid, order.order_id)
+            )
 
             obj = json.loads(jws.payload)
             csr = josepy.decode_csr(obj["csr"])

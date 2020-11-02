@@ -29,7 +29,7 @@ class Account(Base, Serializer):
     __tablename__ = "accounts"
     __serialize__ = ["status", "contact"]
 
-    key = Column(ComparableRSAKeyType)
+    key = Column(ComparableRSAKeyType, index=True)
     kid = Column(String, primary_key=True)
     status = Column("status", Enum(AccountStatus))
     contact = Column(JSON)

@@ -16,10 +16,10 @@ class Identifier(Base, Serializer):
     __tablename__ = "identifiers"
     __serialize__ = ["type", "value"]
 
-    id = Column(Integer, primary_key=True)
+    identifier_id = Column(Integer, primary_key=True)
     type = Column("type", Enum(IdentifierType))
     value = Column(String)
-    order_id = Column(UUID(as_uuid=True), ForeignKey("orders.id"), nullable=False)
+    order_id = Column(UUID(as_uuid=True), ForeignKey("orders.order_id"), nullable=False)
     order = relationship("Order", back_populates="identifiers")
     authorizations = relationship(
         "Authorization",
