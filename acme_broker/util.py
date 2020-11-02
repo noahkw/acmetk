@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import josepy
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
@@ -89,9 +90,6 @@ def serialize_cert(cert):
 
 
 def generate_cert_from_csr(csr, root_cert, root_key):
-    if getattr(csr, "wrapped"):
-        csr = csr.wrapped.to_cryptography()
-
     cert = (
         x509.CertificateBuilder()
         .subject_name(csr.subject)
@@ -135,3 +133,8 @@ def generate_root_cert(country, state, locality, org_name, common_name):
     root_cert = root_cert_builder.sign(root_key, hashes.SHA256())
 
     return root_cert, root_key
+
+
+def decode_csr(b64der):
+    decoded = josepy.decode_csr(b64der)
+    return decoded.wrapped.to_cryptography()

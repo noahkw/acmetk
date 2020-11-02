@@ -5,7 +5,6 @@ import typing
 from typing import Any, Optional
 
 import acme.messages
-import josepy
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.typedefs import JSONEncoder, LooseHeaders
@@ -22,6 +21,7 @@ from acme_broker.util import (
     generate_root_cert,
     generate_cert_from_csr,
     serialize_cert,
+    decode_csr,
 )
 
 logger = logging.getLogger(__name__)
@@ -294,6 +294,9 @@ class AcmeCA:
             authz_id = request.match_info["id"]
 
             authorization = await self._db.get_authz(session, account.kid, authz_id)
+            if not authorization:
+                raise web.HTTPNotFound
+
             await authorization.finalize(session)
             serialized = authorization.serialize(request=request)
             await session.commit()
@@ -306,6 +309,9 @@ class AcmeCA:
             challenge_id = request.match_info["id"]
 
             challenge = await self._db.get_challenge(session, account.kid, challenge_id)
+            if not challenge:
+                raise web.HTTPNotFound
+
             # TODO: validate challenge, simulate HTTP request by sleeping
             # await asyncio.sleep(1)
             challenge.status = models.ChallengeStatus.VALID
@@ -326,6 +332,9 @@ class AcmeCA:
             order_id = request.match_info["id"]
 
             order = await self._db.get_order(session, account.kid, order_id)
+            if not order:
+                raise web.HTTPNotFound
+
             _ = await order.finalize()
             serialized = order.serialize(request)
 
@@ -340,22 +349,24 @@ class AcmeCA:
             # obj = acme.messages.CertificateRequest.json_loads(jws.payload)
 
             order = await self._db.get_order(session, account.kid, order_id)
+            if not order:
+                raise web.HTTPNotFound
+
             status = await order.finalize()
 
             if status != models.OrderStatus.READY:
                 raise acme.messages.Error.with_code("orderNotReady")
 
+            obj = json.loads(jws.payload)
+            csr = decode_csr(obj["csr"])
+
+            order.csr = csr
             order.status = models.OrderStatus.PROCESSING
             session.add(order)
+
             asyncio.ensure_future(
                 self._handle_order_finalize(account.kid, order.order_id)
             )
-
-            obj = json.loads(jws.payload)
-            csr = josepy.decode_csr(obj["csr"])
-
-            cert = generate_cert_from_csr(csr, self.root_cert, self.root_key)
-            order.certificate = serialize_cert(cert)
 
             serialized = order.serialize(request=request)
             await session.commit()
@@ -372,21 +383,31 @@ class AcmeCA:
             jws, account = await self._verify_request(request, session, key_auth=False)
             certificate_id = request.match_info["id"]
 
-            order = await self._db.get_order(session, account.kid, certificate_id)
-            certificate = order.certificate
+            certificate = await self._db.get_certificate(
+                session, account.kid, certificate_id
+            )
+            if not certificate:
+                raise web.HTTPNotFound
+
+            cert = certificate.cert
 
         return AcmeResponse(
-            text=certificate.decode(), nonce=self._issue_nonce(), status=200
+            text=serialize_cert(cert).decode(), nonce=self._issue_nonce(), status=200
         )
 
     async def _handle_order_finalize(self, kid, order_id):
-        await asyncio.sleep(3)
+        # await asyncio.sleep(2)
         logger.debug("Finalizing order %s", order_id)
 
         async with self._session() as session:
             order = await self._db.get_order(session, kid, order_id)
+
+            cert = generate_cert_from_csr(order.csr, self.root_cert, self.root_key)
+            order.certificate = models.Certificate(
+                status=models.CertificateStatus.VALID, cert=cert
+            )
+
             order.status = models.OrderStatus.VALID
-            session.add(order)
             await session.commit()
 
     @middleware

@@ -2,7 +2,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-from acme_broker.models import Account, Identifier, Order, Authorization, Challenge
+from acme_broker.models import (
+    Account,
+    Identifier,
+    Order,
+    Authorization,
+    Challenge,
+    Certificate,
+)
 from acme_broker.models.base import Base
 
 
@@ -56,6 +63,19 @@ class Database:
             select(Order)
             .join(Account)
             .filter((kid == Account.kid) & (order_id == Order.order_id))
+        )
+        result = (await session.execute(statement)).first()
+
+        return result[0] if result else None
+
+    async def get_certificate(self, session, kid, certificate_id):
+        statement = (
+            select(Certificate)
+            .join(Order)
+            .join(Account)
+            .filter(
+                (kid == Account.kid) & (Certificate.certificate_id == certificate_id)
+            )
         )
         result = (await session.execute(statement)).first()
 

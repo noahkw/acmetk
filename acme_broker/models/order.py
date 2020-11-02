@@ -1,13 +1,40 @@
 import enum
 import uuid
 
-from sqlalchemy import Column, Enum, DateTime, String, ForeignKey, LargeBinary
+import cryptography
+from sqlalchemy import (
+    Column,
+    Enum,
+    DateTime,
+    String,
+    ForeignKey,
+    LargeBinary,
+    TypeDecorator,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from . import Identifier, AuthorizationStatus, Authorization, Challenge
 from .base import Base, Serializer
 from ..util import url_for
+
+
+class CSRType(TypeDecorator):
+    """x509 Certificate as PEM"""
+
+    impl = LargeBinary
+
+    def process_bind_param(self, value, dialect):
+        if value:
+            return value.public_bytes(
+                encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM
+            )
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value:
+            return cryptography.x509.load_pem_x509_csr(value)
+        return value
 
 
 class OrderStatus(str, enum.Enum):
@@ -33,13 +60,16 @@ class Order(Base, Serializer):
     notAfter = Column(DateTime)
     account_kid = Column(String, ForeignKey("accounts.kid"), nullable=False)
     account = relationship("Account", back_populates="orders")
-    certificate = Column(LargeBinary)
+    certificate = relationship(
+        "Certificate", uselist=False, back_populates="order", lazy="joined"
+    )
+    csr = Column(CSRType)
 
     def finalize_url(self, request):
         return url_for(request, "finalize-order", id=str(self.order_id))
 
     def certificate_url(self, request):
-        return url_for(request, "certificate", id=str(self.order_id))
+        return url_for(request, "certificate", id=str(self.certificate.certificate_id))
 
     async def finalize(self):
         if self.status != OrderStatus.PENDING:

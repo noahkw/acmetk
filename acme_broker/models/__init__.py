@@ -1,6 +1,7 @@
 from .account import Account, AccountStatus
+from .certificate import Certificate, CertificateStatus
 from .challenge import Challenge, ChallengeStatus, ChallengeType
-from .authorization import Authorization, AuthorizationStatus
+from .authorization import Authorization, AuthorizationStatus  # noqa
 from .identifier import Identifier, IdentifierType
 from .order import Order, OrderStatus
 
@@ -10,6 +11,8 @@ __all__ = [
     "Challenge",
     "ChallengeStatus",
     "ChallengeType",
+    "Certificate",
+    "CertificateStatus",
     "Authorization",
     "AuthorizationStatus",
     "Identifier",
