@@ -1,9 +1,9 @@
-from .account import Account, AccountStatus
 from .certificate import Certificate, CertificateStatus
 from .challenge import Challenge, ChallengeStatus, ChallengeType
 from .authorization import Authorization, AuthorizationStatus  # noqa
 from .identifier import Identifier, IdentifierType
 from .order import Order, OrderStatus
+from .account import Account, AccountStatus
 
 __all__ = [
     "Account",

@@ -5,8 +5,9 @@ import josepy
 from sqlalchemy import Column, Enum, String, types, JSON
 from sqlalchemy.orm import relationship
 
+from . import OrderStatus
 from .base import Base, Serializer
-from ..util import serialize_pubkey
+from ..util import serialize_pubkey, url_for
 
 
 class AccountStatus(str, enum.Enum):
@@ -34,7 +35,19 @@ class Account(Base, Serializer):
     kid = Column(String, primary_key=True)
     status = Column("status", Enum(AccountStatus))
     contact = Column(JSON)
-    orders = relationship("Order", cascade="all, delete", back_populates="account")
+    orders = relationship(
+        "Order", cascade="all, delete", back_populates="account", lazy="joined"
+    )
+
+    def orders_url(self, request):
+        return url_for(request, "orders", id=str(self.kid))
+
+    def orders_list(self, request):
+        return [
+            order.url(request)
+            for order in self.orders
+            if order.status == OrderStatus.PENDING
+        ]
 
     def update(self, upd):
         if contact := upd.contact:
@@ -43,3 +56,8 @@ class Account(Base, Serializer):
         # the only allowed state transition is VALID -> DEACTIVATED if requested by the client
         if upd.status == "deactivated":
             self.status = AccountStatus.DEACTIVATED
+
+    def serialize(self, request=None):
+        d = super().serialize(request)
+        d["orders"] = self.orders_url(request)
+        return d

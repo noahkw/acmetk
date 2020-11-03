@@ -65,6 +65,9 @@ class Order(Base, Serializer):
     )
     csr = Column(CSRType)
 
+    def url(self, request):
+        return url_for(request, "orders", id=str(self.order_id))
+
     def finalize_url(self, request):
         return url_for(request, "finalize-order", id=str(self.order_id))
 

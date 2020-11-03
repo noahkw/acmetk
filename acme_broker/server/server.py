@@ -63,7 +63,7 @@ class AcmeCA:
                 web.post(
                     "/order/{id}/finalize", self._finalize_order, name="finalize-order"
                 ),
-                web.post("/orders/{kid}", self._orders, name="orders"),
+                web.post("/orders/{id}", self._orders, name="orders"),
                 web.post("/revoke-cert", self._revoke_cert, name="revoke-cert"),
                 web.post("/accounts/{kid}", self._accounts, name="accounts"),
                 web.post("/authz/{id}", self._authz, name="authz"),
@@ -218,7 +218,7 @@ class AcmeCA:
                 else:
                     return self._response(
                         request,
-                        account.serialize(),
+                        account.serialize(request),
                         headers={
                             "Location": url_for(request, "accounts", kid=account.kid)
                         },
@@ -239,8 +239,10 @@ class AcmeCA:
                         status=models.AccountStatus.VALID,
                         contact=json.dumps(reg.contact),
                     )
-                    serialized = new_account.serialize()
                     session.add(new_account)
+                    await session.flush()
+
+                    serialized = new_account.serialize(request)
                     kid = new_account.kid
                     await session.commit()
 
@@ -258,7 +260,7 @@ class AcmeCA:
 
             account.update(upd)
 
-            serialized = account.serialize()
+            serialized = account.serialize(request)
 
             await session.commit()
             return self._response(request, serialized)
@@ -337,6 +339,12 @@ class AcmeCA:
             await session.commit()
 
         return self._response(request, serialized)
+
+    async def _orders(self, request):
+        async with self._session() as session:
+            jws, account = await self._verify_request(request, session, key_auth=False)
+
+            return self._response(request, {"orders": account.orders_list(request)})
 
     async def _finalize_order(self, request):
         async with self._session() as session:
