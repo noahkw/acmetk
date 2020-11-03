@@ -311,11 +311,17 @@ class AcmeCA:
 
             serialized = challenge.serialize(request=request)
             kid = account.kid
+            authz_url = challenge.authorization.url(request)
             await session.commit()
 
             asyncio.ensure_future(self._handle_challenge_finalize(kid, challenge_id))
 
-        return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
+        return AcmeResponse.json(
+            serialized,
+            nonce=self._issue_nonce(),
+            status=200,
+            headers={"Link": f'<{authz_url}>; rel="up"'},
+        )
 
     async def _revoke_cert(self, request):
         async with self._session() as session:
@@ -383,7 +389,10 @@ class AcmeCA:
             cert = certificate.cert
 
         return AcmeResponse(
-            text=serialize_cert(cert).decode(), nonce=self._issue_nonce(), status=200
+            text=serialize_cert(self.root_cert).decode()
+            + serialize_cert(cert).decode(),
+            nonce=self._issue_nonce(),
+            status=200,
         )
 
     async def _handle_challenge_finalize(self, kid, challenge_id):

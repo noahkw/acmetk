@@ -138,3 +138,16 @@ def generate_root_cert(country, state, locality, org_name, common_name):
 def decode_csr(b64der):
     decoded = josepy.decode_csr(b64der)
     return decoded.wrapped.to_cryptography()
+
+
+def names_of(csr):
+    return set(
+        [
+            v.value
+            for v in csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
+        ]
+    ) | set(
+        csr.extensions.get_extension_for_class(
+            x509.SubjectAlternativeName
+        ).value.get_values_for_type(x509.DNSName)
+    )

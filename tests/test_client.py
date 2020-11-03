@@ -117,6 +117,7 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
 """
             )
         self._rmtree.extend(["archive", "renewal", "live"])
+        self._rmtree.extend(["etc"])
 
     async def _run(self, cmd):
         argv = shlex.split(f"--non-interactive -c {self.data.path}/certbot.ini " + cmd)
@@ -156,6 +157,7 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
         await self._run(
             f"certonly --webroot --webroot-path {self.data.path} --domain {arg}"
         )
+        return
         arg = " --domain ".join(map(lambda s: f"dns.{s}", domains))
         await self._run(
             f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=dns --manual-auth-hook "

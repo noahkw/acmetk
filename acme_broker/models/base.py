@@ -28,7 +28,7 @@ class Serializer(object):
         return {
             c: self._serialize_value(getattr(self, c))
             for c in inspect(self).attrs.keys()
-            if c in self.__serialize__
+            if c in self.__serialize__ and getattr(self, c) is not None
         }
 
     def _serialize_value(self, value):
