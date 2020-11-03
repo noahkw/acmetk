@@ -54,10 +54,10 @@ class Order(Base, Serializer):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
     )
     status = Column("status", Enum(OrderStatus), nullable=False)
-    expires = Column(DateTime)
+    expires = Column(DateTime(timezone=True))
     identifiers = relationship("Identifier", cascade="all, delete", lazy="joined")
-    notBefore = Column(DateTime)
-    notAfter = Column(DateTime)
+    notBefore = Column(DateTime(timezone=True))
+    notAfter = Column(DateTime(timezone=True))
     account_kid = Column(String, ForeignKey("accounts.kid"), nullable=False)
     account = relationship("Account", back_populates="orders")
     certificate = relationship(

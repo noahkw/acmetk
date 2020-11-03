@@ -38,7 +38,7 @@ class Authorization(Base, Serializer):
         "Identifier", back_populates="authorizations", lazy="joined"
     )
     status = Column("status", Enum(AuthorizationStatus), nullable=False)
-    expires = Column(DateTime)
+    expires = Column(DateTime(timezone=True))
     wildcard = Column(Boolean, nullable=False)
     challenges = relationship(
         "Challenge",
@@ -51,6 +51,11 @@ class Authorization(Base, Serializer):
         return url_for(request, "authz", id=str(self.authorization_id))
 
     async def finalize(self, session):
+        """
+        Should only be called by a child challenge as it's done being validated, thus
+        checking for a completed challenge here would be redundant.
+        """
+
         # check whether at least one challenge is valid
         for challenge in self.challenges:
             if challenge.status == ChallengeStatus.VALID:
@@ -61,9 +66,14 @@ class Authorization(Base, Serializer):
         if self.status == AuthorizationStatus.VALID:
             statement = delete(Challenge).filter(
                 (Challenge.authorization_id == self.authorization_id)
-                & (Challenge.status != ChallengeStatus.VALID)
+                & (
+                    (Challenge.status == ChallengeStatus.PENDING)
+                    | (Challenge.status == ChallengeStatus.PROCESSING)
+                )
             )
             await session.execute(statement)
+
+        await self.identifier.order.finalize()
 
         return self.status
 

@@ -1,9 +1,9 @@
+import datetime
 import enum
 import uuid
 
 from sqlalchemy import Column, Enum, DateTime, ForeignKey
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 
 from .base import Base, Serializer
@@ -40,26 +40,15 @@ class Challenge(Base, Serializer):
         "Authorization", back_populates="challenges", lazy="joined"
     )
     type = Column("type", Enum(ChallengeType), nullable=False)
-    _status = Column("status", Enum(ChallengeStatus), nullable=False)
-    validated = Column(DateTime)
+    status = Column("status", Enum(ChallengeStatus), nullable=False)
+    validated = Column(DateTime(timezone=True))
     token = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True)
-
-    @hybrid_property
-    def status(self):
-        return self._status
-
-    @status.setter
-    def status(self, new_status: ChallengeStatus):
-        self._status = new_status
-        # if new_status == ChallengeStatus.VALID:
-        #     self.authorization.status = AuthorizationStatus.VALID
 
     def url(self, request):
         return url_for(request, "challenge", id=str(self.challenge_id))
 
     def serialize(self, request=None):
         d = Serializer.serialize(self)
-        d["token"] = str(self.token)
         d["url"] = self.url(request)
         return d
 
@@ -68,3 +57,12 @@ class Challenge(Base, Serializer):
         return [
             cls(type=type_, status=ChallengeStatus.PENDING) for type_ in ChallengeType
         ]
+
+    async def finalize(self, session):
+        """
+        Sets the challenge's status and calls its parent authorization's finalize() method.
+        """
+        self.status = ChallengeStatus.VALID
+        self.validated = datetime.datetime.now(datetime.timezone.utc)
+        await self.authorization.finalize(session)
+        return self.status

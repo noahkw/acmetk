@@ -20,18 +20,13 @@ class Identifier(Base, Serializer):
     type = Column("type", Enum(IdentifierType))
     value = Column(String)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.order_id"), nullable=False)
-    order = relationship("Order", back_populates="identifiers")
+    order = relationship("Order", back_populates="identifiers", lazy="joined")
     authorizations = relationship(
         "Authorization",
         cascade="all, delete",
         back_populates="identifier",
         lazy="joined",
     )
-
-    def serialize(self, request=None):
-        d = Serializer.serialize(self)
-        # d['authorizations'] = Serializer.serialize_list(self.authorizations)
-        return d
 
     @classmethod
     def from_obj(cls, obj):

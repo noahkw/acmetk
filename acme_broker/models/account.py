@@ -34,7 +34,3 @@ class Account(Base, Serializer):
     status = Column("status", Enum(AccountStatus))
     contact = Column(JSON)
     orders = relationship("Order", cascade="all, delete", back_populates="account")
-
-    def serialize(self, request=None):
-        d = Serializer.serialize(self)
-        return d

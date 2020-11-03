@@ -1,6 +1,6 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, defaultload
 
 from acme_broker.models import (
     Account,
@@ -48,6 +48,18 @@ class Database:
     async def get_challenge(self, session, kid, challenge_id):
         statement = (
             select(Challenge)
+            .options(
+                defaultload(Challenge.authorization).selectinload(
+                    Authorization.challenges
+                )
+            )
+            .options(
+                defaultload(Challenge.authorization)
+                .selectinload(Authorization.identifier)
+                .selectinload(Identifier.order)
+                .selectinload(Order.identifiers)
+                .selectinload(Identifier.authorizations)
+            )
             .join(Authorization)
             .join(Identifier)
             .join(Order)

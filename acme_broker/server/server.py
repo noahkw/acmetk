@@ -297,7 +297,7 @@ class AcmeCA:
             if not authorization:
                 raise web.HTTPNotFound
 
-            await authorization.finalize(session)
+            # await authorization.finalize(session)
             serialized = authorization.serialize(request=request)
             await session.commit()
 
@@ -314,7 +314,7 @@ class AcmeCA:
 
             # TODO: validate challenge, simulate HTTP request by sleeping
             # await asyncio.sleep(1)
-            challenge.status = models.ChallengeStatus.VALID
+            await challenge.finalize(session)
             serialized = challenge.serialize(request=request)
             await session.commit()
 
@@ -335,7 +335,7 @@ class AcmeCA:
             if not order:
                 raise web.HTTPNotFound
 
-            _ = await order.finalize()
+            await order.finalize()
             serialized = order.serialize(request)
 
             await session.commit()
