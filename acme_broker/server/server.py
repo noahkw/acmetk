@@ -2,12 +2,10 @@ import asyncio
 import json
 import logging
 import typing
-from typing import Any, Optional
 
 import acme.messages
 from aiohttp import web
 from aiohttp.helpers import sentinel
-from aiohttp.typedefs import JSONEncoder, LooseHeaders
 from aiohttp.web_middlewares import middleware
 from cryptography.exceptions import InvalidSignature
 
@@ -32,36 +30,19 @@ async def handle_get(request):
 
 
 class AcmeResponse(web.Response):
-    def __init__(self, *args, nonce, **kwargs):
+    def __init__(self, nonce, directory_url, *args, links=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.headers.update({"Replay-Nonce": nonce, "Cache-Control": "no-store"})
+        if links is None:
+            links = []
 
-    @staticmethod
-    def json(
-        data: Any = sentinel,
-        *,
-        nonce=None,
-        text: str = None,
-        body: bytes = None,
-        status: int = 200,
-        reason: Optional[str] = None,
-        headers: LooseHeaders = None,
-        content_type: str = "application/json",
-        dumps: JSONEncoder = json.dumps,
-    ) -> web.Response:
-        if data is not sentinel:
-            if text or body:
-                raise ValueError("only one of data, text, or body should be specified")
-            else:
-                text = dumps(data)
-        return AcmeResponse(
-            text=text,
-            body=body,
-            status=status,
-            reason=reason,
-            headers=headers,
-            content_type=content_type,
-            nonce=nonce,
+        links.append(f'<{directory_url}>; rel="index"')
+
+        self.headers.update(
+            {
+                "Replay-Nonce": nonce,
+                "Cache-Control": "no-store",
+                "Link": ", ".join(links),
+            }
         )
 
 
@@ -130,6 +111,23 @@ class AcmeCA:
 
         return runner, ca
 
+    def _response(self, data=None, text=None, *args, **kwargs):
+        if data and text:
+            raise ValueError("only one of data, text, or body should be specified")
+        elif data and (data is not sentinel):
+            text = json.dumps(data)
+            kwargs.update({"content_type": "application/json"})
+        else:
+            text = data or text
+
+        return AcmeResponse(
+            self._issue_nonce(),
+            self.main_app.router["directory"].url_for(),
+            *args,
+            **kwargs,
+            text=text,
+        )
+
     def _issue_nonce(self):
         nonce = generate_nonce()
         logger.debug("Storing new nonce %s", nonce)
@@ -197,16 +195,10 @@ class AcmeCA:
             }
         )
 
-        return AcmeResponse.json(directory.to_json(), nonce=self._issue_nonce())
+        return self._response(directory.to_json())
 
     async def _new_nonce(self, request):
-        return AcmeResponse(
-            status=204,
-            headers={
-                "Cache-Control": "no-store",
-            },
-            nonce=self._issue_nonce(),
-        )
+        return self._response(status=204)
 
     async def _new_account(self, request):
         async with self._session() as session:
@@ -218,9 +210,8 @@ class AcmeCA:
                 if account.status != models.AccountStatus.VALID:
                     raise acme.messages.Error.with_code("unauthorized")
                 else:
-                    return AcmeResponse.json(
+                    return self._response(
                         account.serialize(),
-                        nonce=self._issue_nonce(),
                         headers={
                             "Location": url_for(request, "accounts", kid=account.kid)
                         },
@@ -245,10 +236,10 @@ class AcmeCA:
                     session.add(new_account)
                     kid = new_account.kid
                     await session.commit()
-                    return AcmeResponse.json(
+
+                    return self._response(
                         serialized,
                         status=201,
-                        nonce=self._issue_nonce(),
                         headers={"Location": url_for(request, "accounts", kid=kid)},
                     )
 
@@ -262,7 +253,7 @@ class AcmeCA:
             serialized = account.serialize()
 
             await session.commit()
-            return AcmeResponse.json(serialized, status=200, nonce=self._issue_nonce())
+            return self._response(serialized)
 
     async def _new_order(self, request):
         async with self._session() as session:
@@ -277,10 +268,9 @@ class AcmeCA:
             order_id = order.order_id
             await session.commit()
 
-        return AcmeResponse.json(
+        return self._response(
             serialized,
             status=201,
-            nonce=self._issue_nonce(),
             headers={"Location": url_for(request, "order", id=str(order_id))},
         )
 
@@ -296,7 +286,7 @@ class AcmeCA:
             serialized = authorization.serialize(request=request)
             await session.commit()
 
-        return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
+        return self._response(serialized)
 
     async def _challenge(self, request):
         async with self._session() as session:
@@ -316,18 +306,13 @@ class AcmeCA:
 
             asyncio.ensure_future(self._handle_challenge_finalize(kid, challenge_id))
 
-        return AcmeResponse.json(
-            serialized,
-            nonce=self._issue_nonce(),
-            status=200,
-            headers={"Link": f'<{authz_url}>; rel="up"'},
-        )
+        return self._response(serialized, links=[f'<{authz_url}>; rel="up"'])
 
     async def _revoke_cert(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(request, session, key_auth=True)
 
-        return AcmeResponse(nonce=self._issue_nonce(), status=404)
+        return self._response(status=404)
 
     async def _order(self, request):
         async with self._session() as session:
@@ -342,7 +327,7 @@ class AcmeCA:
 
             await session.commit()
 
-        return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
+        return self._response(serialized)
 
     async def _finalize_order(self, request):
         async with self._session() as session:
@@ -368,11 +353,8 @@ class AcmeCA:
 
             asyncio.ensure_future(self._handle_order_finalize(kid, order_id))
 
-        return AcmeResponse.json(
-            serialized,
-            nonce=self._issue_nonce(),
-            status=200,
-            headers={"Location": url_for(request, "order", id=order_id)},
+        return self._response(
+            serialized, headers={"Location": url_for(request, "order", id=order_id)}
         )
 
     async def _certificate(self, request):
@@ -388,11 +370,8 @@ class AcmeCA:
 
             cert = certificate.cert
 
-        return AcmeResponse(
-            text=serialize_cert(self.root_cert).decode()
-            + serialize_cert(cert).decode(),
-            nonce=self._issue_nonce(),
-            status=200,
+        return self._response(
+            text=serialize_cert(self.root_cert).decode() + serialize_cert(cert).decode()
         )
 
     async def _handle_challenge_finalize(self, kid, challenge_id):
@@ -435,10 +414,9 @@ class AcmeCA:
             if error.code == "accountDoesNotExist":
                 status = 404
 
-            return AcmeResponse.json(
+            return self._response(
                 error.json_dumps(),
                 status=status,
-                nonce=self._issue_nonce(),
                 content_type="application/problem+json",
             )
         else:
