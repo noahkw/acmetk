@@ -6,7 +6,7 @@ from sqlalchemy import Column, Enum, String, types, JSON
 from sqlalchemy.orm import relationship
 
 from .base import Base, Serializer
-from ..util import serialize_pubkey, deserialize_pubkey
+from ..util import serialize_pubkey
 
 
 class AccountStatus(str, enum.Enum):
@@ -16,21 +16,21 @@ class AccountStatus(str, enum.Enum):
     REVOKED = "revoked"
 
 
-class ComparableRSAKeyType(types.TypeDecorator):
+class JWKType(types.TypeDecorator):
     impl = types.LargeBinary
 
     def process_bind_param(self, value, dialect):
         return serialize_pubkey(value)
 
     def process_result_value(self, value, dialect):
-        return josepy.util.ComparableRSAKey(deserialize_pubkey(value))
+        return josepy.jwk.JWK.load(data=value)
 
 
 class Account(Base, Serializer):
     __tablename__ = "accounts"
     __serialize__ = ["status", "contact"]
 
-    key = Column(ComparableRSAKeyType, index=True)
+    key = Column(JWKType, index=True)
     kid = Column(String, primary_key=True)
     status = Column("status", Enum(AccountStatus))
     contact = Column(JSON)

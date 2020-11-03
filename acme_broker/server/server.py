@@ -63,6 +63,7 @@ class AcmeCA:
                 web.post(
                     "/order/{id}/finalize", self._finalize_order, name="finalize-order"
                 ),
+                web.post("/orders/{kid}", self._orders, name="orders"),
                 web.post("/revoke-cert", self._revoke_cert, name="revoke-cert"),
                 web.post("/accounts/{kid}", self._accounts, name="accounts"),
                 web.post("/authz/{id}", self._authz, name="authz"),
@@ -180,6 +181,11 @@ class AcmeCA:
             if not account:
                 logger.info("Could not find account with kid %s", kid)
                 raise acme.messages.Error.with_code("accountDoesNotExist")
+
+            try:
+                jws.verify(account.key)
+            except InvalidSignature:
+                raise acme.messages.Error.with_code("badPublicKey")
         else:
             raise acme.messages.Error.with_code("malformed")
 
