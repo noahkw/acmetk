@@ -16,7 +16,7 @@ from sqlalchemy.orm import relationship
 
 from . import Identifier, AuthorizationStatus, Authorization, Challenge
 from .base import Base, Serializer
-from ..util import url_for
+from ..util import url_for, names_of
 
 
 class CSRType(TypeDecorator):
@@ -73,6 +73,10 @@ class Order(Base, Serializer):
 
     def certificate_url(self, request):
         return url_for(request, "certificate", id=str(self.certificate.certificate_id))
+
+    def validate_csr(self):
+        identifiers = set(identifier.value for identifier in self.identifiers)
+        return identifiers == names_of(self.csr)
 
     async def finalize(self):
         if self.status != OrderStatus.PENDING:

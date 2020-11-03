@@ -412,6 +412,9 @@ class AcmeCA:
         async with self._session() as session:
             order = await self._db.get_order(session, kid, order_id)
 
+            if not order.validate_csr():
+                raise acme.messages.Error.with_code("badCSR")
+
             cert = generate_cert_from_csr(order.csr, self.root_cert, self.root_key)
             order.certificate = models.Certificate(
                 status=models.CertificateStatus.VALID, cert=cert
