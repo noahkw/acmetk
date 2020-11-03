@@ -297,7 +297,6 @@ class AcmeCA:
             if not authorization:
                 raise web.HTTPNotFound
 
-            # await authorization.finalize(session)
             serialized = authorization.serialize(request=request)
             await session.commit()
 
@@ -312,11 +311,13 @@ class AcmeCA:
             if not challenge:
                 raise web.HTTPNotFound
 
-            # TODO: validate challenge, simulate HTTP request by sleeping
-            # await asyncio.sleep(1)
-            await challenge.finalize(session)
+            challenge.status = models.ChallengeStatus.PROCESSING
+
             serialized = challenge.serialize(request=request)
+            kid = account.kid
             await session.commit()
+
+            asyncio.ensure_future(self._handle_challenge_finalize(kid, challenge_id))
 
         return AcmeResponse.json(serialized, nonce=self._issue_nonce(), status=200)
 
@@ -335,7 +336,6 @@ class AcmeCA:
             if not order:
                 raise web.HTTPNotFound
 
-            await order.finalize()
             serialized = order.serialize(request)
 
             await session.commit()
@@ -346,15 +346,12 @@ class AcmeCA:
         async with self._session() as session:
             jws, account = await self._verify_request(request, session, key_auth=False)
             order_id = request.match_info["id"]
-            # obj = acme.messages.CertificateRequest.json_loads(jws.payload)
 
             order = await self._db.get_order(session, account.kid, order_id)
             if not order:
                 raise web.HTTPNotFound
 
-            status = await order.finalize()
-
-            if status != models.OrderStatus.READY:
+            if order.status != models.OrderStatus.READY:
                 raise acme.messages.Error.with_code("orderNotReady")
 
             obj = json.loads(jws.payload)
@@ -362,14 +359,12 @@ class AcmeCA:
 
             order.csr = csr
             order.status = models.OrderStatus.PROCESSING
-            session.add(order)
-
-            asyncio.ensure_future(
-                self._handle_order_finalize(account.kid, order.order_id)
-            )
 
             serialized = order.serialize(request=request)
+            kid = account.kid
             await session.commit()
+
+            asyncio.ensure_future(self._handle_order_finalize(kid, order_id))
 
         return AcmeResponse.json(
             serialized,
@@ -394,6 +389,16 @@ class AcmeCA:
         return AcmeResponse(
             text=serialize_cert(cert).decode(), nonce=self._issue_nonce(), status=200
         )
+
+    async def _handle_challenge_finalize(self, kid, challenge_id):
+        logger.debug("Finalizing challenge %s", challenge_id)
+
+        async with self._session() as session:
+            challenge = await self._db.get_challenge(session, kid, challenge_id)
+            # simulate requests to Let's Encrypt CA
+            # await asyncio.sleep(3)
+            await challenge.finalize(session)
+            await session.commit()
 
     async def _handle_order_finalize(self, kid, order_id):
         # await asyncio.sleep(2)
