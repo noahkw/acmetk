@@ -1,3 +1,6 @@
+import datetime
+
+import asyncpg
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.inspection import inspect
 
@@ -19,14 +22,43 @@ Base.__repr__ = __repr__
 
 class Serializer(object):
     __serialize__ = []
+    __type_serializers__ = dict()
 
     def serialize(self, request=None):
         return {
-            c: getattr(self, c)
+            c: self._serialize_value(getattr(self, c))
             for c in inspect(self).attrs.keys()
             if c in self.__serialize__
         }
 
+    def _serialize_value(self, value):
+        if (type_ := type(value)) in self.__type_serializers__:
+            return self.__type_serializers__[type_](value)
+        else:
+            return value
+
     @staticmethod
     def serialize_list(list_, request=None):
         return [m.serialize(request=request) for m in list_]
+
+    @staticmethod
+    def type_serializer(type_):
+        def deco(func):
+            Serializer.__type_serializers__[type_] = func
+
+            def wrapped(*args, **kwargs):
+                return func(*args, **kwargs)
+
+            return wrapped
+
+        return deco
+
+
+@Serializer.type_serializer(datetime.datetime)
+def serialize_datetime(date_time):
+    return date_time.isoformat()
+
+
+@Serializer.type_serializer(asyncpg.pgproto.pgproto.UUID)
+def serialize_uuid(uuid_):
+    return str(uuid_)
