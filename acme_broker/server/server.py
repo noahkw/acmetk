@@ -257,11 +257,7 @@ class AcmeCA:
             jws, account = await self._verify_request(request, session)
             upd = acme.messages.Registration.json_loads(jws.payload)
 
-            if contact := upd.contact:
-                logger.debug(
-                    "Updating contact info for account %s: %s", account.kid, contact
-                )
-                account.contact = json.dumps(contact)
+            account.update(upd)
 
             serialized = account.serialize()
 
@@ -427,6 +423,8 @@ class AcmeCA:
             status = 400
             if error.code == "orderNotReady":
                 status = 403
+            if error.code == "accountDoesNotExist":
+                status = 404
 
             return AcmeResponse.json(
                 error.json_dumps(),
