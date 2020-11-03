@@ -111,7 +111,7 @@ class AcmeCA:
 
         return runner, ca
 
-    def _response(self, data=None, text=None, *args, **kwargs):
+    def _response(self, request, data=None, text=None, *args, **kwargs):
         if data and text:
             raise ValueError("only one of data, text, or body should be specified")
         elif data and (data is not sentinel):
@@ -122,7 +122,7 @@ class AcmeCA:
 
         return AcmeResponse(
             self._issue_nonce(),
-            self.main_app.router["directory"].url_for(),
+            url_for(request, "directory"),
             *args,
             **kwargs,
             text=text,
@@ -195,10 +195,10 @@ class AcmeCA:
             }
         )
 
-        return self._response(directory.to_json())
+        return self._response(request, directory.to_json())
 
     async def _new_nonce(self, request):
-        return self._response(status=204)
+        return self._response(request, status=204)
 
     async def _new_account(self, request):
         async with self._session() as session:
@@ -211,6 +211,7 @@ class AcmeCA:
                     raise acme.messages.Error.with_code("unauthorized")
                 else:
                     return self._response(
+                        request,
                         account.serialize(),
                         headers={
                             "Location": url_for(request, "accounts", kid=account.kid)
@@ -238,6 +239,7 @@ class AcmeCA:
                     await session.commit()
 
                     return self._response(
+                        request,
                         serialized,
                         status=201,
                         headers={"Location": url_for(request, "accounts", kid=kid)},
@@ -253,7 +255,7 @@ class AcmeCA:
             serialized = account.serialize()
 
             await session.commit()
-            return self._response(serialized)
+            return self._response(request, serialized)
 
     async def _new_order(self, request):
         async with self._session() as session:
@@ -269,6 +271,7 @@ class AcmeCA:
             await session.commit()
 
         return self._response(
+            request,
             serialized,
             status=201,
             headers={"Location": url_for(request, "order", id=str(order_id))},
@@ -286,7 +289,7 @@ class AcmeCA:
             serialized = authorization.serialize(request=request)
             await session.commit()
 
-        return self._response(serialized)
+        return self._response(request, serialized)
 
     async def _challenge(self, request):
         async with self._session() as session:
@@ -306,13 +309,13 @@ class AcmeCA:
 
             asyncio.ensure_future(self._handle_challenge_finalize(kid, challenge_id))
 
-        return self._response(serialized, links=[f'<{authz_url}>; rel="up"'])
+        return self._response(request, serialized, links=[f'<{authz_url}>; rel="up"'])
 
     async def _revoke_cert(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(request, session, key_auth=True)
 
-        return self._response(status=404)
+        return self._response(request, status=404)
 
     async def _order(self, request):
         async with self._session() as session:
@@ -327,7 +330,7 @@ class AcmeCA:
 
             await session.commit()
 
-        return self._response(serialized)
+        return self._response(request, serialized)
 
     async def _finalize_order(self, request):
         async with self._session() as session:
@@ -354,7 +357,9 @@ class AcmeCA:
             asyncio.ensure_future(self._handle_order_finalize(kid, order_id))
 
         return self._response(
-            serialized, headers={"Location": url_for(request, "order", id=order_id)}
+            request,
+            serialized,
+            headers={"Location": url_for(request, "order", id=order_id)},
         )
 
     async def _certificate(self, request):
@@ -371,7 +376,9 @@ class AcmeCA:
             cert = certificate.cert
 
         return self._response(
-            text=serialize_cert(self.root_cert).decode() + serialize_cert(cert).decode()
+            request,
+            text=serialize_cert(self.root_cert).decode()
+            + serialize_cert(cert).decode(),
         )
 
     async def _handle_challenge_finalize(self, kid, challenge_id):
@@ -415,6 +422,7 @@ class AcmeCA:
                 status = 404
 
             return self._response(
+                request,
                 error.json_dumps(),
                 status=status,
                 content_type="application/problem+json",
