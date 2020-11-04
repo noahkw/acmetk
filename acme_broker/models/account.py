@@ -7,7 +7,7 @@ from sqlalchemy.orm import relationship
 
 from . import OrderStatus
 from .base import Base, Serializer
-from ..util import serialize_pubkey, url_for
+from ..util import serialize_pubkey, url_for, names_of
 
 
 class AccountStatus(str, enum.Enum):
@@ -48,6 +48,18 @@ class Account(Base, Serializer):
             for order in self.orders
             if order.status == OrderStatus.PENDING
         ]
+
+    def authorized_identifiers(self):
+        identifiers = [
+            identifier for order in self.orders for identifier in order.identifiers
+        ]
+
+        return set(identifier.value for identifier in identifiers)
+
+    def validate_cert(self, cert):
+        authorized_identifiers = self.authorized_identifiers()
+
+        return names_of(cert).issubset(authorized_identifiers)
 
     def update(self, upd):
         if contact := upd.contact:

@@ -42,7 +42,6 @@ class TestDatabase(unittest.IsolatedAsyncioTestCase):
                 account.key
             )
             assert result.key == account.key
-            assert account.serialize() == result.serialize()
 
             await session.commit()
 

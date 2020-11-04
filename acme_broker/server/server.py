@@ -9,7 +9,7 @@ from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
 from cryptography.exceptions import InvalidSignature
 
-from acme_broker import models
+from acme_broker import models, messages
 from acme_broker.database import Database
 from acme_broker.util import (
     generate_nonce,
@@ -19,7 +19,6 @@ from acme_broker.util import (
     generate_root_cert,
     generate_cert_from_csr,
     serialize_cert,
-    decode_csr,
 )
 
 logger = logging.getLogger(__name__)
@@ -59,12 +58,12 @@ class AcmeCA:
                 web.post("/new-account", self._new_account, name="new-account"),
                 web.head("/new-nonce", self._new_nonce, name="new-nonce"),
                 web.post("/new-order", self._new_order, name="new-order"),
+                web.post("/revoke-cert", self._revoke_cert, name="revoke-cert"),
                 web.post("/order/{id}", self._order, name="order"),
                 web.post(
                     "/order/{id}/finalize", self._finalize_order, name="finalize-order"
                 ),
                 web.post("/orders/{id}", self._orders, name="orders"),
-                web.post("/revoke-cert", self._revoke_cert, name="revoke-cert"),
                 web.post("/accounts/{kid}", self._accounts, name="accounts"),
                 web.post("/authz/{id}", self._authz, name="authz"),
                 web.post("/challenge/{id}", self._challenge, name="challenge"),
@@ -321,9 +320,31 @@ class AcmeCA:
 
     async def _revoke_cert(self, request):
         async with self._session() as session:
-            jws, account = await self._verify_request(request, session, key_auth=True)
+            try:
+                # check whether the message is signed using an account key
+                jws, account = await self._verify_request(
+                    request, session, key_auth=False
+                )
+                revocation = messages.Revocation.json_loads(jws.payload)
+                cert = revocation.certificate
 
-        return self._response(request, status=404)
+                certificate = await self._db.get_certificate(session, certificate=cert)
+                if not certificate:
+                    raise web.HTTPNotFound
+
+                # check that the account holds authorizations for all of the identifiers in the certificate
+                if not account.validate_cert(cert):
+                    raise acme.messages.Error.with_code("unauthorized")
+
+                # TODO: do actual revocation logic
+                certificate.status = models.CertificateStatus.REVOKED
+                await session.commit()
+            except acme.messages.Error:
+                # the message is likely signed using the certificate's private key
+                # TODO: case where request is signed using cert's private key
+                raise
+
+        return self._response(request, status=200)
 
     async def _order(self, request):
         async with self._session() as session:
@@ -358,10 +379,9 @@ class AcmeCA:
             if order.status != models.OrderStatus.READY:
                 raise acme.messages.Error.with_code("orderNotReady")
 
-            obj = json.loads(jws.payload)
-            csr = decode_csr(obj["csr"])
+            cert_request = messages.CertificateRequest.json_loads(jws.payload)
 
-            order.csr = csr
+            order.csr = cert_request.csr
             order.status = models.OrderStatus.PROCESSING
 
             serialized = order.serialize(request=request)
@@ -391,8 +411,8 @@ class AcmeCA:
 
         return self._response(
             request,
-            text=serialize_cert(self.root_cert).decode()
-            + serialize_cert(cert).decode(),
+            text=serialize_cert(cert).decode()
+            + serialize_cert(self.root_cert).decode(),
         )
 
     async def _handle_challenge_finalize(self, kid, challenge_id):
@@ -431,17 +451,11 @@ class AcmeCA:
         """
         try:
             response = await handler(request)
-        except acme.messages.errors.Error as error:
-            status = 400
-            if error.code == "orderNotReady":
-                status = 403
-            if error.code == "accountDoesNotExist":
-                status = 404
-
+        except acme.messages.Error as error:
             return self._response(
                 request,
                 error.json_dumps(),
-                status=status,
+                status=messages.get_status(error.code),
                 content_type="application/problem+json",
             )
         else:

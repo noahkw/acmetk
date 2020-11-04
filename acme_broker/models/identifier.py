@@ -4,6 +4,7 @@ from sqlalchemy import Column, Enum, Integer, ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
+from . import AuthorizationStatus
 from .base import Base, Serializer
 
 
@@ -31,3 +32,11 @@ class Identifier(Base, Serializer):
     @classmethod
     def from_obj(cls, obj):
         return cls(type=IdentifierType(obj.typ.name), value=obj.value)
+
+    def is_authorized(self):
+        return all(
+            [
+                authorization.status == AuthorizationStatus.VALID
+                for authorization in self.authorizations
+            ]
+        )

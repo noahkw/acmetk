@@ -157,16 +157,15 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
         await self._run(
             f"certonly --webroot --webroot-path {self.data.path} --domain {arg}"
         )
-        return
         arg = " --domain ".join(map(lambda s: f"dns.{s}", domains))
         await self._run(
             f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=dns --manual-auth-hook "
-            f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg}'
+            f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
         )
         arg = " --domain ".join(map(lambda s: f"http.{s}", domains))
         await self._run(
             f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=http --manual-auth-hook "
-            f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg}'
+            f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
         )
         for j in ["", "dns.", "http."]:
             try:
@@ -174,7 +173,7 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
                     f"revoke --cert-path {self.data.path}/etc/letsencrypt/live/{j}{domains[0]}/cert.pem"
                 )
             except Exception as e:
-                log.error(e)
+                log.exception(e)
         await self._run("renew")
 
     async def test_Register(self):

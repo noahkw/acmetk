@@ -57,4 +57,4 @@ class Certificate(Base, Serializer):
         UUID(as_uuid=True), ForeignKey("orders.order_id"), nullable=False, index=True
     )
     order = relationship("Order", back_populates="certificate")
-    cert = Column(x509Certifcate, nullable=False)
+    cert = Column(x509Certifcate, nullable=False, index=True)

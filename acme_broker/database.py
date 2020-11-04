@@ -80,15 +80,25 @@ class Database:
 
         return result[0] if result else None
 
-    async def get_certificate(self, session, kid, certificate_id):
-        statement = (
-            select(Certificate)
-            .join(Order)
-            .join(Account)
-            .filter(
-                (kid == Account.kid) & (Certificate.certificate_id == certificate_id)
+    async def get_certificate(
+        self, session, kid=None, certificate_id=None, certificate=None
+    ):
+        if kid and certificate_id:
+            statement = (
+                select(Certificate)
+                .join(Order)
+                .join(Account)
+                .filter(
+                    (kid == Account.kid)
+                    & (Certificate.certificate_id == certificate_id)
+                )
             )
-        )
-        result = (await session.execute(statement)).first()
+        elif certificate:
+            statement = select(Certificate).filter(Certificate.cert == certificate)
+        else:
+            raise ValueError(
+                "Either kid and certificate_id OR certificate should be specified"
+            )
 
+        result = (await session.execute(statement)).first()
         return result[0] if result else None
