@@ -37,7 +37,7 @@ class TestClient:
             f"{self.name}.test.de",
             thekey,
             dir_ / "the.csr",
-            names=[f"{self.name}.test.de"],
+            names=[f"{self.name}.test.de", f"{self.name}2.test.de"],
         )
 
         self.data = ClientData(key, csr, dir_)
@@ -126,7 +126,7 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
         r = await self.loop.run_in_executor(None, cbm.main, argv)
         return r
 
-    async def test_run(self):
+    def monkeypatch_certbot(self):
         import certbot.util
         import certbot._internal.log
         import certbot._internal.error_handler
@@ -145,6 +145,9 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
         )
 
         logging.config.dictConfig(self.config["logging"])
+
+    async def test_run(self):
+        self.monkeypatch_certbot()
 
         await self._run("certificates")
 
@@ -174,15 +177,34 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
                 )
             except Exception as e:
                 log.exception(e)
-        await self._run("renew")
+        # await self._run(f"renew --webroot --webroot-path {self.data.path}")
 
-    async def test_Register(self):
+    async def test_renewal(self):
+        self.monkeypatch_certbot()
+
+        await self._run(f"register --agree-tos  -m {self.contact}")
+        domains = sorted(
+            map(lambda x: x.lower(), acme_broker.util.names_of(self.data.csr)),
+            key=lambda s: s[::-1],
+        )
+        arg = " --domain ".join(domains)
+        await self._run(
+            f"certonly --webroot --webroot-path {self.data.path} --domain {arg}"
+        )
+
+        await self._run(
+            f"renew --no-random-sleep-on-renew --webroot --webroot-path {self.data.path}"
+        )
+
+    async def test_register(self):
+        self.monkeypatch_certbot()
         await self._run(f"register --agree-tos  -m {self.contact}")
 
-    async def test_Unregister(self):
+    async def test_unregister(self):
+        self.monkeypatch_certbot()
         try:
             await self._run("unregister --agree-tos")
         except Exception:
             pass
-        await self.test_Register()
+        await self.test_register()
         await self._run("unregister --agree-tos")

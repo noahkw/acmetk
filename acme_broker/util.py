@@ -97,7 +97,7 @@ def generate_cert_from_csr(csr, root_cert, root_key):
         .public_key(csr.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.utcnow() - timedelta(days=1))
-        .not_valid_after(datetime.utcnow() + timedelta(days=180))
+        .not_valid_after(datetime.utcnow() + timedelta(days=29))
         .add_extension(
             x509.SubjectAlternativeName([x509.DNSName(i) for i in names_of(csr)]),
             critical=False,
