@@ -50,7 +50,11 @@ def serialize_key(pk):
 
 
 def serialize_pubkey(pubkey):
-    return pubkey.public_bytes(
+    key = getattr(
+        pubkey, "key", pubkey
+    )  # this allows JWKRSA objects to be passed directly
+
+    return key.public_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PublicFormat.SubjectPublicKeyInfo,
     )

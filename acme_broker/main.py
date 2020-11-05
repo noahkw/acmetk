@@ -39,7 +39,7 @@ def ca(debug, config_file):
     if not debug:
 
         async def serve_forever():
-            _ = await AcmeCA.runner(*config["ca"].values())
+            _ = await AcmeCA.runner(config["ca"])
 
             while True:
                 await asyncio.sleep(3600)

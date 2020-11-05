@@ -46,9 +46,8 @@ class AcmeResponse(web.Response):
 
 
 class AcmeCA:
-    def __init__(self, host, base_route="/acme"):
-        self._host = host
-        self._base_route = base_route
+    def __init__(self, base_route="/acme", rsa_min_keysize=2048):
+        self._rsa_min_keysize = rsa_min_keysize
 
         self.main_app = web.Application()
         self.ca_app = web.Application(middlewares=[self._error_middleware])
@@ -95,18 +94,18 @@ class AcmeCA:
         )
 
     @classmethod
-    async def runner(cls, hostname, port, db_connection_string):
-        ca = AcmeCA(host=f"http://{hostname}:{port}", base_route="/acme")
-        db = Database(db_connection_string)
+    async def runner(cls, config):
+        db = Database(config["db"])
         await db.begin()
 
+        ca = AcmeCA(config["base_route"], config["rsa_min_keysize"])
         ca._db = db
         ca._session = db.session
 
         runner = web.AppRunner(ca.main_app)
         await runner.setup()
 
-        site = web.TCPSite(runner, hostname, port)
+        site = web.TCPSite(runner, config["hostname"], config["port"])
         await site.start()
 
         return runner, ca
@@ -163,7 +162,7 @@ class AcmeCA:
             if not jws.verify(sig.combined.jwk):
                 raise acme.messages.Error.with_code("unauthorized")
             else:
-                account = await self._db.get_account(session, key=sig.combined.jwk.key)
+                account = await self._db.get_account(session, key=sig.combined.jwk)
         elif sig.combined.kid:
             kid = sig.combined.kid.split("/")[-1]
 
@@ -204,7 +203,10 @@ class AcmeCA:
         async with self._session() as session:
             jws, account = await self._verify_request(request, session, key_auth=True)
             reg = acme.messages.Registration.json_loads(jws.payload)
-            key = jws.signature.combined.jwk.key
+            jwk = jws.signature.combined.jwk
+
+            if jwk.key.key_size < self._rsa_min_keysize:
+                raise acme.messages.Error.with_code("badPublicKey")
 
             if account:
                 if account.status != models.AccountStatus.VALID:
@@ -228,8 +230,8 @@ class AcmeCA:
                     )
                 else:  # create new account
                     new_account = models.Account(
-                        key=key,
-                        kid=sha256_hex_digest(serialize_pubkey(key)),
+                        key=jwk,
+                        kid=sha256_hex_digest(serialize_pubkey(jwk)),
                         status=models.AccountStatus.VALID,
                         contact=json.dumps(reg.contact),
                     )
@@ -387,6 +389,8 @@ class AcmeCA:
                 raise acme.messages.Error.with_code("orderNotReady")
 
             cert_request = messages.CertificateRequest.json_loads(jws.payload)
+            if cert_request.csr.public_key().key_size < self._rsa_min_keysize:
+                raise acme.messages.Error.with_code("badPublicKey")
 
             order.csr = cert_request.csr
             order.status = models.OrderStatus.PROCESSING

@@ -60,7 +60,7 @@ class TestClient:
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
         self.config = load_config("../debug.yml")
-        runner, ca = await AcmeCA.runner(*self.config["ca"].values())
+        runner, ca = await AcmeCA.runner(self.config["ca"])
         self.runner = runner
         self.ca = ca
 
