@@ -122,11 +122,6 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
     async def _run(self, cmd):
         argv = shlex.split(f"--non-interactive -c {self.data.path}/certbot.ini " + cmd)
         import certbot._internal.main as cbm
-
-        r = await self.loop.run_in_executor(None, cbm.main, argv)
-        return r
-
-    def monkeypatch_certbot(self):
         import certbot.util
         import certbot._internal.log
         import certbot._internal.error_handler
@@ -146,9 +141,10 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
 
         logging.config.dictConfig(self.config["logging"])
 
-    async def test_run(self):
-        self.monkeypatch_certbot()
+        r = await self.loop.run_in_executor(None, cbm.main, argv)
+        return r
 
+    async def test_run(self):
         await self._run("certificates")
 
         await self._run(f"register --agree-tos  -m {self.contact}")
@@ -180,8 +176,6 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
         # await self._run(f"renew --webroot --webroot-path {self.data.path}")
 
     async def test_renewal(self):
-        self.monkeypatch_certbot()
-
         await self._run(f"register --agree-tos  -m {self.contact}")
         domains = sorted(
             map(lambda x: x.lower(), acme_broker.util.names_of(self.data.csr)),
@@ -197,11 +191,9 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
         )
 
     async def test_register(self):
-        self.monkeypatch_certbot()
         await self._run(f"register --agree-tos  -m {self.contact}")
 
     async def test_unregister(self):
-        self.monkeypatch_certbot()
         try:
             await self._run("unregister --agree-tos")
         except Exception:
