@@ -314,8 +314,7 @@ class AcmeCA:
             authz_url = challenge.authorization.url(request)
             await session.commit()
 
-            asyncio.ensure_future(self._handle_challenge_finalize(kid, challenge_id))
-
+        asyncio.ensure_future(self._handle_challenge_finalize(kid, challenge_id))
         return self._response(request, serialized, links=[f'<{authz_url}>; rel="up"'])
 
     async def _revoke_cert(self, request):
@@ -376,6 +375,7 @@ class AcmeCA:
             if not order:
                 raise web.HTTPNotFound
 
+            await order.finalize()
             if order.status != models.OrderStatus.READY:
                 raise acme.messages.Error.with_code("orderNotReady")
 
@@ -388,8 +388,7 @@ class AcmeCA:
             kid = account.kid
             await session.commit()
 
-            asyncio.ensure_future(self._handle_order_finalize(kid, order_id))
-
+        asyncio.ensure_future(self._handle_order_finalize(kid, order_id))
         return self._response(
             request,
             serialized,
@@ -426,12 +425,12 @@ class AcmeCA:
             await session.commit()
 
     async def _handle_order_finalize(self, kid, order_id):
-        # await asyncio.sleep(2)
         logger.debug("Finalizing order %s", order_id)
 
         async with self._session() as session:
             order = await self._db.get_order(session, kid, order_id)
-
+            # simulate requests to Let's Encrypt CA
+            # await asyncio.sleep(3)
             if not order.validate_csr():
                 raise acme.messages.Error.with_code("badCSR")
 

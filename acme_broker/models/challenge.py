@@ -26,7 +26,7 @@ class ChallengeType(str, enum.Enum):
 
 class Challenge(Base, Serializer):
     __tablename__ = "challenges"
-    __serialize__ = ["type", "validated", "token"]
+    __serialize__ = ["type", "validated", "token", "status"]
 
     challenge_id = Column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
