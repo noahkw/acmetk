@@ -2,11 +2,11 @@ import enum
 import json
 
 import josepy
-from sqlalchemy import Column, Enum, String, types, JSON
+from sqlalchemy import Column, Enum, String, types, JSON, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 
 from . import OrderStatus
-from .base import Base, Serializer
+from .base import Serializer, Entity
 from ..util import serialize_pubkey, url_for, names_of
 
 
@@ -27,16 +27,24 @@ class JWKType(types.TypeDecorator):
         return josepy.jwk.JWK.load(data=value)
 
 
-class Account(Base, Serializer):
+class Account(Entity, Serializer):
     __tablename__ = "accounts"
-    __serialize__ = ["status", "contact"]
+    __serialize__ = __diff__ = frozenset(["status", "contact"])
+    __mapper_args__ = {
+        "polymorphic_identity": "account",
+    }
 
+    _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
     key = Column(JWKType, index=True)
     kid = Column(String, primary_key=True)
     status = Column("status", Enum(AccountStatus))
     contact = Column(JSON)
     orders = relationship(
-        "Order", cascade="all, delete", back_populates="account", lazy="joined"
+        "Order",
+        cascade="all, delete",
+        back_populates="account",
+        lazy="joined",
+        foreign_keys="Order.account_kid",
     )
 
     def orders_url(self, request):

@@ -2,11 +2,11 @@ import enum
 import uuid
 
 import cryptography
-from sqlalchemy import Column, Enum, ForeignKey, LargeBinary, TypeDecorator
+from sqlalchemy import Column, Enum, ForeignKey, LargeBinary, TypeDecorator, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from .base import Base, Serializer
+from .base import Serializer, Entity
 
 
 class x509Certifcate(TypeDecorator):
@@ -46,9 +46,14 @@ class CertificateStatus(str, enum.Enum):
     REVOKED = "revoked"
 
 
-class Certificate(Base, Serializer):
+class Certificate(Entity, Serializer):
     __tablename__ = "certificates"
+    __mapper_args__ = {
+        "polymorphic_identity": "certificate",
+    }
+    __diff__ = frozenset(["status"])
 
+    _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
     certificate_id = Column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
     )
@@ -56,5 +61,5 @@ class Certificate(Base, Serializer):
     order_id = Column(
         UUID(as_uuid=True), ForeignKey("orders.order_id"), nullable=False, index=True
     )
-    order = relationship("Order", back_populates="certificate")
+    order = relationship("Order", back_populates="certificate", foreign_keys=order_id)
     cert = Column(x509Certifcate, nullable=False, index=True)

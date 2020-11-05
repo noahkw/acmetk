@@ -1,8 +1,10 @@
 import datetime
 
 import asyncpg
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.inspection import inspect
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
@@ -18,6 +20,25 @@ def __repr__(self):
 
 
 Base.__repr__ = __repr__
+
+
+class Entity(Base):
+    __tablename__ = "entities"
+
+    entity = Column(Integer, primary_key=True, index=True)
+    identity = Column(String(50), index=True)
+    changes = relationship("Change", backref="entity")
+
+    __mapper_args__ = {"polymorphic_identity": "entity", "polymorphic_on": identity}
+
+
+class Change(Base):
+    __tablename__ = "changes"
+
+    change = Column(Integer, primary_key=True, index=True)
+    _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
+    timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
+    data = Column(JSON, nullable=False)
 
 
 class Serializer(object):

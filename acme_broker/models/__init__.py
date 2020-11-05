@@ -4,6 +4,7 @@ from .authorization import Authorization, AuthorizationStatus  # noqa
 from .identifier import Identifier, IdentifierType
 from .order import Order, OrderStatus
 from .account import Account, AccountStatus
+from .base import Change
 
 __all__ = [
     "Account",
@@ -19,4 +20,5 @@ __all__ = [
     "IdentifierType",
     "Order",
     "OrderStatus",
+    "Change",
 ]
