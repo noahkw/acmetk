@@ -4,6 +4,7 @@ import logging
 import typing
 
 import acme.messages
+import josepy
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
@@ -318,24 +319,36 @@ class AcmeCA:
                 jws, account = await self._verify_request(
                     request, session, key_auth=False
                 )
-                revocation = messages.Revocation.json_loads(jws.payload)
-                cert = revocation.certificate
+            except acme.messages.Error:
+                data = await request.text()
+                jws = acme.jws.JWS.json_loads(data)
+                account = None
 
-                certificate = await self._db.get_certificate(session, certificate=cert)
-                if not certificate:
-                    raise web.HTTPNotFound
+            revocation = messages.Revocation.json_loads(jws.payload)
+            cert = revocation.certificate
 
+            certificate = await self._db.get_certificate(session, certificate=cert)
+            if not certificate:
+                raise web.HTTPNotFound
+
+            if account:
                 # check that the account holds authorizations for all of the identifiers in the certificate
                 if not account.validate_cert(cert):
                     raise acme.messages.Error.with_code("unauthorized")
+            else:
+                # the request was probably signed with the certificate's key pair
+                jwk = jws.signature.combined.jwk
+                cert_key = josepy.util.ComparableRSAKey(cert.public_key())
 
-                # TODO: do actual revocation logic
-                certificate.status = models.CertificateStatus.REVOKED
-                await session.commit()
-            except acme.messages.Error:
-                # the message is likely signed using the certificate's private key
-                # TODO: case where request is signed using cert's private key
-                raise
+                if cert_key != jwk.key:
+                    raise acme.messages.Error.with_code("malformed")
+
+                if not jws.verify(jwk):
+                    raise acme.messages.Error.with_code("unauthorized")
+
+            # TODO: do actual revocation logic
+            certificate.status = models.CertificateStatus.REVOKED
+            await session.commit()
 
         return self._response(request, status=200)
 

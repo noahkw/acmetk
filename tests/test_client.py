@@ -175,6 +175,22 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
                 log.exception(e)
         # await self._run(f"renew --webroot --webroot-path {self.data.path}")
 
+    async def test_skey_revocation(self):
+        await self._run(f"register --agree-tos  -m {self.contact}")
+        domains = sorted(
+            map(lambda x: x.lower(), acme_broker.util.names_of(self.data.csr)),
+            key=lambda s: s[::-1],
+        )
+        arg = " --domain ".join(domains)
+        await self._run(
+            f"certonly --webroot --webroot-path {self.data.path} --domain {arg}"
+        )
+
+        await self._run(
+            f"revoke --cert-path {self.data.path}/etc/letsencrypt/live/{domains[0]}/cert.pem "
+            f"--key-path {self.data.path}/etc/letsencrypt/live/{domains[0]}/privkey.pem"
+        )
+
     async def test_renewal(self):
         await self._run(f"register --agree-tos  -m {self.contact}")
         domains = sorted(
