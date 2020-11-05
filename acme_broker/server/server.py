@@ -7,7 +7,6 @@ import acme.messages
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
-from cryptography.exceptions import InvalidSignature
 
 from acme_broker import models, messages
 from acme_broker.database import Database
@@ -148,7 +147,6 @@ class AcmeCA:
         jws = acme.jws.JWS.json_loads(data)
         sig = jws.signature
 
-        # TODO: send error if verification unsuccessful
         protected = json.loads(sig.protected)
 
         nonce = protected.get("nonce", None)
@@ -161,10 +159,8 @@ class AcmeCA:
         logger.debug("Request has a %s", "jwk" if sig.combined.jwk else "kid")
 
         if key_auth:
-            try:
-                jws.verify(sig.combined.jwk)
-            except InvalidSignature:
-                raise acme.messages.Error.with_code("badPublicKey")
+            if not jws.verify(sig.combined.jwk):
+                raise acme.messages.Error.with_code("unauthorized")
             else:
                 account = await self._db.get_account(session, key=sig.combined.jwk.key)
         elif sig.combined.kid:
@@ -181,10 +177,8 @@ class AcmeCA:
                 logger.info("Could not find account with kid %s", kid)
                 raise acme.messages.Error.with_code("accountDoesNotExist")
 
-            try:
-                jws.verify(account.key)
-            except InvalidSignature:
-                raise acme.messages.Error.with_code("badPublicKey")
+            if not jws.verify(account.key):
+                raise acme.messages.Error.with_code("unauthorized")
         else:
             raise acme.messages.Error.with_code("malformed")
 
