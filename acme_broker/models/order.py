@@ -10,12 +10,13 @@ from sqlalchemy import (
     ForeignKey,
     LargeBinary,
     TypeDecorator,
+    Integer,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from . import Identifier, AuthorizationStatus, Authorization, Challenge
-from .base import Base, Serializer
+from .base import Serializer, Entity
 from ..util import url_for, names_of
 
 
@@ -46,22 +47,36 @@ class OrderStatus(str, enum.Enum):
     INVALID = "invalid"
 
 
-class Order(Base, Serializer):
+class Order(Entity, Serializer):
     __tablename__ = "orders"
-    __serialize__ = ["status", "expires", "notBefore", "notAfter"]
+    __serialize__ = __diff__ = frozenset(["status", "expires", "notBefore", "notAfter"])
+    __mapper_args__ = {
+        "polymorphic_identity": "order",
+    }
+
+    _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
 
     order_id = Column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
     )
     status = Column("status", Enum(OrderStatus), nullable=False)
     expires = Column(DateTime(timezone=True))
-    identifiers = relationship("Identifier", cascade="all, delete", lazy="joined")
+    identifiers = relationship(
+        "Identifier",
+        cascade="all, delete",
+        lazy="joined",
+        foreign_keys="Identifier.order_id",
+    )
     notBefore = Column(DateTime(timezone=True))
     notAfter = Column(DateTime(timezone=True))
     account_kid = Column(String, ForeignKey("accounts.kid"), nullable=False)
-    account = relationship("Account", back_populates="orders")
+    account = relationship("Account", back_populates="orders", foreign_keys=account_kid)
     certificate = relationship(
-        "Certificate", uselist=False, back_populates="order", lazy="joined"
+        "Certificate",
+        uselist=False,
+        back_populates="order",
+        lazy="joined",
+        foreign_keys="Certificate.order_id",
     )
     csr = Column(CSRType)
 

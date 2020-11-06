@@ -2,11 +2,11 @@ import datetime
 import enum
 import uuid
 
-from sqlalchemy import Column, Enum, DateTime, ForeignKey
+from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from .base import Base, Serializer
+from .base import Serializer, Entity
 from ..util import url_for
 
 
@@ -24,10 +24,14 @@ class ChallengeType(str, enum.Enum):
     DNS_01 = "dns-01"
 
 
-class Challenge(Base, Serializer):
+class Challenge(Entity, Serializer):
     __tablename__ = "challenges"
-    __serialize__ = ["type", "validated", "token", "status"]
+    __serialize__ = __diff__ = frozenset(["type", "validated", "token", "status"])
+    __mapper_args__ = {
+        "polymorphic_identity": "challenge",
+    }
 
+    _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
     challenge_id = Column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
     )
@@ -37,7 +41,10 @@ class Challenge(Base, Serializer):
         nullable=False,
     )
     authorization = relationship(
-        "Authorization", back_populates="challenges", lazy="joined"
+        "Authorization",
+        back_populates="challenges",
+        lazy="joined",
+        foreign_keys=authorization_id,
     )
     type = Column("type", Enum(ChallengeType), nullable=False)
     status = Column("status", Enum(ChallengeStatus), nullable=False)

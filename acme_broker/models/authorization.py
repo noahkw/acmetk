@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from . import ChallengeStatus, Challenge
-from .base import Base, Serializer
+from .base import Serializer, Entity
 from ..util import url_for
 
 
@@ -20,10 +20,14 @@ class AuthorizationStatus(str, enum.Enum):
     REVOKED = "revoked"
 
 
-class Authorization(Base, Serializer):
+class Authorization(Entity, Serializer):
     __tablename__ = "authorizations"
-    __serialize__ = ["status", "expires", "wildcard"]
+    __serialize__ = __diff__ = frozenset(["status", "expires", "wildcard"])
+    __mapper_args__ = {
+        "polymorphic_identity": "authorization",
+    }
 
+    _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
     authorization_id = Column(
         UUID(as_uuid=True),
         primary_key=True,
@@ -35,7 +39,10 @@ class Authorization(Base, Serializer):
         Integer, ForeignKey("identifiers.identifier_id"), nullable=False
     )
     identifier = relationship(
-        "Identifier", back_populates="authorizations", lazy="joined"
+        "Identifier",
+        back_populates="authorizations",
+        lazy="joined",
+        foreign_keys=identifier_id,
     )
     status = Column("status", Enum(AuthorizationStatus), nullable=False)
     expires = Column(DateTime(timezone=True))
@@ -45,6 +52,7 @@ class Authorization(Base, Serializer):
         cascade="all, delete",
         back_populates="authorization",
         lazy="joined",
+        foreign_keys="Challenge.authorization_id",
     )
 
     def url(self, request):

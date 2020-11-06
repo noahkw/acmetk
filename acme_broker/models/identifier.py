@@ -5,7 +5,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from . import AuthorizationStatus
-from .base import Base, Serializer
+from .base import Serializer, Entity
 
 
 class IdentifierType(str, enum.Enum):
@@ -13,20 +13,26 @@ class IdentifierType(str, enum.Enum):
     DNS = "dns"
 
 
-class Identifier(Base, Serializer):
+class Identifier(Entity, Serializer):
     __tablename__ = "identifiers"
-    __serialize__ = ["type", "value"]
+    __serialize__ = __diff__ = frozenset(["type", "value"])
+    __mapper_args__ = {
+        "polymorphic_identity": "identifier",
+    }
 
+    _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
     identifier_id = Column(Integer, primary_key=True)
     type = Column("type", Enum(IdentifierType))
     value = Column(String)
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.order_id"), nullable=False)
-    order = relationship("Order", back_populates="identifiers", lazy="joined")
+    order = relationship(
+        "Order", back_populates="identifiers", lazy="joined", foreign_keys=order_id
+    )
     authorizations = relationship(
         "Authorization",
         cascade="all, delete",
-        back_populates="identifier",
         lazy="joined",
+        foreign_keys="Authorization.identifier_id",
     )
 
     @classmethod
