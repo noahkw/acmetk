@@ -56,10 +56,13 @@ class Authorization(Base, Serializer):
         checking for a completed challenge here would be redundant.
         """
 
-        # check whether at least one challenge is valid
+        # check whether at least one challenge is valid/invalid
         for challenge in self.challenges:
             if challenge.status == ChallengeStatus.VALID:
                 self.status = AuthorizationStatus.VALID
+                break
+            elif challenge.status == ChallengeStatus.INVALID:
+                self.status = AuthorizationStatus.INVALID
                 break
 
         # delete all other challenges
@@ -79,7 +82,10 @@ class Authorization(Base, Serializer):
 
     def update(self, upd):
         # the only allowed state transition is VALID -> DEACTIVATED if requested by the client
-        if upd.status == AuthorizationStatus.DEACTIVATED:
+        if (
+            self.status == AuthorizationStatus.VALID
+            and upd.status == AuthorizationStatus.DEACTIVATED
+        ):
             self.status = AuthorizationStatus.DEACTIVATED
         elif upd.status:
             raise ValueError(f"Cannot set an authorizations's status to {upd.status}")

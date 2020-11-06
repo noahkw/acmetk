@@ -88,6 +88,10 @@ class Order(Base, Serializer):
             for authorization in identifier.authorizations:
                 if authorization.status != AuthorizationStatus.VALID:
                     all_valid = False
+
+                    if authorization.status != AuthorizationStatus.PENDING:
+                        self.status = OrderStatus.INVALID
+
                     break
 
         self.status = OrderStatus.READY if all_valid else self.status
