@@ -9,7 +9,7 @@ from sqlalchemy.orm import relationship
 from .base import Serializer, Entity
 
 
-class x509Certifcate(TypeDecorator):
+class x509Certificate(TypeDecorator):
     """x509 Certificate as PEM"""
 
     impl = LargeBinary
@@ -62,4 +62,4 @@ class Certificate(Entity, Serializer):
         UUID(as_uuid=True), ForeignKey("orders.order_id"), nullable=False, index=True
     )
     order = relationship("Order", back_populates="certificate", foreign_keys=order_id)
-    cert = Column(x509Certifcate, nullable=False, index=True)
+    cert = Column(x509Certificate, nullable=False, index=True)
