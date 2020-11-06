@@ -112,16 +112,22 @@ def serialize_cert(cert):
 
 
 def generate_cert_from_csr(csr, root_cert, root_key):
+    names = list(names_of(csr))
+
+    subject = csr.subject or x509.Name(
+        [x509.NameAttribute(NameOID.COMMON_NAME, names[0])]
+    )
+
     cert = (
         x509.CertificateBuilder()
-        .subject_name(csr.subject)
+        .subject_name(subject)
         .issuer_name(root_cert.issuer)
         .public_key(csr.public_key())
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.utcnow() - timedelta(days=1))
         .not_valid_after(datetime.utcnow() + timedelta(days=29))
         .add_extension(
-            x509.SubjectAlternativeName([x509.DNSName(i) for i in names_of(csr)]),
+            x509.SubjectAlternativeName([x509.DNSName(i) for i in names]),
             critical=False,
         )
         .sign(root_key, hashes.SHA256())
