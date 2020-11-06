@@ -1,11 +1,11 @@
 import enum
 import uuid
 
-from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer, Boolean, delete
+from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from . import ChallengeStatus, Challenge
+from . import ChallengeStatus
 from .base import Serializer, Entity
 from ..util import url_for
 
@@ -36,11 +36,15 @@ class Authorization(Entity, Serializer):
         nullable=False,
     )
     identifier_id = Column(
-        Integer, ForeignKey("identifiers.identifier_id"), nullable=False
+        Integer,
+        ForeignKey("identifiers.identifier_id"),
+        nullable=False,
+        unique=True,
+        index=True,
     )
     identifier = relationship(
         "Identifier",
-        back_populates="authorizations",
+        back_populates="authorization",
         lazy="joined",
         foreign_keys=identifier_id,
     )
@@ -58,34 +62,19 @@ class Authorization(Entity, Serializer):
     def url(self, request):
         return url_for(request, "authz", id=str(self.authorization_id))
 
-    async def finalize(self, session):
-        """
-        Should only be called by a child challenge as it's done being validated, thus
-        checking for a completed challenge here would be redundant.
-        """
+    async def validate(self, session):
+        if self.status != AuthorizationStatus.PENDING:
+            return self.status
+
+        statuses = {challenge.status for challenge in self.challenges}
 
         # check whether at least one challenge is valid/invalid
-        for challenge in self.challenges:
-            if challenge.status == ChallengeStatus.VALID:
-                self.status = AuthorizationStatus.VALID
-                break
-            elif challenge.status == ChallengeStatus.INVALID:
-                self.status = AuthorizationStatus.INVALID
-                break
+        if ChallengeStatus.INVALID in statuses:
+            self.status = AuthorizationStatus.INVALID
+        elif ChallengeStatus.VALID in statuses:
+            self.status = AuthorizationStatus.VALID
 
-        # delete all other challenges
-        if self.status == AuthorizationStatus.VALID:
-            statement = delete(Challenge).filter(
-                (Challenge.authorization_id == self.authorization_id)
-                & (
-                    (Challenge.status == ChallengeStatus.PENDING)
-                    | (Challenge.status == ChallengeStatus.PROCESSING)
-                )
-            )
-            await session.execute(statement)
-
-        await self.identifier.order.finalize()
-
+        await self.identifier.order.validate()
         return self.status
 
     def update(self, upd):
@@ -105,10 +94,8 @@ class Authorization(Entity, Serializer):
         return d
 
     @classmethod
-    def create_all(cls, identifier):
-        return [
-            cls(
-                status=AuthorizationStatus.PENDING,
-                wildcard=identifier.value.startswith("*"),
-            )
-        ]
+    def for_identifier(cls, identifier):
+        return cls(
+            status=AuthorizationStatus.PENDING,
+            wildcard=identifier.value.startswith("*"),
+        )

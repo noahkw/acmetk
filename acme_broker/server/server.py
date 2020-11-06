@@ -397,7 +397,6 @@ class AcmeCA:
             if not order:
                 raise web.HTTPNotFound
 
-            await order.finalize()
             if order.status != models.OrderStatus.READY:
                 raise acme.messages.Error.with_code("orderNotReady")
 
@@ -459,7 +458,7 @@ class AcmeCA:
             challenge = await self._db.get_challenge(session, kid, challenge_id)
             # simulate requests to Let's Encrypt CA
             # await asyncio.sleep(3)
-            await challenge.finalize(session)
+            await challenge.validate(session)
             await session.commit()
 
     async def _handle_order_finalize(self, kid, order_id):

@@ -59,7 +59,11 @@ class Certificate(Entity, Serializer):
     )
     status = Column("status", Enum(CertificateStatus), nullable=False)
     order_id = Column(
-        UUID(as_uuid=True), ForeignKey("orders.order_id"), nullable=False, index=True
+        UUID(as_uuid=True),
+        ForeignKey("orders.order_id"),
+        nullable=False,
+        index=True,
+        unique=True,
     )
     order = relationship("Order", back_populates="certificate", foreign_keys=order_id)
     cert = Column(x509Certificate, nullable=False, index=True)

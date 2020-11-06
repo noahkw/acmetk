@@ -65,11 +65,14 @@ class Challenge(Entity, Serializer):
             cls(type=type_, status=ChallengeStatus.PENDING) for type_ in ChallengeType
         ]
 
-    async def finalize(self, session):
+    async def validate(self, session):
         """
         Sets the challenge's status and calls its parent authorization's finalize() method.
         """
+        if self.status not in [ChallengeStatus.PENDING, ChallengeStatus.PROCESSING]:
+            return self.status
+
         self.status = ChallengeStatus.VALID
         self.validated = datetime.datetime.now(datetime.timezone.utc)
-        await self.authorization.finalize(session)
+        await self.authorization.validate(session)
         return self.status

@@ -28,10 +28,12 @@ class Identifier(Entity, Serializer):
     order = relationship(
         "Order", back_populates="identifiers", lazy="joined", foreign_keys=order_id
     )
-    authorizations = relationship(
+    authorization = relationship(
         "Authorization",
         cascade="all, delete",
         lazy="joined",
+        uselist=False,
+        single_parent=True,
         foreign_keys="Authorization.identifier_id",
     )
 
@@ -40,9 +42,4 @@ class Identifier(Entity, Serializer):
         return cls(type=IdentifierType(obj.typ.name), value=obj.value)
 
     def is_authorized(self):
-        return all(
-            [
-                authorization.status == AuthorizationStatus.VALID
-                for authorization in self.authorizations
-            ]
-        )
+        return self.authorization.status == AuthorizationStatus.VALID

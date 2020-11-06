@@ -74,6 +74,7 @@ class Order(Entity, Serializer):
     certificate = relationship(
         "Certificate",
         uselist=False,
+        single_parent=True,
         back_populates="order",
         lazy="joined",
         foreign_keys="Certificate.order_id",
@@ -93,40 +94,29 @@ class Order(Entity, Serializer):
         identifiers = set(identifier.value for identifier in self.identifiers)
         return identifiers == names_of(csr)
 
-    async def finalize(self):
+    async def validate(self):
         if self.status != OrderStatus.PENDING:
             return self.status
 
-        all_valid = True
-
         for identifier in self.identifiers:
-            for authorization in identifier.authorizations:
-                if authorization.status != AuthorizationStatus.VALID:
-                    all_valid = False
+            if identifier.authorization.status == AuthorizationStatus.INVALID:
+                self.status = OrderStatus.INVALID
+                break
+            if identifier.authorization.status != AuthorizationStatus.VALID:
+                break
+        else:
+            self.status = OrderStatus.READY
 
-                    if authorization.status != AuthorizationStatus.PENDING:
-                        self.status = OrderStatus.INVALID
-
-                    break
-
-        self.status = OrderStatus.READY if all_valid else self.status
         return self.status
 
     def serialize(self, request=None):
         d = Serializer.serialize(self)
         d["identifiers"] = Serializer.serialize_list(self.identifiers)
-
-        authorizations = []
-        for identifier in self.identifiers:
-            authorizations.extend(
-                [
-                    authorization.url(request)
-                    for authorization in identifier.authorizations
-                    if authorization.status == AuthorizationStatus.PENDING
-                ]
-            )
-
-        d["authorizations"] = authorizations
+        d["authorizations"] = [
+            identifier.authorization.url(request)
+            for identifier in self.identifiers
+            if identifier.authorization.status == AuthorizationStatus.PENDING
+        ]
         d["finalize"] = self.finalize_url(request)
 
         if self.status == OrderStatus.VALID:
@@ -140,10 +130,8 @@ class Order(Entity, Serializer):
             Identifier.from_obj(identifier) for identifier in obj.identifiers
         ]
         for identifier in identifiers:
-            identifier.authorizations = Authorization.create_all(identifier)
-
-            for authorization in identifier.authorizations:
-                authorization.challenges = Challenge.create_all()
+            identifier.authorization = Authorization.for_identifier(identifier)
+            identifier.authorization.challenges = Challenge.create_all()
 
         order = Order(
             expires=obj.expires,

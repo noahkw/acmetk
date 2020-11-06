@@ -59,34 +59,30 @@ class TestDatabase(unittest.IsolatedAsyncioTestCase):
                 models.Identifier(
                     type=models.IdentifierType.DNS,
                     value="test.uni-hannover.de",
-                    authorizations=[
-                        models.Authorization(
-                            status=models.AuthorizationStatus.PENDING,
-                            wildcard=False,
-                            challenges=[
-                                models.Challenge(
-                                    type=models.ChallengeType.HTTP_01,
-                                    status=models.ChallengeStatus.PENDING,
-                                )
-                            ],
-                        ),
-                    ],
+                    authorization=models.Authorization(
+                        status=models.AuthorizationStatus.PENDING,
+                        wildcard=False,
+                        challenges=[
+                            models.Challenge(
+                                type=models.ChallengeType.HTTP_01,
+                                status=models.ChallengeStatus.PENDING,
+                            )
+                        ],
+                    ),
                 ),
                 models.Identifier(
                     type=models.IdentifierType.DNS,
                     value="test2.uni-hannover.de",
-                    authorizations=[
-                        models.Authorization(
-                            status=models.AuthorizationStatus.VALID,
-                            wildcard=False,
-                            challenges=[
-                                models.Challenge(
-                                    type=models.ChallengeType.DNS_01,
-                                    status=models.ChallengeStatus.INVALID,
-                                )
-                            ],
-                        ),
-                    ],
+                    authorization=models.Authorization(
+                        status=models.AuthorizationStatus.VALID,
+                        wildcard=False,
+                        challenges=[
+                            models.Challenge(
+                                type=models.ChallengeType.DNS_01,
+                                status=models.ChallengeStatus.INVALID,
+                            )
+                        ],
+                    ),
                 ),
             ]
 
@@ -99,10 +95,10 @@ class TestDatabase(unittest.IsolatedAsyncioTestCase):
                 ),
             ]
             for identifier in identifiers_:
-                identifier.authorizations = models.Authorization.create_all(identifier)
-
-                for authorization in identifier.authorizations:
-                    authorization.challenges = models.Challenge.create_all()
+                identifier.authorization = models.Authorization.for_identifier(
+                    identifier
+                )
+                identifier.authorization.challenges = models.Challenge.create_all()
 
             identifiers.extend(identifiers_)
 
@@ -117,21 +113,19 @@ class TestDatabase(unittest.IsolatedAsyncioTestCase):
             session.add(order)
 
             self.assertEqual(len(account.orders[0].identifiers), 4)
-            self.assertFalse(
-                account.orders[0].identifiers[1].authorizations[0].wildcard
-            )
+            self.assertFalse(account.orders[0].identifiers[1].authorization.wildcard)
             self.assertEqual(
-                account.orders[0].identifiers[0].authorizations[0].challenges[0].type,
+                account.orders[0].identifiers[0].authorization.challenges[0].type,
                 models.ChallengeType.HTTP_01,
             )
 
             await session.flush()
             self.assertIsNotNone(
-                account.orders[0].identifiers[1].authorizations[0].authorization_id
+                account.orders[0].identifiers[1].authorization.authorization_id
             )
             self.assertNotEqual(
-                account.orders[0].identifiers[3].authorizations[0].challenges[0].type,
-                account.orders[0].identifiers[3].authorizations[0].challenges[1].type,
+                account.orders[0].identifiers[3].authorization.challenges[0].type,
+                account.orders[0].identifiers[3].authorization.challenges[1].type,
             )
 
             await session.commit()

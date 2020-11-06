@@ -136,7 +136,7 @@ class Database:
                 .selectinload(Authorization.identifier)
                 .selectinload(Identifier.order)
                 .selectinload(Order.identifiers)
-                .selectinload(Identifier.authorizations)
+                .selectinload(Identifier.authorization)
             )
             .join(
                 Authorization,
