@@ -480,7 +480,7 @@ class AcmeCA:
             logger.debug("Returned ACME error: %s", serialized)
             return self._response(
                 request,
-                serialized,
+                text=serialized,
                 status=messages.get_status(error.code),
                 content_type="application/problem+json",
             )
