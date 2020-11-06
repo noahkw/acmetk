@@ -2,7 +2,6 @@ ca:
   hostname: 'localhost'
   port: 8000
   db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
-  base_route: '/acme'
   rsa_min_keysize: 2048
   cert: './root.crt'
   private_key: './root.key'

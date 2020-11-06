@@ -47,13 +47,12 @@ class AcmeResponse(web.Response):
 
 
 class AcmeCA:
-    def __init__(self, *, base_route="/acme", rsa_min_keysize=2048, cert, private_key):
+    def __init__(self, *, rsa_min_keysize=2048, cert, private_key):
         self._rsa_min_keysize = rsa_min_keysize
 
-        self.main_app = web.Application()
-        self.ca_app = web.Application(middlewares=[self._error_middleware])
+        self.app = web.Application(middlewares=[self._error_middleware])
 
-        self.ca_app.add_routes(
+        self.app.add_routes(
             [
                 web.post("/new-account", self._new_account, name="new-account"),
                 web.head("/new-nonce", self._new_nonce, name="new-nonce"),
@@ -68,21 +67,13 @@ class AcmeCA:
                 web.post("/authz/{id}", self._authz, name="authz"),
                 web.post("/challenge/{id}", self._challenge, name="challenge"),
                 web.post("/certificate/{id}", self._certificate, name="certificate"),
+                web.get("/directory", self._get_directory, name="directory"),
             ]
         )
-        self.ca_app.router.add_route("GET", "/new-nonce", self._new_nonce)
+        self.app.router.add_route("GET", "/new-nonce", self._new_nonce)
 
         # catch-all get
-        self.ca_app.router.add_route("GET", "/{tail:.*}", handle_get),
-
-        self.main_app.add_routes(
-            [
-                web.get("/directory", self._get_directory, name="directory"),
-                # catch-all get
-                # web.get('/{tail:.*}', handle_get),
-            ]
-        )
-        self.main_app.add_subapp(base_route, self.ca_app)
+        self.app.router.add_route("GET", "/{tail:.*}", handle_get),
 
         self._nonces = set()
 
@@ -98,7 +89,6 @@ class AcmeCA:
         await db.begin()
 
         ca = cls(
-            base_route=config["base_route"],
             rsa_min_keysize=config["rsa_min_keysize"],
             cert=config["cert"],
             private_key=config["private_key"],
@@ -106,7 +96,7 @@ class AcmeCA:
         ca._db = db
         ca._session = db.session
 
-        runner = web.AppRunner(ca.main_app)
+        runner = web.AppRunner(ca.app)
         await runner.setup()
 
         site = web.TCPSite(runner, config["hostname"], config["port"])
