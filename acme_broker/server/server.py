@@ -402,10 +402,25 @@ class AcmeCA:
                 raise acme.messages.Error.with_code("orderNotReady")
 
             cert_request = messages.CertificateRequest.json_loads(jws.payload)
-            if cert_request.csr.public_key().key_size < self._rsa_min_keysize:
-                raise acme.messages.Error.with_code("badPublicKey")
+            csr = cert_request.csr
 
-            order.csr = cert_request.csr
+            if csr.public_key().key_size < self._rsa_min_keysize:
+                raise acme.messages.Error.with_code(
+                    "badPublicKey",
+                    detail="Only RSA keys with more than 2048 bits are accepted.",
+                )
+            elif not csr.is_signature_valid:
+                raise acme.messages.Error.with_code(
+                    "badCSR", detail="The CSR's signature is invalid."
+                )
+            elif not order.validate_csr(csr):
+                raise acme.messages.Error.with_code(
+                    "badCSR",
+                    detail="The requested identifiers in the CSR differ from those "
+                    "that this order has authorizations for.",
+                )
+
+            order.csr = csr
             order.status = models.OrderStatus.PROCESSING
 
             serialized = order.serialize(request=request)
@@ -454,8 +469,6 @@ class AcmeCA:
             order = await self._db.get_order(session, kid, order_id)
             # simulate requests to Let's Encrypt CA
             # await asyncio.sleep(3)
-            if not order.validate_csr():
-                raise acme.messages.Error.with_code("badCSR")
 
             cert = generate_cert_from_csr(order.csr, self._cert, self._private_key)
             order.certificate = models.Certificate(

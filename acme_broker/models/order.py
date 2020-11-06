@@ -74,9 +74,9 @@ class Order(Base, Serializer):
     def certificate_url(self, request):
         return url_for(request, "certificate", id=str(self.certificate.certificate_id))
 
-    def validate_csr(self):
+    def validate_csr(self, csr):
         identifiers = set(identifier.value for identifier in self.identifiers)
-        return identifiers == names_of(self.csr)
+        return identifiers == names_of(csr)
 
     async def finalize(self):
         if self.status != OrderStatus.PENDING:
