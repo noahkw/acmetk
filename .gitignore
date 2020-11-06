@@ -149,6 +149,8 @@ dmypy.json
 
 # config
 *.key
+*.crt
+certbot/
 
 # db
 db_data/

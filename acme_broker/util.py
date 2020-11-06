@@ -64,10 +64,28 @@ def deserialize_pubkey(pem):
     return serialization.load_pem_public_key(pem)
 
 
+def deserialize_privatekey(pem):
+    return serialization.load_pem_private_key(pem, None)
+
+
+def deserialize_cert(pem):
+    return x509.load_pem_x509_certificate(pem)
+
+
 def save_key(pk, filename):
     pem = serialize_key(pk)
     with open(filename, "wb") as pem_out:
         pem_out.write(pem)
+
+
+def load_key(filename):
+    with open(filename, "rb") as pem:
+        return deserialize_privatekey(pem.read())
+
+
+def load_cert(filename):
+    with open(filename, "rb") as pem:
+        return deserialize_cert(pem.read())
 
 
 def sha256_hex_digest(data):
@@ -112,8 +130,8 @@ def generate_cert_from_csr(csr, root_cert, root_key):
     return cert
 
 
-def generate_root_cert(country, state, locality, org_name, common_name):
-    root_key = generate_rsa_key(Path("root.key"))
+def generate_root_cert(path: Path, country, state, locality, org_name, common_name):
+    root_key = generate_rsa_key(path)
 
     subject = x509.Name(
         [
@@ -137,6 +155,10 @@ def generate_root_cert(country, state, locality, org_name, common_name):
     )
 
     root_cert = root_cert_builder.sign(root_key, hashes.SHA256())
+
+    pem = serialize_cert(root_cert)
+    with open(path.parent / "root.crt", "wb") as pem_out:
+        pem_out.write(pem)
 
     return root_cert, root_key
 

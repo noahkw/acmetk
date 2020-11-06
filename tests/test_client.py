@@ -42,6 +42,10 @@ class TestClient:
 
         self.data = ClientData(key, csr, dir_)
 
+        _, _ = acme_broker.util.generate_root_cert(
+            Path("./root.key"), "DE", "Lower Saxony", "Hanover", "Acme Broker", "AB CA"
+        )
+
         self._rmtree = ["the.csr"]
 
     def tearDown(self):

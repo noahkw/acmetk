@@ -16,9 +16,10 @@ from acme_broker.util import (
     sha256_hex_digest,
     serialize_pubkey,
     url_for,
-    generate_root_cert,
     generate_cert_from_csr,
     serialize_cert,
+    load_cert,
+    load_key,
 )
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ class AcmeResponse(web.Response):
 
 
 class AcmeCA:
-    def __init__(self, base_route="/acme", rsa_min_keysize=2048):
+    def __init__(self, *, base_route="/acme", rsa_min_keysize=2048, cert, private_key):
         self._rsa_min_keysize = rsa_min_keysize
 
         self.main_app = web.Application()
@@ -88,17 +89,20 @@ class AcmeCA:
         self._db: typing.Optional[Database] = None
         self._session = None
 
-        # TODO: add possibility to persist/load root cert
-        self.root_cert, self.root_key = generate_root_cert(
-            "DE", "Lower Saxony", "Hanover", "Acme Broker", "AB CA"
-        )
+        self._cert = load_cert(cert)
+        self._private_key = load_key(private_key)
 
     @classmethod
     async def runner(cls, config):
         db = Database(config["db"])
         await db.begin()
 
-        ca = AcmeCA(config["base_route"], config["rsa_min_keysize"])
+        ca = cls(
+            base_route=config["base_route"],
+            rsa_min_keysize=config["rsa_min_keysize"],
+            cert=config["cert"],
+            private_key=config["private_key"],
+        )
         ca._db = db
         ca._session = db.session
 
@@ -430,8 +434,7 @@ class AcmeCA:
 
         return self._response(
             request,
-            text=serialize_cert(cert).decode()
-            + serialize_cert(self.root_cert).decode(),
+            text=serialize_cert(cert).decode() + serialize_cert(self._cert).decode(),
         )
 
     async def _handle_challenge_finalize(self, kid, challenge_id):
@@ -454,7 +457,7 @@ class AcmeCA:
             if not order.validate_csr():
                 raise acme.messages.Error.with_code("badCSR")
 
-            cert = generate_cert_from_csr(order.csr, self.root_cert, self.root_key)
+            cert = generate_cert_from_csr(order.csr, self._cert, self._private_key)
             order.certificate = models.Certificate(
                 status=models.CertificateStatus.VALID, cert=cert
             )
