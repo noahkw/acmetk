@@ -1,7 +1,11 @@
+import json
+
+import acme
 import cryptography
 import josepy
 from cryptography import x509
 
+from acme_broker import models
 
 ERROR_CODE_STATUS = {
     "unauthorized": 401,
@@ -47,3 +51,25 @@ def decode_csr(b64der):
 
 class CertificateRequest(josepy.JSONObjectWithFields):
     csr = josepy.Field("csr", decoder=decode_csr, encoder=encode_csr)
+
+
+class JSONDeSerializableAllowEmpty:
+    @classmethod
+    def json_loads(cls, json_string):
+        """Deserialize from JSON document string."""
+        try:
+            if len(json_string) == 0:
+                loads = "{}"
+            else:
+                loads = json.loads(json_string)
+        except ValueError as error:
+            raise josepy.errors.DeserializationError(error)
+        return cls.from_json(loads)
+
+
+class AuthorizationUpdate(JSONDeSerializableAllowEmpty, josepy.JSONObjectWithFields):
+    status = josepy.Field("status", decoder=models.AuthorizationStatus, omitempty=True)
+
+
+class AccountUpdate(JSONDeSerializableAllowEmpty, acme.messages.Registration):
+    status = josepy.Field("status", decoder=models.AccountStatus, omitempty=True)

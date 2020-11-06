@@ -252,9 +252,12 @@ class AcmeCA:
     async def _accounts(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
-            upd = acme.messages.Registration.json_loads(jws.payload)
+            upd = messages.AccountUpdate.json_loads(jws.payload)
 
-            account.update(upd)
+            try:
+                account.update(upd)
+            except ValueError as e:
+                raise acme.messages.Error.with_code("malformed", detail=e.args[0])
 
             serialized = account.serialize(request)
 
@@ -285,10 +288,16 @@ class AcmeCA:
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             authz_id = request.match_info["id"]
+            upd = messages.AuthorizationUpdate.json_loads(jws.payload)
 
             authorization = await self._db.get_authz(session, account.kid, authz_id)
             if not authorization:
                 raise web.HTTPNotFound
+
+            try:
+                authorization.update(upd)
+            except ValueError as e:
+                raise acme.messages.Error.with_code("malformed", detail=e.args[0])
 
             serialized = authorization.serialize(request=request)
             await session.commit()
@@ -462,9 +471,11 @@ class AcmeCA:
         try:
             response = await handler(request)
         except acme.messages.Error as error:
+            serialized = error.json_dumps()
+            logger.debug("Returned ACME error: %s", serialized)
             return self._response(
                 request,
-                error.json_dumps(),
+                serialized,
                 status=messages.get_status(error.code),
                 content_type="application/problem+json",
             )

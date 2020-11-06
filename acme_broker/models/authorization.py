@@ -77,6 +77,13 @@ class Authorization(Base, Serializer):
 
         return self.status
 
+    def update(self, upd):
+        # the only allowed state transition is VALID -> DEACTIVATED if requested by the client
+        if upd.status == AuthorizationStatus.DEACTIVATED:
+            self.status = AuthorizationStatus.DEACTIVATED
+        elif upd.status:
+            raise ValueError(f"Cannot set an authorizations's status to {upd.status}")
+
     def serialize(self, request=None):
         d = Serializer.serialize(self)
         d["challenges"] = Serializer.serialize_list(self.challenges, request=request)

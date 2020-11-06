@@ -66,8 +66,10 @@ class Account(Base, Serializer):
             self.contact = json.dumps(contact)
 
         # the only allowed state transition is VALID -> DEACTIVATED if requested by the client
-        if upd.status == "deactivated":
+        if upd.status == AccountStatus.DEACTIVATED:
             self.status = AccountStatus.DEACTIVATED
+        elif upd.status:
+            raise ValueError(f"Cannot set an account's status to {upd.status}")
 
     def serialize(self, request=None):
         d = super().serialize(request)
