@@ -141,9 +141,7 @@ class AcmeCA:
         jws = acme.jws.JWS.json_loads(data)
         sig = jws.signature
 
-        protected = json.loads(sig.protected)
-
-        nonce = protected.get("nonce", None)
+        nonce = acme.jose.b64.b64encode(sig.combined.nonce).decode()
         self._verify_nonce(nonce)
 
         # Check whether we have *either* a jwk or a kid

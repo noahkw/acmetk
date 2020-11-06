@@ -8,6 +8,7 @@ from pathlib import Path
 
 import acme_broker.util
 from acme_broker import AcmeCA
+from acme_broker.client import AcmeClient
 from acme_broker.main import load_config
 
 log = logging.getLogger("acme_broker.test_client")
@@ -220,3 +221,25 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
             pass
         await self.test_register()
         await self._run("unregister --agree-tos")
+
+
+class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        TestClient.setUp(self)
+
+    async def test_run(self):
+        key, csr, path = self.data
+        account_key_path = path / "account.key"
+        csr_path = path / "the.csr"
+
+        self.assertTrue(account_key_path.exists())
+        self.assertTrue(csr_path.exists())
+
+        client = AcmeClient(
+            directory_url=self.config["client"]["directory"],
+            private_key=account_key_path,
+        )
+        await client.get_directory()
+        await client._get_nonce()
+        await client.register_account("ourclient@test.de")
+        await client.close()
