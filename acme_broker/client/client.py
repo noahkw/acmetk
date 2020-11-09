@@ -1,4 +1,5 @@
 import abc
+import asyncio
 import enum
 import logging
 import typing
@@ -14,9 +15,21 @@ logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
 
 
+class AcmeClientException(Exception):
+    pass
+
+
+class CouldNotCompleteChallenge(AcmeClientException):
+    pass
+
+
 def load_key(filename):
     with open(filename, "rb") as pem:
         return pem.read()
+
+
+def is_valid(obj):
+    return obj.status == acme.messages.STATUS_VALID
 
 
 class ChallengeSolverType(enum.Enum):
@@ -26,13 +39,17 @@ class ChallengeSolverType(enum.Enum):
 
 class ChallengeSolver(abc.ABC):
     @abc.abstractmethod
-    async def solve_challenge(self, challenge):
+    async def complete_challenge(self, challenge):
         pass
 
 
 class DummySolver(ChallengeSolver):
-    async def solve_challenge(self, challenge):
-        return
+    async def complete_challenge(self, challenge):
+        logger.debug(
+            f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ}"
+        )
+        await asyncio.sleep(1)
+        return True
 
 
 class AcmeClient:
@@ -107,10 +124,56 @@ class AcmeClient:
             await self.get_authorization(authorization_url)
             for authorization_url in order.authorizations
         ]
-        return authorizations
 
-    async def complete_challenge(self, challenge_url):
-        pass
+        for authorization in authorizations:
+            for challenge in authorization.challenges:
+                type_ = ChallengeSolverType(challenge.chall.typ)
+                if solver := self._challenge_solvers.get(type_, None):
+                    await solver.complete_challenge(challenge)
+
+                    challenge_upd = await self.get_challenge(challenge.uri)
+                    if challenge_upd.status in (
+                        acme.messages.STATUS_PROCESSING,
+                        acme.messages.STATUS_VALID,
+                    ):
+                        # this authorization should be valid soon, skip to the next one
+                        break
+
+        results = await asyncio.gather(
+            *[
+                self._poll_until(
+                    self.get_authorization, authorization_url, predicate=is_valid
+                )
+                for authorization_url in order.authorizations
+            ]
+        )
+        return results
+
+    async def _poll_until(
+        self, coro, *args, predicate=None, delay=1.0, max_tries=5, **kwargs
+    ):
+        tries = max_tries
+        result = await coro(*args, **kwargs)
+        while tries > 0:
+            logger.debug(
+                "Polling %s%s, tries remaining: %d", coro.__name__, args, tries - 1
+            )
+            if predicate(result):
+                break
+
+            await asyncio.sleep(delay)
+            result = await coro(*args, **kwargs)
+            tries -= 1
+        else:
+            raise ValueError("Polling unsuccessful")
+
+        return result
+
+    async def get_challenge(self, challenge_url):
+        resp, challenge_obj = await self._signed_request(None, challenge_url)
+        challenge_upd = acme.messages.ChallengeBody.from_json(challenge_obj)
+
+        return challenge_upd
 
     def _wrap_in_jws(self, obj: typing.Optional[josepy.JSONDeSerializable], nonce, url):
         jobj = obj.json_dumps(indent=2).encode() if obj else b""
