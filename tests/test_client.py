@@ -236,15 +236,16 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
         self.assertTrue(csr_path.exists())
 
         client = AcmeClient(
-            directory_url=self.config["client"]["directory"],
+            directory_url=self.DIRECTORY,
             private_key=account_key_path,
         )
-        solver = acme_broker.client.client.DummySolver()
+
         client.register_challenge_solver(
-            (acme_broker.client.client.ChallengeSolverType.DNS_01,), solver
+            (acme_broker.client.client.ChallengeSolverType.DNS_01,),
+            acme_broker.client.client.DummySolver(),
         )
 
-        await client.get_directory()
+        await client.init()
         await client.register_account("ourclient@test.de")
         await client.get_orders()
 

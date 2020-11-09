@@ -35,6 +35,7 @@ def is_valid(obj):
 class ChallengeSolverType(enum.Enum):
     HTTP_01 = "http-01"
     DNS_01 = "dns-01"
+    TLS_ALPN_01 = "tls-alpn-01"
 
 
 class ChallengeSolver(abc.ABC):
@@ -69,9 +70,14 @@ class AcmeClient:
     async def close(self):
         await self._session.close()
 
-    async def get_directory(self):
+    async def init(self):
         async with self._session.get(self._directory_url) as resp:
             self._directory = await resp.json()
+
+        if not self._challenge_solvers.keys():
+            raise ValueError(
+                "There is no challenge solver registered with the client. Certificate retrieval will likely fail."
+            )
 
     async def _get_nonce(self, tries=NONCE_RETRIES):
         if tries < 1:
@@ -92,7 +98,7 @@ class AcmeClient:
 
         return nonce
 
-    async def register_account(self, email=None, phone=None):
+    async def register_account(self, email=None, phone=None) -> None:
         reg = acme.messages.Registration.from_data(
             email=email, phone=phone, terms_of_service_agreed=True
         )
@@ -103,27 +109,30 @@ class AcmeClient:
         account_obj["kid"] = resp.headers["Location"]
         self._account = messages.Account.from_json(account_obj)
 
-    async def get_orders(self):
+    async def get_orders(self) -> typing.List[str]:
+        if "orders" not in self._account:
+            return []
+
         resp, orders = await self._signed_request(None, self._account["orders"])
         return orders
 
-    async def get_order(self, order_url):
+    async def get_order(self, order_url) -> acme.messages.Order:
         resp, order = await self._signed_request(None, order_url)
         return acme.messages.Order.from_json(order)
 
-    async def get_authorization(self, authorization_url):
+    async def get_authorization(self, authorization_url) -> acme.messages.Authorization:
         resp, authorization = await self._signed_request(None, authorization_url)
         return acme.messages.Authorization.from_json(authorization)
 
     async def create_order(
         self, identifiers: typing.Union[typing.List[dict], typing.List[str]]
-    ):
+    ) -> acme.messages.Order:
         order = messages.NewOrder.from_data(identifiers=identifiers)
 
         resp, order_obj = await self._signed_request(order, self._directory["newOrder"])
         return acme.messages.Order.from_json(order_obj)
 
-    async def complete_authorizations(self, order: acme.messages.Order):
+    async def complete_authorizations(self, order: acme.messages.Order) -> None:
         authorizations = [
             await self.get_authorization(authorization_url)
             for authorization_url in order.authorizations
@@ -152,7 +161,7 @@ class AcmeClient:
             ]
         )
 
-    async def finalize_order(self, order, csr):
+    async def finalize_order(self, order, csr) -> acme.messages.Order:
         cert_req = messages.CertificateRequest(csr=csr)
         resp, order_obj = await self._signed_request(cert_req, order.finalize)
 
@@ -161,7 +170,7 @@ class AcmeClient:
         )
         return finalized
 
-    async def get_certificate(self, order):
+    async def get_certificate(self, order) -> str:
         resp, cert = await self._signed_request(None, order.certificate)
         return cert
 
@@ -185,7 +194,7 @@ class AcmeClient:
 
         return result
 
-    async def get_challenge(self, challenge_url):
+    async def get_challenge(self, challenge_url) -> acme.messages.ChallengeBody:
         resp, challenge_obj = await self._signed_request(None, challenge_url)
         challenge_upd = acme.messages.ChallengeBody.from_json(challenge_obj)
 
@@ -205,7 +214,9 @@ class AcmeClient:
     ):
         payload = self._wrap_in_jws(obj, await self._get_nonce(), url)
 
-        async with self._session.post(url, data=payload) as resp:
+        async with self._session.post(
+            url, data=payload, headers={"Content-Type": "application/jose+json"}
+        ) as resp:
             self._nonces.add(resp.headers.get("Replay-Nonce"))
 
             if resp.content_type == "application/json":
