@@ -20,6 +20,8 @@ from acme_broker.util import (
     serialize_cert,
     load_cert,
     load_key,
+    names_of,
+    deserialize_cert,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,7 +86,7 @@ class AcmeCA:
         self._private_key = load_key(private_key)
 
     @classmethod
-    async def runner(cls, config):
+    async def create_app(cls, config, **kwargs):
         db = Database(config["db"])
         await db.begin()
 
@@ -92,9 +94,16 @@ class AcmeCA:
             rsa_min_keysize=config["rsa_min_keysize"],
             cert=config["cert"],
             private_key=config["private_key"],
+            **kwargs,
         )
         ca._db = db
         ca._session = db.session
+
+        return ca
+
+    @classmethod
+    async def runner(cls, config, **kwargs):
+        ca = await cls.create_app(config, **kwargs)
 
         runner = web.AppRunner(ca.app)
         await runner.setup()
@@ -492,4 +501,31 @@ class AcmeProxy(AcmeCA):
 
 
 class AcmeBroker(AcmeCA):
-    pass
+    def __init__(self, *, client, **kwargs):
+        super().__init__(**kwargs)
+        self._client = client
+
+    async def _finalize_order(self, request):
+        return await super()._finalize_order(request)
+
+    async def _handle_order_finalize(self, kid, order_id):
+        logger.debug("Finalizing order %s", order_id)
+
+        async with self._session() as session:
+            order = await self._db.get_order(session, kid, order_id)
+            # requests to AcmeCA
+            await self._client.register_account("ourclient@test.de")
+
+            order_ca = await self._client.create_order(list(names_of(order.csr)))
+            await self._client.complete_authorizations(order_ca)
+            finalized = await self._client.finalize_order(order_ca, order.csr)
+            cert = deserialize_cert(
+                (await self._client.get_certificate(finalized)).encode()
+            )
+
+            order.certificate = models.Certificate(
+                status=models.CertificateStatus.VALID, cert=cert
+            )
+
+            order.status = models.OrderStatus.VALID
+            await session.commit()
