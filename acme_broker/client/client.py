@@ -79,24 +79,19 @@ class AcmeClient:
                 "There is no challenge solver registered with the client. Certificate retrieval will likely fail."
             )
 
-    async def _get_nonce(self, tries=NONCE_RETRIES):
-        if tries < 1:
-            raise ValueError(
-                f"Could not fetch a valid nonce from the server after {NONCE_RETRIES} retries."
-            )
-
-        nonce = None
-        try:
-            nonce = self._nonces.pop()
-        except KeyError:
-            while not nonce:
+    async def _get_nonce(self):
+        async def fetch_nonce():
+            try:
                 async with self._session.head(self._directory["newNonce"]) as resp:
                     logger.debug("Storing new nonce %s", resp.headers["Replay-Nonce"])
-                    self._nonces.add(resp.headers["Replay-Nonce"])
+                    return resp.headers["Replay-Nonce"]
+            except Exception as e:
+                logger.exception(e)
 
-                nonce = await self._get_nonce(tries=tries - 1)
-
-        return nonce
+        try:
+            return self._nonces.pop()
+        except KeyError:
+            return await self._poll_until(fetch_nonce, predicate=lambda x: x, delay=5.0)
 
     async def register_account(self, email=None, phone=None) -> None:
         reg = acme.messages.Registration.from_data(
@@ -190,7 +185,7 @@ class AcmeClient:
             result = await coro(*args, **kwargs)
             tries -= 1
         else:
-            raise ValueError("Polling unsuccessful")
+            raise ValueError(f"Polling unsuccessful: {coro.__name__}{args}")
 
         return result
 
