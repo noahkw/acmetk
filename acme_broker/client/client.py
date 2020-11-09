@@ -107,6 +107,10 @@ class AcmeClient:
         resp, orders = await self._signed_request(None, self._account["orders"])
         return orders
 
+    async def get_order(self, order_url):
+        resp, order = await self._signed_request(None, order_url)
+        return acme.messages.Order.from_json(order)
+
     async def get_authorization(self, authorization_url):
         resp, authorization = await self._signed_request(None, authorization_url)
         return acme.messages.Authorization.from_json(authorization)
@@ -139,7 +143,7 @@ class AcmeClient:
                         # this authorization should be valid soon, skip to the next one
                         break
 
-        results = await asyncio.gather(
+        await asyncio.gather(
             *[
                 self._poll_until(
                     self.get_authorization, authorization_url, predicate=is_valid
@@ -147,7 +151,19 @@ class AcmeClient:
                 for authorization_url in order.authorizations
             ]
         )
-        return results
+
+    async def finalize_order(self, order, csr):
+        cert_req = messages.CertificateRequest(csr=csr)
+        resp, order_obj = await self._signed_request(cert_req, order.finalize)
+
+        finalized = await self._poll_until(
+            self.get_order, resp.headers["Location"], predicate=is_valid
+        )
+        return finalized
+
+    async def get_certificate(self, order):
+        resp, cert = await self._signed_request(None, order.certificate)
+        return cert
 
     async def _poll_until(
         self, coro, *args, predicate=None, delay=1.0, max_tries=5, **kwargs
@@ -192,9 +208,15 @@ class AcmeClient:
         async with self._session.post(url, data=payload) as resp:
             self._nonces.add(resp.headers.get("Replay-Nonce"))
 
-            obj = await resp.json()
-            logger.debug(obj)
-            return resp, obj
+            if resp.content_type == "application/json":
+                data = await resp.json()
+            elif resp.content_type == "application/problem+json":
+                raise acme.messages.Error.from_json(await resp.json())
+            else:
+                data = await resp.text()
+
+            logger.debug(data)
+            return resp, data
 
     def register_challenge_solver(
         self,

@@ -305,7 +305,8 @@ class AcmeCA:
             if not challenge:
                 raise web.HTTPNotFound
 
-            challenge.status = models.ChallengeStatus.PROCESSING
+            if challenge.status == models.ChallengeStatus.PENDING:
+                challenge.status = models.ChallengeStatus.PROCESSING
 
             serialized = challenge.serialize(request=request)
             kid = account.kid

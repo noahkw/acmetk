@@ -249,9 +249,11 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
         await client.get_orders()
 
         domains = sorted(
-            map(lambda x: x.lower(), acme_broker.util.names_of(self.data.csr)),
+            acme_broker.util.names_of(self.data.csr),
             key=lambda s: s[::-1],
         )
         ord = await client.create_order(domains)
         await client.complete_authorizations(ord)
+        finalized = await client.finalize_order(ord, self.data.csr)
+        await client.get_certificate(finalized)
         await client.close()
