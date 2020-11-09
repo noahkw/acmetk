@@ -3,6 +3,7 @@ import json
 import acme
 import cryptography
 import josepy
+from acme.messages import ResourceBody
 from cryptography import x509
 
 from acme_broker import models
@@ -73,3 +74,39 @@ class AuthorizationUpdate(JSONDeSerializableAllowEmpty, josepy.JSONObjectWithFie
 
 class AccountUpdate(JSONDeSerializableAllowEmpty, acme.messages.Registration):
     status = josepy.Field("status", decoder=models.AccountStatus, omitempty=True)
+
+
+class NewOrder(ResourceBody):
+    """New Order Resource Body."""
+
+    identifiers = josepy.Field("identifiers", omitempty=True)
+    not_before = josepy.Field("notBefore", omitempty=True)
+    not_after = josepy.Field("notAfter", omitempty=True)
+
+    @classmethod
+    def from_data(cls, identifiers=None, not_before=None, not_after=None, **kwargs):
+        if type(identifiers[0]) is dict:
+            kwargs["identifiers"] = identifiers
+        elif type(identifiers[0]) is str:
+            kwargs["identifiers"] = [
+                dict(type="dns", value=identifier) for identifier in identifiers
+            ]
+        else:
+            raise ValueError(
+                "Could not decode identifiers list. Must be either List(str) or List(dict) where "
+                "the dict has two keys 'type' and 'value'"
+            )
+
+        kwargs["not_before"] = not_before
+        kwargs["not_after"] = not_after
+
+        return cls(**kwargs)
+
+
+class Account(ResourceBody):
+    """Account Resource Body."""
+
+    status = josepy.Field("status", omitempty=True)
+    contact = josepy.Field("contact", omitempty=True)
+    orders = josepy.Field("orders", omitempty=True)
+    kid = josepy.Field("kid")

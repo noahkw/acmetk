@@ -239,7 +239,19 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
             directory_url=self.config["client"]["directory"],
             private_key=account_key_path,
         )
+        solver = acme_broker.client.client.DummySolver()
+        client.register_challenge_solver(
+            (acme_broker.client.client.ChallengeSolverType.DNS_01,), solver
+        )
+
         await client.get_directory()
-        await client._get_nonce()
         await client.register_account("ourclient@test.de")
+        await client.get_orders()
+
+        domains = sorted(
+            map(lambda x: x.lower(), acme_broker.util.names_of(self.data.csr)),
+            key=lambda s: s[::-1],
+        )
+        ord = await client.create_order(domains)
+        await client.complete_authorizations(ord)
         await client.close()
