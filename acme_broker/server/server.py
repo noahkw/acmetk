@@ -395,6 +395,8 @@ class AcmeCA:
             if not order:
                 raise web.HTTPNotFound
 
+            await order.validate()
+
             if order.status != models.OrderStatus.READY:
                 raise acme.messages.Error.with_code("orderNotReady")
 

@@ -73,6 +73,8 @@ class DummySolver(ChallengeSolver):
 
 
 class AcmeClient:
+    FINALIZE_DELAY = 10.0
+
     def __init__(self, *, directory_url, private_key, contact=None):
         self._session = ClientSession()
 
@@ -199,7 +201,17 @@ class AcmeClient:
 
     async def finalize_order(self, order, csr) -> acme.messages.Order:
         cert_req = messages.CertificateRequest(csr=csr)
-        resp, order_obj = await self._signed_request(cert_req, order.finalize)
+
+        while True:
+            try:
+                resp, order_obj = await self._signed_request(cert_req, order.finalize)
+                break
+            except acme.messages.Error as e:
+                # Make sure that the order is in state READY before moving on.
+                if e.code == "orderNotReady":
+                    await asyncio.sleep(self.FINALIZE_DELAY)
+                else:
+                    raise e
 
         finalized = await self._poll_until(
             self.get_order, resp.headers["Location"], predicate=is_valid

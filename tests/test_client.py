@@ -227,7 +227,6 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         TestClient.setUp(self)
 
-    async def test_run(self):
         key, csr, path = self.data
         account_key_path = path / "account.key"
         csr_path = path / "the.csr"
@@ -235,6 +234,14 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
         self.assertTrue(account_key_path.exists())
         self.assertTrue(csr_path.exists())
 
+        self.client = self._make_client(account_key_path)
+
+        self.domains = sorted(
+            acme_broker.util.names_of(self.data.csr),
+            key=lambda s: s[::-1],
+        )
+
+    def _make_client(self, account_key_path):
         client = AcmeClient(
             directory_url=self.DIRECTORY,
             private_key=account_key_path,
@@ -246,15 +253,27 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
             acme_broker.client.client.DummySolver(),
         )
 
-        await client.start()
-        await client.get_orders()
+        return client
 
-        domains = sorted(
-            acme_broker.util.names_of(self.data.csr),
-            key=lambda s: s[::-1],
-        )
-        ord = await client.create_order(domains)
-        await client.complete_authorizations(ord)
-        finalized = await client.finalize_order(ord, self.data.csr)
-        await client.get_certificate(finalized)
-        await client.close()
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        await self.client.start()
+
+    async def asyncTearDown(self) -> None:
+        await super().asyncTearDown()
+        await self.client.close()
+
+    async def _run_one(self, client):
+        ord = await self.client.create_order(self.domains)
+        await self.client.complete_authorizations(ord)
+        finalized = await self.client.finalize_order(ord, self.data.csr)
+        await self.client.get_certificate(finalized)
+
+    async def test_run(self):
+        await self._run_one(self.client)
+
+    async def test_run_stress(self):
+        clients = [self._make_client(self.data.path / "account.key") for _ in range(10)]
+
+        await asyncio.gather(*[self._run_one(client) for client in clients])
+        await asyncio.gather(*[client.close() for client in clients])
