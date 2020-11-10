@@ -42,7 +42,7 @@ class TestBroker:
             f"{self.name}.test.de",
             thekey,
             dir_ / "the.csr",
-            names=[f"{self.name}.test.de", f"{self.name}2.test.de"],
+            names=[f"{self.name}.test.de".lower(), f"{self.name}2.test.de".lower()],
         )
 
         self.data = ClientData(key, csr, dir_)
@@ -137,3 +137,116 @@ class TestAcmetiny(TestBroker, unittest.IsolatedAsyncioTestCase):
             f"--directory-url {self.DIRECTORY_BROKER} --disable-check --contact {self.contact} --account-key "
             f"{account_key_path} --csr {csr_path} --acme-dir {self.data.path}/challenge "
         )
+
+
+class TestCertBot(TestBroker, unittest.IsolatedAsyncioTestCase):
+    def setUp(self) -> None:
+        TestBroker.setUp(self)
+        with open(self.data.path / "certbot.ini", "wt") as f:
+            f.write(
+                f"""server = {self.DIRECTORY_BROKER}
+config-dir = ./{self.data.path}/etc/letsencrypt
+work-dir = /home/noah/workspace/acme-broker/certbot/
+logs-dir = /home/noah/workspace/acme-broker/certbot/logs
+"""
+            )
+        self._rmtree.extend(["archive", "renewal", "live"])
+        self._rmtree.extend(["etc"])
+
+    async def _run(self, cmd):
+        argv = shlex.split(f"--non-interactive -c {self.data.path}/certbot.ini " + cmd)
+        import certbot._internal.main as cbm
+        import certbot.util
+        import certbot._internal.log
+        import certbot._internal.error_handler
+
+        certbot.util.atexit_register = lambda func, *argv, **kwargs: log.info(
+            f"patched certbot.util.atexit_register for {func}"
+        )
+        certbot._internal.error_handler.ErrorHandler._set_signal_handlers = lambda x: log.info(
+            "patched certbot._internal.error_handler.ErrorHandler._set_signal_handlers"
+        )
+        certbot._internal.log.pre_arg_parse_setup = lambda: log.info(
+            "patched certbot._internal.log.pre_arg_parse_setup"
+        )
+        certbot._internal.log.post_arg_parse_setup = lambda x: log.info(
+            "patched certbot._internal.log.post_arg_parse_setup"
+        )
+
+        logging.config.dictConfig(self.config["logging"])
+
+        r = await self.loop.run_in_executor(None, cbm.main, argv)
+        return r
+
+    async def test_run(self):
+        await self._run("certificates")
+
+        await self._run(f"register --agree-tos  -m {self.contact}")
+        domains = sorted(
+            map(lambda x: x.lower(), acme_broker.util.names_of(self.data.csr)),
+            key=lambda s: s[::-1],
+        )
+        arg = " --domain ".join(domains)
+        await self._run(
+            f"certonly --webroot --webroot-path {self.data.path} --domain {arg}"
+        )
+        arg = " --domain ".join(map(lambda s: f"dns.{s}", domains))
+        await self._run(
+            f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=dns --manual-auth-hook "
+            f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
+        )
+        arg = " --domain ".join(map(lambda s: f"http.{s}", domains))
+        await self._run(
+            f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=http --manual-auth-hook "
+            f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
+        )
+        for j in ["", "dns.", "http."]:
+            try:
+                await self._run(
+                    f"revoke --cert-path {self.data.path}/etc/letsencrypt/live/{j}{domains[0]}/cert.pem"
+                )
+            except Exception as e:
+                log.exception(e)
+        # await self._run(f"renew --webroot --webroot-path {self.data.path}")
+
+    async def test_skey_revocation(self):
+        await self._run(f"register --agree-tos  -m {self.contact}")
+        domains = sorted(
+            map(lambda x: x.lower(), acme_broker.util.names_of(self.data.csr)),
+            key=lambda s: s[::-1],
+        )
+        arg = " --domain ".join(domains)
+        await self._run(
+            f"certonly --webroot --webroot-path {self.data.path} --domain {arg}"
+        )
+
+        await self._run(
+            f"revoke --cert-path {self.data.path}/etc/letsencrypt/live/{domains[0]}/cert.pem "
+            f"--key-path {self.data.path}/etc/letsencrypt/live/{domains[0]}/privkey.pem"
+        )
+
+    async def test_renewal(self):
+        await self._run(f"register --agree-tos  -m {self.contact}")
+        domains = sorted(
+            map(lambda x: x.lower(), acme_broker.util.names_of(self.data.csr)),
+            key=lambda s: s[::-1],
+        )
+        arg = " --domain ".join(domains)
+        await self._run(
+            f"certonly --webroot --webroot-path {self.data.path} --domain {arg}"
+        )
+
+        await self._run(
+            f"renew --no-random-sleep-on-renew --webroot --webroot-path {self.data.path}"
+        )
+
+    async def test_register(self):
+        await self._run(f"register --agree-tos  -m {self.contact}")
+
+    async def test_unregister(self):
+        try:
+            await self._run("unregister --agree-tos")
+        except Exception:
+            pass
+        await self.test_register()
+        await self._run("unregister --agree-tos")

@@ -21,6 +21,7 @@ from acme_broker.util import (
     load_cert,
     load_key,
     names_of,
+    certs_from_fullchain,
 )
 
 logger = logging.getLogger(__name__)
@@ -537,8 +538,12 @@ class AcmeBroker(AcmeServerBase):
             finalized = await self._client.finalize_order(order_ca, order.csr)
             full_chain = await self._client.get_certificate(finalized)
 
+            certs = certs_from_fullchain(full_chain)
+
             order.certificate = models.Certificate(
-                status=models.CertificateStatus.VALID, full_chain=full_chain
+                status=models.CertificateStatus.VALID,
+                cert=certs[0],
+                full_chain=full_chain,
             )
 
             order.status = models.OrderStatus.VALID
@@ -559,6 +564,49 @@ class AcmeBroker(AcmeServerBase):
                 request,
                 text=certificate.full_chain,
             )
+
+    async def _revoke_cert(self, request):
+        async with self._session() as session:
+            try:
+                # check whether the message is signed using an account key
+                jws, account = await self._verify_request(
+                    request, session, key_auth=False
+                )
+            except acme.messages.Error:
+                data = await request.text()
+                jws = acme.jws.JWS.json_loads(data)
+                account = None
+
+            revocation = messages.Revocation.json_loads(jws.payload)
+            cert = revocation.certificate
+
+            certificate = await self._db.get_certificate(session, certificate=cert)
+            if not certificate:
+                raise web.HTTPNotFound
+
+            if account:
+                # check that the account holds authorizations for all of the identifiers in the certificate
+                if not account.validate_cert(cert):
+                    raise acme.messages.Error.with_code("unauthorized")
+            else:
+                # the request was probably signed with the certificate's key pair
+                jwk = jws.signature.combined.jwk
+                cert_key = josepy.util.ComparableRSAKey(cert.public_key())
+
+                if cert_key != jwk.key:
+                    raise acme.messages.Error.with_code("malformed")
+
+                if not jws.verify(jwk):
+                    raise acme.messages.Error.with_code("unauthorized")
+
+            revocation_succeeded = await self._client.revoke_certificate(cert)
+            if not revocation_succeeded:
+                raise acme.messages.Error.with_code("unauthorized")
+
+            certificate.status = models.CertificateStatus.REVOKED
+            await session.commit()
+
+        return self._response(request, status=200)
 
 
 class AcmeProxy(AcmeServerBase):
