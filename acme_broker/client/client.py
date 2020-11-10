@@ -115,6 +115,12 @@ class AcmeClient:
         account_obj["kid"] = resp.headers["Location"]
         self._account = messages.Account.from_json(account_obj)
 
+    async def deactivate_account(self) -> None:
+        reg = acme.messages.Registration(status=acme.messages.STATUS_DEACTIVATED)
+
+        await self._signed_request(reg, self._account.kid)
+        self._account = None
+
     async def get_orders(self) -> typing.List[str]:
         if "orders" not in self._account:
             return []

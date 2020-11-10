@@ -6,6 +6,8 @@ import shutil
 import unittest
 from pathlib import Path
 
+import acme
+
 import acme_broker.util
 from acme_broker import AcmeCA
 from acme_broker.client import AcmeClient
@@ -279,3 +281,12 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
         full_chain = await self._run_one(self.client)
         certs = acme_broker.util.certs_from_fullchain(full_chain)
         await self.client.revoke_certificate(certs[0])
+
+    async def test_unregister(self):
+        await self.client.start()
+        await self.client.deactivate_account()
+        try:
+            await self.client.start()
+        except acme.messages.Error as e:
+            if e.code == "unauthorized":
+                pass
