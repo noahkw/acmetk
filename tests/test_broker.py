@@ -72,8 +72,9 @@ class TestBroker:
         ca = await AcmeCA.create_app(self.config["ca"])
 
         client = AcmeClient(
-            directory_url=self.DIRECTORY_CA,
-            private_key=self.data.path / "acme_client.key",
+            directory_url=self.config["broker"]["client"]["directory"],
+            private_key=self.data.path / self.config["broker"]["client"]["private_key"],
+            contact=self.config["broker"]["client"]["contact"],
         )
 
         client.register_challenge_solver(
@@ -95,7 +96,7 @@ class TestBroker:
         )
         await site.start()
 
-        await client.init()
+        await client.start()
 
         self.runner = runner
         self.ca = ca

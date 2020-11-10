@@ -238,6 +238,7 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
         client = AcmeClient(
             directory_url=self.DIRECTORY,
             private_key=account_key_path,
+            contact={"email": self.contact},
         )
 
         client.register_challenge_solver(
@@ -245,8 +246,7 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
             acme_broker.client.client.DummySolver(),
         )
 
-        await client.init()
-        await client.register_account("ourclient@test.de")
+        await client.start()
         await client.get_orders()
 
         domains = sorted(

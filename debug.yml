@@ -12,9 +12,18 @@ broker:
   rsa_min_keysize: 2048
   cert: './root.crt'
   private_key: './root.key'
+  client:
+    directory: 'http://localhost:8000/ca/directory'
+    private_key: './account.key'
+    contact:
+      # phone: ''
+      email: 'woehler+testbrokerclient@luis.uni-hannover.de'
 client:
   directory: 'http://localhost:8000/directory'
   private_key: './account.key'
+  contact:
+    # phone: ''
+    email: 'woehler+testclient@luis.uni-hannover.de'
 logging:
   version: 1
   formatters:

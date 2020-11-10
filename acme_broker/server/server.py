@@ -103,15 +103,15 @@ class AcmeCA:
 
     @classmethod
     async def runner(cls, config, **kwargs):
-        ca = await cls.create_app(config, **kwargs)
+        instance = await cls.create_app(config, **kwargs)
 
-        runner = web.AppRunner(ca.app)
+        runner = web.AppRunner(instance.app)
         await runner.setup()
 
         site = web.TCPSite(runner, config["hostname"], config["port"])
         await site.start()
 
-        return runner, ca
+        return runner, instance
 
     def _response(self, request, data=None, text=None, *args, **kwargs):
         if data and text:
@@ -514,7 +514,6 @@ class AcmeBroker(AcmeCA):
         async with self._session() as session:
             order = await self._db.get_order(session, kid, order_id)
             # requests to AcmeCA
-            await self._client.register_account("ourclient@test.de")
 
             order_ca = await self._client.create_order(list(names_of(order.csr)))
             await self._client.complete_authorizations(order_ca)

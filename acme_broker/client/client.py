@@ -54,11 +54,12 @@ class DummySolver(ChallengeSolver):
 
 
 class AcmeClient:
-    def __init__(self, *, directory_url, private_key):
+    def __init__(self, *, directory_url, private_key, contact=None):
         self._session = ClientSession()
 
         self._directory_url = directory_url
         self._private_key = josepy.jwk.JWKRSA.load(load_key(private_key))
+        self._contact = {k: v for k, v in contact.items() if len(v) > 0}
 
         self._directory = dict()
         self._nonces = set()
@@ -70,7 +71,7 @@ class AcmeClient:
     async def close(self):
         await self._session.close()
 
-    async def init(self):
+    async def start(self):
         async with self._session.get(self._directory_url) as resp:
             self._directory = await resp.json()
 
@@ -78,6 +79,8 @@ class AcmeClient:
             raise ValueError(
                 "There is no challenge solver registered with the client. Certificate retrieval will likely fail."
             )
+
+        await self.register_account(**self._contact)
 
     async def _get_nonce(self):
         async def fetch_nonce():
