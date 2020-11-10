@@ -20,7 +20,19 @@ class AcmeClientException(Exception):
 
 
 class CouldNotCompleteChallenge(AcmeClientException):
-    pass
+    def __init__(self, challenge, *args):
+        super().__init__(*args)
+        self.challenge = challenge
+
+    def __str__(self):
+        return f"Could not complete challenge: {self.challenge}"
+
+
+class PollingException(AcmeClientException):
+    def __init__(self, msg, obj, *args):
+        super().__init__(*args)
+        self.msg = msg
+        self.obj = obj
 
 
 def load_key(filename):
@@ -41,6 +53,14 @@ class ChallengeSolverType(enum.Enum):
 class ChallengeSolver(abc.ABC):
     @abc.abstractmethod
     async def complete_challenge(self, challenge):
+        """Complete the given challenge.
+
+        This method should complete the given challenge and then delay
+        returning until the server is allowed to check for completion.
+
+        :param challenge: The challenge to be completed
+        :type challenge: acme.messages.ChallengeBody
+        """
         pass
 
 
@@ -49,8 +69,7 @@ class DummySolver(ChallengeSolver):
         logger.debug(
             f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ}"
         )
-        await asyncio.sleep(1)
-        return True
+        # await asyncio.sleep(1)
 
 
 class AcmeClient:
@@ -82,20 +101,6 @@ class AcmeClient:
 
         await self.register_account(**self._contact)
 
-    async def _get_nonce(self):
-        async def fetch_nonce():
-            try:
-                async with self._session.head(self._directory["newNonce"]) as resp:
-                    logger.debug("Storing new nonce %s", resp.headers["Replay-Nonce"])
-                    return resp.headers["Replay-Nonce"]
-            except Exception as e:
-                logger.exception(e)
-
-        try:
-            return self._nonces.pop()
-        except KeyError:
-            return await self._poll_until(fetch_nonce, predicate=lambda x: x, delay=5.0)
-
     async def register_account(self, email=None, phone=None) -> None:
         reg = acme.messages.Registration.from_data(
             email=email, phone=phone, terms_of_service_agreed=True
@@ -111,7 +116,7 @@ class AcmeClient:
         if "orders" not in self._account:
             return []
 
-        resp, orders = await self._signed_request(None, self._account["orders"])
+        _, orders = await self._signed_request(None, self._account["orders"])
         return orders
 
     async def get_order(self, order_url) -> acme.messages.Order:
@@ -127,7 +132,7 @@ class AcmeClient:
     ) -> acme.messages.Order:
         order = messages.NewOrder.from_data(identifiers=identifiers)
 
-        resp, order_obj = await self._signed_request(order, self._directory["newOrder"])
+        _, order_obj = await self._signed_request(order, self._directory["newOrder"])
         return acme.messages.Order.from_json(order_obj)
 
     async def complete_authorizations(self, order: acme.messages.Order) -> None:
@@ -136,20 +141,53 @@ class AcmeClient:
             for authorization_url in order.authorizations
         ]
 
+        challenge_types = set(
+            [
+                ChallengeSolverType(challenge.chall.typ)
+                for authorization in authorizations
+                for challenge in authorization.challenges
+            ]
+        )
+        possible_types = self._challenge_solvers.keys() & challenge_types
+
+        if len(possible_types) == 0:
+            raise ValueError(
+                f"The server offered the following challenge types but there is no solver "
+                f"that is able to complete them: {', '.join(possible_types)}"
+            )
+
+        chosen_challenge_type = possible_types.pop()
+        solver = self._challenge_solvers[chosen_challenge_type]
+        logger.debug(
+            "Chosen challenge type: %s, solver: %s",
+            chosen_challenge_type,
+            type(solver).__name__,
+        )
+
+        processing_challenges = []
+
         for authorization in authorizations:
             for challenge in authorization.challenges:
-                type_ = ChallengeSolverType(challenge.chall.typ)
-                if solver := self._challenge_solvers.get(type_, None):
+                if ChallengeSolverType(challenge.chall.typ) == chosen_challenge_type:
                     await solver.complete_challenge(challenge)
+                    processing_challenges.append(challenge)
 
-                    challenge_upd = await self.get_challenge(challenge.uri)
-                    if challenge_upd.status in (
-                        acme.messages.STATUS_PROCESSING,
-                        acme.messages.STATUS_VALID,
-                    ):
-                        # this authorization should be valid soon, skip to the next one
-                        break
+                    break
 
+        try:
+            await asyncio.gather(
+                *[
+                    self._poll_until(
+                        self.get_challenge, challenge.uri, predicate=is_valid, delay=5.0
+                    )
+                    for challenge in processing_challenges
+                ]
+            )
+        except PollingException as e:
+            raise CouldNotCompleteChallenge(e.obj)
+
+        # Realistically, polling for the authorizations to become valid should never fail since we have already
+        # ensured that one challenge per authorization is valid.
         await asyncio.gather(
             *[
                 self._poll_until(
@@ -169,8 +207,12 @@ class AcmeClient:
         return finalized
 
     async def get_certificate(self, order) -> str:
-        resp, cert = await self._signed_request(None, order.certificate)
+        _, cert = await self._signed_request(None, order.certificate)
         return cert
+
+    async def get_challenge(self, challenge_url) -> acme.messages.ChallengeBody:
+        _, challenge_obj = await self._signed_request(None, challenge_url)
+        return acme.messages.ChallengeBody.from_json(challenge_obj)
 
     async def _poll_until(
         self, coro, *args, predicate=None, delay=1.0, max_tries=5, **kwargs
@@ -188,15 +230,25 @@ class AcmeClient:
             result = await coro(*args, **kwargs)
             tries -= 1
         else:
-            raise ValueError(f"Polling unsuccessful: {coro.__name__}{args}")
+            raise PollingException(
+                f"Polling unsuccessful: {coro.__name__}{args}", result
+            )
 
         return result
 
-    async def get_challenge(self, challenge_url) -> acme.messages.ChallengeBody:
-        resp, challenge_obj = await self._signed_request(None, challenge_url)
-        challenge_upd = acme.messages.ChallengeBody.from_json(challenge_obj)
+    async def _get_nonce(self):
+        async def fetch_nonce():
+            try:
+                async with self._session.head(self._directory["newNonce"]) as resp:
+                    logger.debug("Storing new nonce %s", resp.headers["Replay-Nonce"])
+                    return resp.headers["Replay-Nonce"]
+            except Exception as e:
+                logger.exception(e)
 
-        return challenge_upd
+        try:
+            return self._nonces.pop()
+        except KeyError:
+            return await self._poll_until(fetch_nonce, predicate=lambda x: x, delay=5.0)
 
     def _wrap_in_jws(self, obj: typing.Optional[josepy.JSONDeSerializable], nonce, url):
         jobj = obj.json_dumps(indent=2).encode() if obj else b""
@@ -215,7 +267,8 @@ class AcmeClient:
         async with self._session.post(
             url, data=payload, headers={"Content-Type": "application/jose+json"}
         ) as resp:
-            self._nonces.add(resp.headers.get("Replay-Nonce"))
+            if "Replay-Nonce" in resp.headers:
+                self._nonces.add(resp.headers["Replay-Nonce"])
 
             if resp.content_type == "application/json":
                 data = await resp.json()
