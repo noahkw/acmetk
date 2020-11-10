@@ -2,7 +2,16 @@ import enum
 import uuid
 
 import cryptography
-from sqlalchemy import Column, Enum, ForeignKey, LargeBinary, TypeDecorator, Integer
+from sqlalchemy import (
+    Column,
+    Enum,
+    ForeignKey,
+    LargeBinary,
+    TypeDecorator,
+    Integer,
+    Text,
+    CheckConstraint,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
@@ -52,6 +61,12 @@ class Certificate(Entity, Serializer):
         "polymorphic_identity": "certificate",
     }
     __diff__ = frozenset(["status"])
+    __table_args__ = (
+        CheckConstraint(
+            "cert is not NULL or full_chain is not NULL",
+            name="check_cert_or_full_chain",
+        ),
+    )
 
     _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
     certificate_id = Column(
@@ -66,4 +81,5 @@ class Certificate(Entity, Serializer):
         unique=True,
     )
     order = relationship("Order", back_populates="certificate", foreign_keys=order_id)
-    cert = Column(x509Certificate, nullable=False, index=True)
+    cert = Column(x509Certificate, nullable=True, index=True)
+    full_chain = Column(Text, nullable=True)

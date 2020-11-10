@@ -21,7 +21,6 @@ from acme_broker.util import (
     load_cert,
     load_key,
     names_of,
-    deserialize_cert,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,8 +47,8 @@ class AcmeResponse(web.Response):
         )
 
 
-class AcmeCA:
-    def __init__(self, *, rsa_min_keysize=2048, cert, private_key):
+class AcmeServerBase:
+    def __init__(self, *, rsa_min_keysize=2048, **kwargs):
         self._rsa_min_keysize = rsa_min_keysize
 
         self.app = web.Application(middlewares=[self._error_middleware])
@@ -82,9 +81,6 @@ class AcmeCA:
         self._db: typing.Optional[Database] = None
         self._session = None
 
-        self._cert = load_cert(cert)
-        self._private_key = load_key(private_key)
-
     @classmethod
     async def create_app(cls, config, **kwargs):
         db = Database(config["db"])
@@ -92,8 +88,6 @@ class AcmeCA:
 
         ca = cls(
             rsa_min_keysize=config["rsa_min_keysize"],
-            cert=config["cert"],
-            private_key=config["private_key"],
             **kwargs,
         )
         ca._db = db
@@ -434,22 +428,7 @@ class AcmeCA:
         )
 
     async def _certificate(self, request):
-        async with self._session() as session:
-            jws, account = await self._verify_request(request, session, key_auth=False)
-            certificate_id = request.match_info["id"]
-
-            certificate = await self._db.get_certificate(
-                session, account.kid, certificate_id
-            )
-            if not certificate:
-                raise web.HTTPNotFound
-
-            cert = certificate.cert
-
-        return self._response(
-            request,
-            text=serialize_cert(cert).decode() + serialize_cert(self._cert).decode(),
-        )
+        raise NotImplementedError
 
     async def _handle_challenge_finalize(self, kid, challenge_id):
         logger.debug("Finalizing challenge %s", challenge_id)
@@ -462,20 +441,7 @@ class AcmeCA:
             await session.commit()
 
     async def _handle_order_finalize(self, kid, order_id):
-        logger.debug("Finalizing order %s", order_id)
-
-        async with self._session() as session:
-            order = await self._db.get_order(session, kid, order_id)
-            # simulate requests to Let's Encrypt CA
-            # await asyncio.sleep(3)
-
-            cert = generate_cert_from_csr(order.csr, self._cert, self._private_key)
-            order.certificate = models.Certificate(
-                status=models.CertificateStatus.VALID, cert=cert
-            )
-
-            order.status = models.OrderStatus.VALID
-            await session.commit()
+        raise NotImplementedError
 
     @middleware
     async def _error_middleware(self, request, handler):
@@ -498,35 +464,102 @@ class AcmeCA:
             return response
 
 
-class AcmeProxy(AcmeCA):
-    pass
+class AcmeCA(AcmeServerBase):
+    def __init__(self, *, rsa_min_keysize=2048, cert, private_key):
+        super().__init__(rsa_min_keysize=rsa_min_keysize)
 
+        self._cert = load_cert(cert)
+        self._private_key = load_key(private_key)
 
-class AcmeBroker(AcmeCA):
-    def __init__(self, *, client, **kwargs):
-        super().__init__(**kwargs)
-        self._client = client
+    @classmethod
+    async def create_app(cls, config, **kwargs):
+        db = Database(config["db"])
+        await db.begin()
 
-    async def _finalize_order(self, request):
-        return await super()._finalize_order(request)
+        ca = cls(
+            rsa_min_keysize=config["rsa_min_keysize"],
+            cert=config["cert"],
+            private_key=config["private_key"],
+            **kwargs,
+        )
+        ca._db = db
+        ca._session = db.session
+
+        return ca
 
     async def _handle_order_finalize(self, kid, order_id):
         logger.debug("Finalizing order %s", order_id)
 
         async with self._session() as session:
             order = await self._db.get_order(session, kid, order_id)
-            # requests to AcmeCA
+            # simulate requests to Let's Encrypt CA
+            # await asyncio.sleep(3)
 
-            order_ca = await self._client.create_order(list(names_of(order.csr)))
-            await self._client.complete_authorizations(order_ca)
-            finalized = await self._client.finalize_order(order_ca, order.csr)
-            cert = deserialize_cert(
-                (await self._client.get_certificate(finalized)).encode()
-            )
-
+            cert = generate_cert_from_csr(order.csr, self._cert, self._private_key)
             order.certificate = models.Certificate(
                 status=models.CertificateStatus.VALID, cert=cert
             )
 
             order.status = models.OrderStatus.VALID
             await session.commit()
+
+    async def _certificate(self, request):
+        async with self._session() as session:
+            jws, account = await self._verify_request(request, session, key_auth=False)
+            certificate_id = request.match_info["id"]
+
+            certificate = await self._db.get_certificate(
+                session, account.kid, certificate_id
+            )
+            if not certificate:
+                raise web.HTTPNotFound
+
+            return self._response(
+                request,
+                text=serialize_cert(certificate.cert).decode()
+                + serialize_cert(self._cert).decode(),
+            )
+
+
+class AcmeBroker(AcmeServerBase):
+    def __init__(self, *, client, **kwargs):
+        super().__init__(**kwargs)
+        self._client = client
+
+    async def _handle_order_finalize(self, kid, order_id):
+        logger.debug("Finalizing order %s", order_id)
+
+        async with self._session() as session:
+            order = await self._db.get_order(session, kid, order_id)
+
+            order_ca = await self._client.create_order(list(names_of(order.csr)))
+            await self._client.complete_authorizations(order_ca)
+            finalized = await self._client.finalize_order(order_ca, order.csr)
+            full_chain = await self._client.get_certificate(finalized)
+
+            order.certificate = models.Certificate(
+                status=models.CertificateStatus.VALID, full_chain=full_chain
+            )
+
+            order.status = models.OrderStatus.VALID
+            await session.commit()
+
+    async def _certificate(self, request):
+        async with self._session() as session:
+            jws, account = await self._verify_request(request, session, key_auth=False)
+            certificate_id = request.match_info["id"]
+
+            certificate = await self._db.get_certificate(
+                session, account.kid, certificate_id
+            )
+            if not certificate:
+                raise web.HTTPNotFound
+
+            return self._response(
+                request,
+                text=certificate.full_chain,
+            )
+
+
+class AcmeProxy(AcmeServerBase):
+    pass
