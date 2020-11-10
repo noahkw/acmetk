@@ -8,6 +8,7 @@ import acme.messages
 import josepy
 from acme import jws
 from aiohttp import ClientSession
+from cryptography import x509
 
 from acme_broker import messages
 
@@ -221,6 +222,12 @@ class AcmeClient:
     async def get_certificate(self, order) -> str:
         _, cert = await self._signed_request(None, order.certificate)
         return cert
+
+    async def revoke_certificate(self, certificate: x509.Certificate) -> bool:
+        cert_rev = messages.Revocation(certificate=certificate)
+        resp, _ = await self._signed_request(cert_rev, self._directory["revokeCert"])
+
+        return resp.status == 200
 
     async def get_challenge(self, challenge_url) -> acme.messages.ChallengeBody:
         _, challenge_obj = await self._signed_request(None, challenge_url)

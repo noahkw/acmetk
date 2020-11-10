@@ -264,7 +264,7 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
         ord = await client.create_order(self.domains)
         await client.complete_authorizations(ord)
         finalized = await client.finalize_order(ord, self.data.csr)
-        await client.get_certificate(finalized)
+        return await client.get_certificate(finalized)
 
     async def test_run(self):
         await self._run_one(self.client)
@@ -274,3 +274,8 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
 
         await asyncio.gather(*[self._run_one(client) for client in clients])
         await asyncio.gather(*[client.close() for client in clients])
+
+    async def test_revoke(self):
+        full_chain = await self._run_one(self.client)
+        certs = acme_broker.util.certs_from_fullchain(full_chain)
+        await self.client.revoke_certificate(certs[0])

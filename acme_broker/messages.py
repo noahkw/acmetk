@@ -1,5 +1,6 @@
 import json
 
+import OpenSSL
 import acme
 import cryptography
 import josepy
@@ -23,6 +24,12 @@ def decode_cert(b64der):
     return x509.load_der_x509_certificate(josepy.json_util.decode_b64jose(b64der))
 
 
+def encode_cert(cert):
+    return josepy.encode_b64jose(
+        OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_ASN1, cert)
+    )
+
+
 class Revocation(josepy.JSONObjectWithFields):
     """Revocation message.
 
@@ -31,9 +38,7 @@ class Revocation(josepy.JSONObjectWithFields):
 
     """
 
-    certificate = josepy.Field(
-        "certificate", decoder=decode_cert, encoder=josepy.encode_cert
-    )
+    certificate = josepy.Field("certificate", decoder=decode_cert, encoder=encode_cert)
     reason = josepy.Field("reason")
 
 

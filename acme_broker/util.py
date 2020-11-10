@@ -1,3 +1,4 @@
+import re
 import typing
 import uuid
 from datetime import datetime, timedelta
@@ -185,3 +186,23 @@ def names_of(csr):
             x509.SubjectAlternativeName
         ).value.get_values_for_type(x509.DNSName)
     )
+
+
+CERT_PEM_REGEX = re.compile(
+    b"""-----BEGIN CERTIFICATE-----\r?
+.+?\r?
+-----END CERTIFICATE-----\r?
+""",
+    re.DOTALL,  # DOTALL (/s) because the base64text may include newlines
+)
+
+
+def certs_from_fullchain(fullchain_pem):
+    certs = CERT_PEM_REGEX.findall(fullchain_pem.encode())
+    if len(certs) < 2:
+        raise ValueError(
+            "failed to parse fullchain into cert and chain: "
+            + "less than 2 certificates in chain"
+        )
+
+    return [deserialize_cert(cert) for cert in certs]
