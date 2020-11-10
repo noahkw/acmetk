@@ -255,19 +255,16 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
 
         return client
 
-    async def asyncSetUp(self) -> None:
-        await super().asyncSetUp()
-        await self.client.start()
-
     async def asyncTearDown(self) -> None:
         await super().asyncTearDown()
         await self.client.close()
 
     async def _run_one(self, client):
-        ord = await self.client.create_order(self.domains)
-        await self.client.complete_authorizations(ord)
-        finalized = await self.client.finalize_order(ord, self.data.csr)
-        await self.client.get_certificate(finalized)
+        await client.start()
+        ord = await client.create_order(self.domains)
+        await client.complete_authorizations(ord)
+        finalized = await client.finalize_order(ord, self.data.csr)
+        await client.get_certificate(finalized)
 
     async def test_run(self):
         await self._run_one(self.client)
