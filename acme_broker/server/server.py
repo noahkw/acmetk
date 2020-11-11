@@ -153,30 +153,33 @@ class AcmeServerBase:
 
         data = await request.text()
         jws = acme.jws.JWS.json_loads(data)
-        sig = jws.signature
+        sig = jws.signature.combined
 
-        if sig.combined.alg not in self.SUPPORTED_JWS_ALGORITHMS:
+        if sig.url != str(request.url):
+            raise acme.messages.Error.with_code("unauthorized")
+
+        if sig.alg not in self.SUPPORTED_JWS_ALGORITHMS:
             raise acme.messages.Error.with_code(
                 "badSignatureAlgorithm",
                 detail=f"Supported algorithms: {', '.join([str(alg) for alg in self.SUPPORTED_JWS_ALGORITHMS])}",
             )
 
-        nonce = acme.jose.b64.b64encode(sig.combined.nonce).decode()
+        nonce = acme.jose.b64.b64encode(sig.nonce).decode()
         self._verify_nonce(nonce)
 
         # Check whether we have *either* a jwk or a kid
-        if not ((sig.combined.jwk is not None) ^ (sig.combined.kid is not None)):
+        if not ((sig.jwk is not None) ^ (sig.kid is not None)):
             raise acme.messages.Error.with_code("malformed")
 
-        logger.debug("Request has a %s", "jwk" if sig.combined.jwk else "kid")
+        logger.debug("Request has a %s", "jwk" if sig.jwk else "kid")
 
         if key_auth:
-            if not jws.verify(sig.combined.jwk):
+            if not jws.verify(sig.jwk):
                 raise acme.messages.Error.with_code("unauthorized")
             else:
-                account = await self._db.get_account(session, key=sig.combined.jwk)
-        elif sig.combined.kid:
-            kid = sig.combined.kid.split("/")[-1]
+                account = await self._db.get_account(session, key=sig.jwk)
+        elif sig.kid:
+            kid = sig.kid.split("/")[-1]
 
             if url_for(request, "accounts", kid=kid) != jws.signature.combined.kid:
                 raise acme.messages.Error.with_code("malformed")
