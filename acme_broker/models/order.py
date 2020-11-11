@@ -117,10 +117,17 @@ class Order(Entity, Serializer):
     def serialize(self, request=None):
         d = Serializer.serialize(self)
         d["identifiers"] = Serializer.serialize_list(self.identifiers)
+
+        authorizations_to_show = (
+            (AuthorizationStatus.PENDING, AuthorizationStatus.VALID)
+            if self.status == OrderStatus.PENDING
+            else (AuthorizationStatus.VALID,)
+        )
+
         d["authorizations"] = [
             identifier.authorization.url(request)
             for identifier in self.identifiers
-            if identifier.authorization.status == AuthorizationStatus.PENDING
+            if identifier.authorization.status in authorizations_to_show
         ]
         d["finalize"] = self.finalize_url(request)
 
