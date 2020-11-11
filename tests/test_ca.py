@@ -16,7 +16,7 @@ from acme_broker.main import load_config
 
 log = logging.getLogger("acme_broker.test_client")
 
-ClientData = collections.namedtuple("ClientData", "key_path csr csr_path path")
+ClientData = collections.namedtuple("ClientData", "key_path csr csr_path")
 CAData = collections.namedtuple("CADAta", "key_path cert_path")
 
 
@@ -35,6 +35,8 @@ class TestAcme:
         if not dir_.exists():
             dir_.mkdir(parents=True)
 
+        self.path = dir_
+
         client_account_key_path = dir_ / "client_account.key"
         client_cert_key_path = dir_ / "client_cert.key"
         csr_path = dir_ / "client.csr"
@@ -48,7 +50,7 @@ class TestAcme:
             names=[f"{self.name}.test.de", f"{self.name}2.test.de"],
         )
 
-        self.client_data = ClientData(client_account_key_path, csr, csr_path, dir_)
+        self.client_data = ClientData(client_account_key_path, csr, csr_path)
 
         ca_key_path = dir_ / "root.key"
         ca_cert_path = dir_ / "root.crt"
@@ -76,18 +78,17 @@ class TestAcme:
                 log.error(f"{i} is not relative")
                 continue
 
-            if (path := self.client_data.path / i).is_dir():
-                log.info(f"rmtree {path}")
-                shutil.rmtree(path, ignore_errors=True)
-            elif path.is_file():
-                log.info(f"unlink {path}")
-                path.unlink()
+            if (self.path / i).is_dir():
+                log.info(f"rmtree {self.path}")
+                shutil.rmtree(self.path, ignore_errors=True)
+            elif self.path.is_file():
+                log.info(f"unlink {self.path}")
+                self.path.unlink()
 
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
         runner, ca = await AcmeCA.runner(self.config["ca"])
         self.runner = runner
-        self.ca = ca
 
     async def asyncTearDown(self) -> None:
         await self.runner.shutdown()
@@ -103,9 +104,8 @@ class TestRunClient(TestAcme, unittest.IsolatedAsyncioTestCase):
 class TestAcmetiny(TestAcme, unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         super().setUp()
-        path = self.client_data.path
         for n in ["challenge"]:
-            if not (r := (path / n)).exists():
+            if not (r := (self.path / n)).exists():
                 r.mkdir()
 
     async def _run_acmetiny(self, cmd):
@@ -120,7 +120,7 @@ class TestAcmetiny(TestAcme, unittest.IsolatedAsyncioTestCase):
         await self._run_acmetiny(
             f"--directory-url {self.DIRECTORY} --disable-check --contact {self.contact} --account-key "
             f"{self.client_data.key_path} --csr {self.client_data.csr_path} "
-            f"--acme-dir {self.client_data.path}/challenge"
+            f"--acme-dir {self.path}/challenge"
         )
 
 
@@ -128,10 +128,10 @@ class TestCertBot(TestAcme, unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         super().setUp()
 
-        with open(self.client_data.path / "certbot.ini", "wt") as f:
+        with open(self.path / "certbot.ini", "wt") as f:
             f.write(
                 f"""server = {self.DIRECTORY}
-config-dir = ./{self.client_data.path}/etc/letsencrypt
+config-dir = ./{self.path}/etc/letsencrypt
 work-dir = {self.config["certbot"]["workdir"]}/
 logs-dir = {self.config["certbot"]["workdir"]}/logs
 """
@@ -146,9 +146,7 @@ logs-dir = {self.config["certbot"]["workdir"]}/logs
         )
 
     async def _run(self, cmd):
-        argv = shlex.split(
-            f"--non-interactive -c {self.client_data.path}/certbot.ini " + cmd
-        )
+        argv = shlex.split(f"--non-interactive -c {self.path}/certbot.ini " + cmd)
         import certbot._internal.main as cbm
         import certbot.util
         import certbot._internal.log
@@ -178,9 +176,7 @@ logs-dir = {self.config["certbot"]["workdir"]}/logs
         await self._run(f"register --agree-tos  -m {self.contact}")
 
         arg = " --domain ".join(self.domains)
-        await self._run(
-            f"certonly --webroot --webroot-path {self.client_data.path} --domain {arg}"
-        )
+        await self._run(f"certonly --webroot --webroot-path {self.path} --domain {arg}")
         arg = " --domain ".join(map(lambda s: f"dns.{s}", self.domains))
         await self._run(
             f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=dns --manual-auth-hook "
@@ -194,7 +190,7 @@ logs-dir = {self.config["certbot"]["workdir"]}/logs
         for j in ["", "dns.", "http."]:
             try:
                 await self._run(
-                    f"revoke --cert-path {self.client_data.path}/etc/letsencrypt/live/{j}{self.domains[0]}/cert.pem"
+                    f"revoke --cert-path {self.path}/etc/letsencrypt/live/{j}{self.domains[0]}/cert.pem"
                 )
             except Exception as e:
                 log.exception(e)
@@ -203,13 +199,11 @@ logs-dir = {self.config["certbot"]["workdir"]}/logs
         await self._run(f"register --agree-tos  -m {self.contact}")
 
         arg = " --domain ".join(self.domains)
-        await self._run(
-            f"certonly --webroot --webroot-path {self.client_data.path} --domain {arg}"
-        )
+        await self._run(f"certonly --webroot --webroot-path {self.path} --domain {arg}")
 
         await self._run(
-            f"revoke --cert-path {self.client_data.path}/etc/letsencrypt/live/{self.domains[0]}/cert.pem "
-            f"--key-path {self.client_data.path}/etc/letsencrypt/live/{self.domains[0]}/privkey.pem"
+            f"revoke --cert-path {self.path}/etc/letsencrypt/live/{self.domains[0]}/cert.pem "
+            f"--key-path {self.path}/etc/letsencrypt/live/{self.domains[0]}/privkey.pem"
         )
 
     async def test_renewal(self):
@@ -219,12 +213,10 @@ logs-dir = {self.config["certbot"]["workdir"]}/logs
             key=lambda s: s[::-1],
         )
         arg = " --domain ".join(domains)
-        await self._run(
-            f"certonly --webroot --webroot-path {self.client_data.path} --domain {arg}"
-        )
+        await self._run(f"certonly --webroot --webroot-path {self.path} --domain {arg}")
 
         await self._run(
-            f"renew --no-random-sleep-on-renew --webroot --webroot-path {self.client_data.path}"
+            f"renew --no-random-sleep-on-renew --webroot --webroot-path {self.path}"
         )
 
     async def test_register(self):

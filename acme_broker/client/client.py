@@ -221,7 +221,11 @@ class AcmeClient:
                     raise e
 
         finalized = await self._poll_until(
-            self.get_order, resp.headers["Location"], predicate=is_valid
+            self.get_order,
+            resp.headers["Location"],
+            predicate=is_valid,
+            delay=3.0,
+            max_tries=15,
         )
         return finalized
 
@@ -240,7 +244,7 @@ class AcmeClient:
         return acme.messages.ChallengeBody.from_json(challenge_obj)
 
     async def _poll_until(
-        self, coro, *args, predicate=None, delay=1.0, max_tries=5, **kwargs
+        self, coro, *args, predicate=None, delay=3.0, max_tries=5, **kwargs
     ):
         tries = max_tries
         result = await coro(*args, **kwargs)

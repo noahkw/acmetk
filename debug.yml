@@ -3,24 +3,22 @@ ca:
   port: 8000
   db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-ca'
   rsa_min_keysize: 2048
-  cert: './root.crt'
-  private_key: './root.key'
+#  cert: './root.crt'
+#  private_key: './root.key'
 broker:
   hostname: 'localhost'
   port: 8000
   db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
   rsa_min_keysize: 2048
-  cert: './root.crt'
-  private_key: './root.key'
   client:
     directory: 'http://localhost:8000/ca/directory'
-    private_key: './account.key'
+#    private_key: './account.key'
     contact:
       # phone: ''
       email: 'woehler+testbrokerclient@luis.uni-hannover.de'
 client:
   directory: 'http://localhost:8000/directory'
-  private_key: './account.key'
+#  private_key: './account.key'
   contact:
     # phone: ''
     email: 'woehler+testclient@luis.uni-hannover.de'
