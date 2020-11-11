@@ -414,6 +414,12 @@ class AcmeServerBase:
 
             await order.validate()
 
+            if order.status == models.OrderStatus.INVALID:
+                raise acme.messages.Error(
+                    typ="orderInvalid",
+                    detail="This order cannot be finalized because it is invalid.",
+                )
+
             if order.status != models.OrderStatus.READY:
                 raise acme.messages.Error.with_code("orderNotReady")
 

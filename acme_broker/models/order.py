@@ -1,5 +1,6 @@
 import enum
 import uuid
+from datetime import datetime, timezone, timedelta
 
 import cryptography
 from sqlalchemy import (
@@ -60,7 +61,7 @@ class Order(Entity, Serializer):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
     )
     status = Column("status", Enum(OrderStatus), nullable=False)
-    expires = Column(DateTime(timezone=True))
+    expires = Column(DateTime(timezone=True), nullable=False)
     identifiers = relationship(
         "Identifier",
         cascade="all, delete",
@@ -96,6 +97,10 @@ class Order(Entity, Serializer):
 
     async def validate(self):
         if self.status != OrderStatus.PENDING:
+            return self.status
+
+        if datetime.now(timezone.utc) > self.expires:
+            self.status = OrderStatus.INVALID
             return self.status
 
         for identifier in self.identifiers:
@@ -134,8 +139,8 @@ class Order(Entity, Serializer):
             identifier.authorization.challenges = Challenge.create_all()
 
         order = Order(
-            expires=obj.expires,
-            status=obj.status or OrderStatus.PENDING,
+            expires=datetime.now(timezone.utc) + timedelta(days=7),
+            status=OrderStatus.PENDING,
             account=account,
             identifiers=identifiers,
         )
