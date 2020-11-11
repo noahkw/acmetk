@@ -78,12 +78,12 @@ class TestAcme:
                 log.error(f"{i} is not relative")
                 continue
 
-            if (self.path / i).is_dir():
-                log.info(f"rmtree {self.path}")
-                shutil.rmtree(self.path, ignore_errors=True)
-            elif self.path.is_file():
-                log.info(f"unlink {self.path}")
-                self.path.unlink()
+            if (path := self.path / i).is_dir():
+                log.info(f"rmtree {path}")
+                shutil.rmtree(path, ignore_errors=True)
+            elif path.is_file():
+                log.info(f"unlink {path}")
+                path.unlink()
 
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
@@ -208,11 +208,8 @@ logs-dir = {self.config["certbot"]["workdir"]}/logs
 
     async def test_renewal(self):
         await self._run(f"register --agree-tos  -m {self.contact}")
-        domains = sorted(
-            map(lambda x: x.lower(), acme_broker.util.names_of(self.client_data.csr)),
-            key=lambda s: s[::-1],
-        )
-        arg = " --domain ".join(domains)
+
+        arg = " --domain ".join(self.domains)
         await self._run(f"certonly --webroot --webroot-path {self.path} --domain {arg}")
 
         await self._run(
