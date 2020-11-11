@@ -4,6 +4,7 @@ import logging
 import typing
 
 import acme.messages
+import acme.jws
 import josepy
 from aiohttp import web
 from aiohttp.helpers import sentinel
@@ -49,6 +50,15 @@ class AcmeResponse(web.Response):
 
 
 class AcmeServerBase:
+    SUPPORTED_JWS_ALGORITHMS = (
+        josepy.RS256,
+        josepy.RS384,
+        josepy.RS512,
+        josepy.PS256,
+        josepy.PS384,
+        josepy.PS512,
+    )
+
     def __init__(self, *, rsa_min_keysize=2048, **kwargs):
         self._rsa_min_keysize = rsa_min_keysize
 
@@ -144,6 +154,12 @@ class AcmeServerBase:
         data = await request.text()
         jws = acme.jws.JWS.json_loads(data)
         sig = jws.signature
+
+        if sig.combined.alg not in self.SUPPORTED_JWS_ALGORITHMS:
+            raise acme.messages.Error.with_code(
+                "badSignatureAlgorithm",
+                detail=f"Supported algorithms: {', '.join([str(alg) for alg in self.SUPPORTED_JWS_ALGORITHMS])}",
+            )
 
         nonce = acme.jose.b64.b64encode(sig.combined.nonce).decode()
         self._verify_nonce(nonce)

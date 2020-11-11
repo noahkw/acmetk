@@ -6,7 +6,7 @@ import shutil
 import unittest
 from pathlib import Path
 
-import acme
+import acme.messages
 
 import acme_broker.util
 from acme_broker import AcmeCA
