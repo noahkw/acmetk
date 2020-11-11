@@ -95,7 +95,7 @@ class TestAcme:
         await self.runner.cleanup()
 
 
-class TestRunClient(TestAcme, unittest.IsolatedAsyncioTestCase):
+class TestRun(TestAcme, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         # await asyncio.sleep(600)
         pass

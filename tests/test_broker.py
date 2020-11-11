@@ -7,7 +7,7 @@ from aiohttp import web
 import acme_broker.util
 from acme_broker import AcmeCA, AcmeBroker
 from acme_broker.client import AcmeClient
-from tests.test_ca import TestAcme, TestAcmetiny, TestCertBot, TestOurClient
+from tests.test_ca import TestAcme, TestAcmetiny, TestCertBot, TestOurClient, TestRun
 
 log = logging.getLogger("acme_broker.test_broker")
 
@@ -21,7 +21,7 @@ class TestBroker(TestAcme):
     def setUp(self) -> None:
         super().setUp()
 
-        brokerclient_account_key_path = self.path / "client_account.key"
+        brokerclient_account_key_path = self.path / "broker_client_account.key"
         acme_broker.util.generate_rsa_key(brokerclient_account_key_path)
 
         self.broker_data = BrokerData(brokerclient_account_key_path)
@@ -70,6 +70,12 @@ class TestBroker(TestAcme):
         await self.runner.shutdown()
         await self.runner.cleanup()
         await self.broker_client.close()
+
+
+class TestRunBroker(TestRun, TestBroker):
+    async def test_run(self):
+        # await asyncio.sleep(600)
+        pass
 
 
 class TestAcmetinyBroker(TestAcmetiny, TestBroker):
