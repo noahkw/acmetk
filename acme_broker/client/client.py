@@ -119,7 +119,7 @@ class AcmeClient:
         reg = acme.messages.Registration(status=acme.messages.STATUS_DEACTIVATED)
 
         await self._signed_request(reg, self._account.kid)
-        self._account = None
+        # self._account = None
 
     async def get_orders(self) -> typing.List[str]:
         if "orders" not in self._account:

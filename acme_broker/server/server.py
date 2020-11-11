@@ -192,6 +192,9 @@ class AcmeServerBase:
                 logger.info("Could not find account with kid %s", kid)
                 raise acme.messages.Error.with_code("accountDoesNotExist")
 
+            if account.status != models.AccountStatus.VALID:
+                raise acme.messages.Error.with_code("unauthorized")
+
             if not jws.verify(account.key):
                 raise acme.messages.Error.with_code("unauthorized")
         else:

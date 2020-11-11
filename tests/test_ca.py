@@ -283,8 +283,6 @@ class TestOurClient(TestAcme, unittest.IsolatedAsyncioTestCase):
     async def test_unregister(self):
         await self.client.start()
         await self.client.deactivate_account()
-        try:
-            await self.client.start()
-        except acme.messages.Error as e:
-            if e.code == "unauthorized":
-                pass
+
+        with self.assertRaises(acme.messages.Error):
+            await self.client.create_order(self.domains)
