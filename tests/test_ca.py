@@ -1,6 +1,7 @@
 import asyncio
 import collections
 import logging
+import logging.config
 import shlex
 import shutil
 import unittest
@@ -15,41 +16,59 @@ from acme_broker.main import load_config
 
 log = logging.getLogger("acme_broker.test_client")
 
-DEFAULT_NETWORK_TIMEOUT = 45
+ClientData = collections.namedtuple("ClientData", "key_path csr csr_path path")
+CAData = collections.namedtuple("CADAta", "key_path cert_path")
 
-ClientData = collections.namedtuple("data", ["key", "csr", "path"])
 
-
-class TestClient:
+class TestAcme:
     DIRECTORY = "http://localhost:8000/directory"
 
     @property
     def name(self):
-        return self.__class__.__name__[4:]
+        return type(self).__name__[4:]
 
     def setUp(self) -> None:
         self.log = logging.getLogger(f"acme_broker.tests.{self.name}")
         self.contact = f"woehler+{self.name}@luis.uni-hannover.de"
+
         dir_ = Path("./tmp") / self.name
         if not dir_.exists():
             dir_.mkdir(parents=True)
 
-        key = acme_broker.util.generate_rsa_key(dir_ / "account.key")
-        thekey = acme_broker.util.generate_rsa_key(dir_ / "the.key")
+        client_account_key_path = dir_ / "client_account.key"
+        client_cert_key_path = dir_ / "client_cert.key"
+        csr_path = dir_ / "client.csr"
+
+        acme_broker.util.generate_rsa_key(client_account_key_path)
+        client_cert_key = acme_broker.util.generate_rsa_key(client_cert_key_path)
         csr = acme_broker.util.generate_csr(
             f"{self.name}.test.de",
-            thekey,
-            dir_ / "the.csr",
+            client_cert_key,
+            csr_path,
             names=[f"{self.name}.test.de", f"{self.name}2.test.de"],
         )
 
-        self.data = ClientData(key, csr, dir_)
+        self.client_data = ClientData(client_account_key_path, csr, csr_path, dir_)
 
-        _, _ = acme_broker.util.generate_root_cert(
-            Path("./root.key"), "DE", "Lower Saxony", "Hanover", "Acme Broker", "AB CA"
+        ca_key_path = dir_ / "root.key"
+        ca_cert_path = dir_ / "root.crt"
+
+        self.config = load_config("../debug.yml")
+
+        self.config["ca"].update(
+            {
+                "cert": ca_cert_path,
+                "private_key": ca_key_path,
+            }
         )
 
-        self._rmtree = ["the.csr"]
+        self.ca_data = CAData(ca_key_path, ca_cert_path)
+
+        acme_broker.util.generate_root_cert(
+            ca_key_path, "DE", "Lower Saxony", "Hanover", "Acme Broker", "AB CA"
+        )
+
+        self._rmtree = ["client.csr"]
 
     def tearDown(self):
         for i in self._rmtree:
@@ -57,7 +76,7 @@ class TestClient:
                 log.error(f"{i} is not relative")
                 continue
 
-            if (path := self.data.path / i).is_dir():
+            if (path := self.client_data.path / i).is_dir():
                 log.info(f"rmtree {path}")
                 shutil.rmtree(path, ignore_errors=True)
             elif path.is_file():
@@ -66,7 +85,6 @@ class TestClient:
 
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
-        self.config = load_config("../debug.yml")
         runner, ca = await AcmeCA.runner(self.config["ca"])
         self.runner = runner
         self.ca = ca
@@ -76,16 +94,16 @@ class TestClient:
         await self.runner.cleanup()
 
 
-class TestRunClient(TestClient, unittest.IsolatedAsyncioTestCase):
+class TestRunClient(TestAcme, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         # await asyncio.sleep(600)
         pass
 
 
-class TestAcmetiny(TestClient, unittest.IsolatedAsyncioTestCase):
+class TestAcmetiny(TestAcme, unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        TestClient.setUp(self)
-        path = self.data.path
+        super().setUp()
+        path = self.client_data.path
         for n in ["challenge"]:
             if not (r := (path / n)).exists():
                 r.mkdir()
@@ -99,35 +117,38 @@ class TestAcmetiny(TestClient, unittest.IsolatedAsyncioTestCase):
         return r
 
     async def test_run(self):
-        key, csr, path = self.data
-        account_key_path = path / "account.key"
-        csr_path = path / "the.csr"
-
-        self.assertTrue(account_key_path.exists())
-        self.assertTrue(csr_path.exists())
-
         await self._run_acmetiny(
             f"--directory-url {self.DIRECTORY} --disable-check --contact {self.contact} --account-key "
-            f"{account_key_path} --csr {csr_path} --acme-dir {self.data.path}/challenge "
+            f"{self.client_data.key_path} --csr {self.client_data.csr_path} "
+            f"--acme-dir {self.client_data.path}/challenge"
         )
 
 
-class TestCertBot(TestClient, unittest.IsolatedAsyncioTestCase):
+class TestCertBot(TestAcme, unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        TestClient.setUp(self)
-        with open(self.data.path / "certbot.ini", "wt") as f:
+        super().setUp()
+
+        with open(self.client_data.path / "certbot.ini", "wt") as f:
             f.write(
                 f"""server = {self.DIRECTORY}
-config-dir = ./{self.data.path}/etc/letsencrypt
-work-dir = /home/noah/workspace/acme-broker/certbot/
-logs-dir = /home/noah/workspace/acme-broker/certbot/logs
+config-dir = ./{self.client_data.path}/etc/letsencrypt
+work-dir = {self.config["certbot"]["workdir"]}/
+logs-dir = {self.config["certbot"]["workdir"]}/logs
 """
             )
+
         self._rmtree.extend(["archive", "renewal", "live"])
         self._rmtree.extend(["etc"])
 
+        self.domains = sorted(
+            map(lambda x: x.lower(), acme_broker.util.names_of(self.client_data.csr)),
+            key=lambda s: s[::-1],
+        )
+
     async def _run(self, cmd):
-        argv = shlex.split(f"--non-interactive -c {self.data.path}/certbot.ini " + cmd)
+        argv = shlex.split(
+            f"--non-interactive -c {self.client_data.path}/certbot.ini " + cmd
+        )
         import certbot._internal.main as cbm
         import certbot.util
         import certbot._internal.log
@@ -155,20 +176,17 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
         await self._run("certificates")
 
         await self._run(f"register --agree-tos  -m {self.contact}")
-        domains = sorted(
-            map(lambda x: x.lower(), acme_broker.util.names_of(self.data.csr)),
-            key=lambda s: s[::-1],
-        )
-        arg = " --domain ".join(domains)
+
+        arg = " --domain ".join(self.domains)
         await self._run(
-            f"certonly --webroot --webroot-path {self.data.path} --domain {arg}"
+            f"certonly --webroot --webroot-path {self.client_data.path} --domain {arg}"
         )
-        arg = " --domain ".join(map(lambda s: f"dns.{s}", domains))
+        arg = " --domain ".join(map(lambda s: f"dns.{s}", self.domains))
         await self._run(
             f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=dns --manual-auth-hook "
             f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
         )
-        arg = " --domain ".join(map(lambda s: f"http.{s}", domains))
+        arg = " --domain ".join(map(lambda s: f"http.{s}", self.domains))
         await self._run(
             f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=http --manual-auth-hook "
             f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
@@ -176,41 +194,37 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
         for j in ["", "dns.", "http."]:
             try:
                 await self._run(
-                    f"revoke --cert-path {self.data.path}/etc/letsencrypt/live/{j}{domains[0]}/cert.pem"
+                    f"revoke --cert-path {self.client_data.path}/etc/letsencrypt/live/{j}{self.domains[0]}/cert.pem"
                 )
             except Exception as e:
                 log.exception(e)
-        # await self._run(f"renew --webroot --webroot-path {self.data.path}")
 
     async def test_skey_revocation(self):
         await self._run(f"register --agree-tos  -m {self.contact}")
-        domains = sorted(
-            map(lambda x: x.lower(), acme_broker.util.names_of(self.data.csr)),
-            key=lambda s: s[::-1],
-        )
-        arg = " --domain ".join(domains)
+
+        arg = " --domain ".join(self.domains)
         await self._run(
-            f"certonly --webroot --webroot-path {self.data.path} --domain {arg}"
+            f"certonly --webroot --webroot-path {self.client_data.path} --domain {arg}"
         )
 
         await self._run(
-            f"revoke --cert-path {self.data.path}/etc/letsencrypt/live/{domains[0]}/cert.pem "
-            f"--key-path {self.data.path}/etc/letsencrypt/live/{domains[0]}/privkey.pem"
+            f"revoke --cert-path {self.client_data.path}/etc/letsencrypt/live/{self.domains[0]}/cert.pem "
+            f"--key-path {self.client_data.path}/etc/letsencrypt/live/{self.domains[0]}/privkey.pem"
         )
 
     async def test_renewal(self):
         await self._run(f"register --agree-tos  -m {self.contact}")
         domains = sorted(
-            map(lambda x: x.lower(), acme_broker.util.names_of(self.data.csr)),
+            map(lambda x: x.lower(), acme_broker.util.names_of(self.client_data.csr)),
             key=lambda s: s[::-1],
         )
         arg = " --domain ".join(domains)
         await self._run(
-            f"certonly --webroot --webroot-path {self.data.path} --domain {arg}"
+            f"certonly --webroot --webroot-path {self.client_data.path} --domain {arg}"
         )
 
         await self._run(
-            f"renew --no-random-sleep-on-renew --webroot --webroot-path {self.data.path}"
+            f"renew --no-random-sleep-on-renew --webroot --webroot-path {self.client_data.path}"
         )
 
     async def test_register(self):
@@ -225,28 +239,19 @@ logs-dir = /home/noah/workspace/acme-broker/certbot/logs
         await self._run("unregister --agree-tos")
 
 
-class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
+class TestOurClient(TestAcme, unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
-        TestClient.setUp(self)
-
-        key, csr, path = self.data
-        account_key_path = path / "account.key"
-        csr_path = path / "the.csr"
-
-        self.assertTrue(account_key_path.exists())
-        self.assertTrue(csr_path.exists())
-
-        self.client = self._make_client(account_key_path)
+        super().setUp()
 
         self.domains = sorted(
-            acme_broker.util.names_of(self.data.csr),
+            acme_broker.util.names_of(self.client_data.csr),
             key=lambda s: s[::-1],
         )
 
-    def _make_client(self, account_key_path):
+    def _make_client(self):
         client = AcmeClient(
             directory_url=self.DIRECTORY,
-            private_key=account_key_path,
+            private_key=self.client_data.key_path,
             contact={"email": self.contact},
         )
 
@@ -257,6 +262,10 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
 
         return client
 
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        self.client = self._make_client()
+
     async def asyncTearDown(self) -> None:
         await super().asyncTearDown()
         await self.client.close()
@@ -265,14 +274,14 @@ class TestOurClient(TestClient, unittest.IsolatedAsyncioTestCase):
         await client.start()
         ord = await client.create_order(self.domains)
         await client.complete_authorizations(ord)
-        finalized = await client.finalize_order(ord, self.data.csr)
+        finalized = await client.finalize_order(ord, self.client_data.csr)
         return await client.get_certificate(finalized)
 
     async def test_run(self):
         await self._run_one(self.client)
 
     async def test_run_stress(self):
-        clients = [self._make_client(self.data.path / "account.key") for _ in range(10)]
+        clients = [self._make_client() for _ in range(10)]
 
         await asyncio.gather(*[self._run_one(client) for client in clients])
         await asyncio.gather(*[client.close() for client in clients])

@@ -24,6 +24,8 @@ client:
   contact:
     # phone: ''
     email: 'woehler+testclient@luis.uni-hannover.de'
+certbot:
+  workdir: '/home/noah/workspace/acme-broker/certbot'
 logging:
   version: 1
   formatters:
