@@ -237,11 +237,11 @@ class TestOurClient(TestAcme, unittest.IsolatedAsyncioTestCase):
             key=lambda s: s[::-1],
         )
 
-    def _make_client(self):
+    def _make_client(self, key_path, email):
         client = AcmeClient(
             directory_url=self.DIRECTORY,
-            private_key=self.client_data.key_path,
-            contact={"email": self.contact},
+            private_key=key_path,
+            contact={"email": email},
         )
 
         client.register_challenge_solver(
@@ -253,30 +253,60 @@ class TestOurClient(TestAcme, unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
-        self.client = self._make_client()
+        self.client = self._make_client(self.client_data.key_path, self.contact)
 
     async def asyncTearDown(self) -> None:
         await super().asyncTearDown()
         await self.client.close()
 
-    async def _run_one(self, client):
+    async def _run_one(self, client, csr):
         await client.start()
-        ord = await client.order_create(self.domains)
+
+        domains = sorted(
+            map(lambda x: x.lower(), acme_broker.util.names_of(csr)),
+            key=lambda s: s[::-1],
+        )
+
+        ord = await client.order_create(domains)
         await client.authorizations_complete(ord)
-        finalized = await client.order_finalize(ord, self.client_data.csr)
+        finalized = await client.order_finalize(ord, csr)
         return await client.certificate_get(finalized)
 
     async def test_run(self):
-        await self._run_one(self.client)
+        await self._run_one(self.client, self.client_data.csr)
 
     async def test_run_stress(self):
-        clients = [self._make_client() for _ in range(10)]
+        clients_csr = []  # (client, csr) tuples
+        for i in range(10):
+            client_account_key_path = self.path / f"client_{i}_account.key"
 
-        await asyncio.gather(*[self._run_one(client) for client in clients])
-        await asyncio.gather(*[client.close() for client in clients])
+            acme_broker.util.generate_rsa_key(client_account_key_path)
+            client_cert_key = acme_broker.util.generate_rsa_key(
+                self.path / f"client_{i}_cert.key"
+            )
+            csr = acme_broker.util.generate_csr(
+                f"{self.name}.test.de",
+                client_cert_key,
+                self.path / f"client_{i}.csr",
+                names=[f"{self.name}.{i}.test.de", f"{self.name}2.{i}.test.de"],
+            )
+
+            clients_csr.append(
+                (
+                    self._make_client(
+                        client_account_key_path, f"client_{i}_{self.contact}"
+                    ),
+                    csr,
+                )
+            )
+
+        await asyncio.gather(
+            *[self._run_one(client, csr) for client, csr in clients_csr]
+        )
+        await asyncio.gather(*[client.close() for client, _ in clients_csr])
 
     async def test_revoke(self):
-        full_chain = await self._run_one(self.client)
+        full_chain = await self._run_one(self.client, self.client_data.csr)
         certs = acme_broker.util.certs_from_fullchain(full_chain)
         await self.client.certificate_revoke(certs[0])
 
