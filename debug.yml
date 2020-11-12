@@ -3,6 +3,7 @@ ca:
   port: 8000
   db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-ca'
   rsa_min_keysize: 2048
+  tos_url: 'http://localhost:8000/ca/tos'
 #  cert: './root.crt'
 #  private_key: './root.key'
 broker:
@@ -10,6 +11,7 @@ broker:
   port: 8000
   db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
   rsa_min_keysize: 2048
+  tos_url: 'http://localhost:8000/broker/tos'
   client:
     directory: 'http://localhost:8000/ca/directory'
 #    private_key: './account.key'

@@ -59,8 +59,9 @@ class AcmeServerBase:
         josepy.PS512,
     )
 
-    def __init__(self, *, rsa_min_keysize=2048, **kwargs):
+    def __init__(self, *, rsa_min_keysize=2048, tos_url=None, **kwargs):
         self._rsa_min_keysize = rsa_min_keysize
+        self._tos_url = tos_url
 
         self.app = web.Application(middlewares=[self._error_middleware])
 
@@ -99,6 +100,7 @@ class AcmeServerBase:
 
         ca = cls(
             rsa_min_keysize=config["rsa_min_keysize"],
+            tos_url=config["tos_url"],
             **kwargs,
         )
         ca._db = db
@@ -209,6 +211,9 @@ class AcmeServerBase:
                 "newNonce": url_for(request, "new-nonce"),
                 "newOrder": url_for(request, "new-order"),
                 "revokeCert": url_for(request, "revoke-cert"),
+                "meta": {
+                    "termsOfService": self._tos_url,
+                },
             }
         )
 
@@ -241,10 +246,9 @@ class AcmeServerBase:
                 if reg.only_return_existing:
                     raise acme.messages.Error.with_code("accountDoesNotExist")
                 elif not reg.terms_of_service_agreed:
-                    # TODO: make available and link to ToS
                     raise acme.messages.Error(
                         typ="urn:ietf:params:acme:error:termsOfServiceNotAgreed",
-                        title="The client must agree to the terms of service.",
+                        title=f"The client must agree to the terms of service: {self._tos_url}.",
                     )
                 else:  # create new account
                     new_account = models.Account(
@@ -494,8 +498,8 @@ class AcmeServerBase:
 
 
 class AcmeCA(AcmeServerBase):
-    def __init__(self, *, rsa_min_keysize=2048, cert, private_key):
-        super().__init__(rsa_min_keysize=rsa_min_keysize)
+    def __init__(self, *, cert, private_key, **kwargs):
+        super().__init__(**kwargs)
 
         self._cert = load_cert(cert)
         self._private_key = load_key(private_key)
@@ -507,6 +511,7 @@ class AcmeCA(AcmeServerBase):
 
         ca = cls(
             rsa_min_keysize=config["rsa_min_keysize"],
+            tos_url=config["tos_url"],
             cert=config["cert"],
             private_key=config["private_key"],
             **kwargs,
