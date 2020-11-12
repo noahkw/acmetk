@@ -4,8 +4,8 @@ ca:
   db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-ca'
   rsa_min_keysize: 2048
   tos_url: 'http://localhost:8000/ca/tos'
-#  cert: './root.crt'
-#  private_key: './root.key'
+  cert: './root.crt'
+  private_key: './root.key'
 broker:
   hostname: 'localhost'
   port: 8000
@@ -14,7 +14,7 @@ broker:
   tos_url: 'http://localhost:8000/broker/tos'
   client:
     directory: 'http://localhost:8000/ca/directory'
-#    private_key: './account.key'
+    private_key: './account.key'
     contact:
       # phone: ''
       email: 'woehler+testbrokerclient@luis.uni-hannover.de'
