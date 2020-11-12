@@ -291,7 +291,7 @@ class AcmeServerBase:
             session.add(order)
 
             await session.flush()
-            serialized = order.serialize(request=request)
+            serialized = order.serialize(request)
             order_id = order.order_id
             await session.commit()
 
@@ -317,7 +317,7 @@ class AcmeServerBase:
             except ValueError as e:
                 raise acme.messages.Error.with_code("malformed", detail=e.args[0])
 
-            serialized = authorization.serialize(request=request)
+            serialized = authorization.serialize(request)
             await session.commit()
 
         return self._response(request, serialized)
@@ -334,7 +334,7 @@ class AcmeServerBase:
             if challenge.status == models.ChallengeStatus.PENDING:
                 challenge.status = models.ChallengeStatus.PROCESSING
 
-            serialized = challenge.serialize(request=request)
+            serialized = challenge.serialize(request)
             kid = account.kid
             authz_url = challenge.authorization.url(request)
             await session.commit()
@@ -445,7 +445,7 @@ class AcmeServerBase:
             order.csr = csr
             order.status = models.OrderStatus.PROCESSING
 
-            serialized = order.serialize(request=request)
+            serialized = order.serialize(request)
             kid = account.kid
             await session.commit()
 
