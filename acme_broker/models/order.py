@@ -92,8 +92,9 @@ class Order(Entity, Serializer):
         return url_for(request, "certificate", id=str(self.certificate.certificate_id))
 
     def validate_csr(self, csr):
-        identifiers = set(identifier.value for identifier in self.identifiers)
-        return identifiers == names_of(csr)
+        identifiers = set(identifier.value.lower() for identifier in self.identifiers)
+
+        return identifiers == names_of(csr, lower=True)
 
     async def validate(self):
         if self.status != OrderStatus.PENDING:

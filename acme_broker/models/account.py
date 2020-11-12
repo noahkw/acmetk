@@ -57,17 +57,20 @@ class Account(Entity, Serializer):
             if order.status == OrderStatus.PENDING
         ]
 
-    def authorized_identifiers(self):
+    def authorized_identifiers(self, lower=False):
         identifiers = [
             identifier for order in self.orders for identifier in order.identifiers
         ]
 
-        return set(identifier.value for identifier in identifiers)
+        return set(
+            identifier.value.lower() if lower else identifier.value
+            for identifier in identifiers
+        )
 
     def validate_cert(self, cert):
-        authorized_identifiers = self.authorized_identifiers()
-
-        return names_of(cert).issubset(authorized_identifiers)
+        return names_of(cert, lower=True).issubset(
+            self.authorized_identifiers(lower=True)
+        )
 
     def update(self, upd):
         if contact := upd.contact:

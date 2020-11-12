@@ -175,17 +175,18 @@ def decode_csr(b64der):
     return decoded.wrapped.to_cryptography()
 
 
-def names_of(csr):
-    return set(
-        [
-            v.value
-            for v in csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
-        ]
-    ) | set(
+def names_of(csr, lower=False):
+    names = [
+        v.value
+        for v in csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
+    ]
+    names.extend(
         csr.extensions.get_extension_for_class(
             x509.SubjectAlternativeName
         ).value.get_values_for_type(x509.DNSName)
     )
+
+    return set([name.lower() if lower else name for name in names])
 
 
 CERT_PEM_REGEX = re.compile(

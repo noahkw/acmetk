@@ -233,7 +233,7 @@ class TestOurClient(TestAcme, unittest.IsolatedAsyncioTestCase):
         super().setUp()
 
         self.domains = sorted(
-            acme_broker.util.names_of(self.client_data.csr),
+            map(lambda x: x.lower(), acme_broker.util.names_of(self.client_data.csr)),
             key=lambda s: s[::-1],
         )
 
