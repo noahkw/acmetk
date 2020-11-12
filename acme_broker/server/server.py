@@ -151,8 +151,6 @@ class AcmeServerBase:
             raise acme.messages.Error.with_code("badNonce", detail=nonce)
 
     async def _verify_request(self, request, session, key_auth=False):
-        logger.debug("Verifying request")
-
         data = await request.text()
         jws = acme.jws.JWS.json_loads(data)
         sig = jws.signature.combined
@@ -284,7 +282,8 @@ class AcmeServerBase:
             serialized = account.serialize(request)
 
             await session.commit()
-            return self._response(request, serialized)
+
+        return self._response(request, serialized)
 
     async def _new_order(self, request):
         async with self._session() as session:
@@ -395,11 +394,7 @@ class AcmeServerBase:
             if not order:
                 raise web.HTTPNotFound
 
-            serialized = order.serialize(request)
-
-            await session.commit()
-
-        return self._response(request, serialized)
+            return self._response(request, order.serialize(request))
 
     async def _orders(self, request):
         async with self._session() as session:

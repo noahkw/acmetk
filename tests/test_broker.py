@@ -1,13 +1,14 @@
 import asyncio
 import collections
 import logging
+import unittest
 
 from aiohttp import web
 
 import acme_broker.util
 from acme_broker import AcmeCA, AcmeBroker
 from acme_broker.client import AcmeClient
-from tests.test_ca import TestAcme, TestAcmetiny, TestCertBot, TestOurClient, TestRun
+from tests.test_ca import TestAcme, TestAcmetiny, TestCertBot, TestOurClient
 
 log = logging.getLogger("acme_broker.test_broker")
 
@@ -72,20 +73,40 @@ class TestBroker(TestAcme):
         await self.broker_client.close()
 
 
-class TestRunBroker(TestRun, TestBroker):
-    async def test_run(self):
-        # await asyncio.sleep(600)
-        pass
-
-
-class TestAcmetinyBroker(TestAcmetiny, TestBroker):
-    pass
-
-
-class TestCertBotBroker(TestCertBot, TestBroker):
-    pass
-
-
-class TestOurClientBroker(TestOurClient, TestBroker):
+class TestAcmetinyBroker(TestAcmetiny, TestBroker, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
+
+
+class TestCertBotBroker(TestCertBot, TestBroker, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
+
+    async def test_skey_revocation(self):
+        await super().test_skey_revocation()
+
+    async def test_renewal(self):
+        await super().test_renewal()
+
+    async def test_register(self):
+        await super().test_register()
+
+    async def test_unregister(self):
+        await super().test_renewal()
+
+
+class TestOurClientBroker(TestOurClient, TestBroker, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
+
+    async def test_run_stress(self):
+        await super().test_run_stress()
+
+    async def test_revoke(self):
+        await super().test_revoke()
+
+    async def test_account_update(self):
+        await super().test_account_update()
+
+    async def test_unregister(self):
+        await super().test_unregister()

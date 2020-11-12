@@ -95,13 +95,7 @@ class TestAcme:
         await self.runner.cleanup()
 
 
-class TestRun(TestAcme, unittest.IsolatedAsyncioTestCase):
-    async def test_run(self):
-        # await asyncio.sleep(600)
-        pass
-
-
-class TestAcmetiny(TestAcme, unittest.IsolatedAsyncioTestCase):
+class TestAcmetiny(TestAcme):
     def setUp(self) -> None:
         super().setUp()
         for n in ["challenge"]:
@@ -124,7 +118,7 @@ class TestAcmetiny(TestAcme, unittest.IsolatedAsyncioTestCase):
         )
 
 
-class TestCertBot(TestAcme, unittest.IsolatedAsyncioTestCase):
+class TestCertBot(TestAcme):
     def setUp(self) -> None:
         super().setUp()
 
@@ -228,7 +222,7 @@ logs-dir = {self.config["certbot"]["workdir"]}/logs
         await self._run("unregister --agree-tos")
 
 
-class TestOurClient(TestAcme, unittest.IsolatedAsyncioTestCase):
+class TestOurClient(TestAcme):
     def setUp(self) -> None:
         super().setUp()
 
@@ -328,3 +322,42 @@ class TestOurClient(TestAcme, unittest.IsolatedAsyncioTestCase):
 
         with self.assertRaises(acme.messages.Error):
             await self.client.order_create(self.domains)
+
+
+class TestAcmetinyCA(TestAcmetiny, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
+
+
+class TestCertBotCA(TestCertBot, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
+
+    async def test_skey_revocation(self):
+        await super().test_skey_revocation()
+
+    async def test_renewal(self):
+        await super().test_renewal()
+
+    async def test_register(self):
+        await super().test_register()
+
+    async def test_unregister(self):
+        await super().test_renewal()
+
+
+class TestOurClientCA(TestOurClient, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
+
+    async def test_run_stress(self):
+        await super().test_run_stress()
+
+    async def test_revoke(self):
+        await super().test_revoke()
+
+    async def test_account_update(self):
+        await super().test_account_update()
+
+    async def test_unregister(self):
+        await super().test_unregister()
