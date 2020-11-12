@@ -152,7 +152,13 @@ class AcmeServerBase:
 
     async def _verify_request(self, request, session, key_auth=False):
         data = await request.text()
-        jws = acme.jws.JWS.json_loads(data)
+        try:
+            jws = acme.jws.JWS.json_loads(data)
+        except josepy.errors.DeserializationError:
+            raise acme.messages.Error.with_code(
+                "malformed", detail="The request does not contain a valid JWS."
+            )
+
         sig = jws.signature.combined
 
         if sig.url != str(request.url):
@@ -354,7 +360,9 @@ class AcmeServerBase:
                 )
             except acme.messages.Error:
                 data = await request.text()
-                jws = acme.jws.JWS.json_loads(data)
+                jws = acme.jws.JWS.json_loads(
+                    data
+                )  # TODO: raise acme error on deserialization error
                 account = None
 
             revocation = messages.Revocation.json_loads(jws.payload)
@@ -593,7 +601,7 @@ class AcmeBroker(AcmeServerBase):
                 text=certificate.full_chain,
             )
 
-    async def _revoke_cert(self, request):
+    async def _revoke_cert(self, request):  # TODO: reduce code duplication
         async with self._session() as session:
             try:
                 # check whether the message is signed using an account key
@@ -602,7 +610,9 @@ class AcmeBroker(AcmeServerBase):
                 )
             except acme.messages.Error:
                 data = await request.text()
-                jws = acme.jws.JWS.json_loads(data)
+                jws = acme.jws.JWS.json_loads(
+                    data
+                )  # TODO: raise acme error on deserialization error
                 account = None
 
             revocation = messages.Revocation.json_loads(jws.payload)
