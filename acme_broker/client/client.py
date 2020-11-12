@@ -115,11 +115,12 @@ class AcmeClient:
         account_obj["kid"] = resp.headers["Location"]
         self._account = messages.Account.from_json(account_obj)
 
-    async def account_deactivate(self) -> None:
-        reg = acme.messages.Registration(status=acme.messages.STATUS_DEACTIVATED)
+    async def account_update(self, **kwargs) -> None:
+        reg = acme.messages.Registration(**kwargs)
 
-        await self._signed_request(reg, self._account.kid)
-        # self._account = None
+        _, account_obj = await self._signed_request(reg, self._account.kid)
+        account_obj["kid"] = self._account.kid
+        self._account = messages.Account.from_json(account_obj)
 
     async def account_lookup(self, kid) -> messages.Account:
         _, account_obj = await self._signed_request(None, kid)

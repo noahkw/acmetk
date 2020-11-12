@@ -82,4 +82,5 @@ class Account(Entity, Serializer):
     def serialize(self, request=None):
         d = super().serialize(request)
         d["orders"] = self.orders_url(request)
+        d["contact"] = json.loads(self.contact)
         return d

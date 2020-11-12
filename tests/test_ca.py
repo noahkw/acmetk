@@ -280,13 +280,21 @@ class TestOurClient(TestAcme, unittest.IsolatedAsyncioTestCase):
         certs = acme_broker.util.certs_from_fullchain(full_chain)
         await self.client.certificate_revoke(certs[0])
 
+    async def test_account_update(self):
+        await self.client.start()
+
+        new_contact = ("mailto:newmail.test.de", "tel:555-1234")
+        await self.client.account_update(contact=new_contact)
+        account = await self.client.account_lookup(self.client._account.kid)
+        self.assertEqual(account.contact, new_contact)
+
     async def test_unregister(self):
         await self.client.start()
         account = await self.client.account_lookup(self.client._account.kid)
 
         self.assertEqual(account.kid, self.client._account.kid)
 
-        await self.client.account_deactivate()
+        await self.client.account_update(status=acme.messages.STATUS_DEACTIVATED)
 
         with self.assertRaises(acme.messages.Error):
             await self.client.order_create(self.domains)
