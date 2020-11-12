@@ -261,10 +261,10 @@ class TestOurClient(TestAcme, unittest.IsolatedAsyncioTestCase):
 
     async def _run_one(self, client):
         await client.start()
-        ord = await client.create_order(self.domains)
-        await client.complete_authorizations(ord)
-        finalized = await client.finalize_order(ord, self.client_data.csr)
-        return await client.get_certificate(finalized)
+        ord = await client.order_create(self.domains)
+        await client.authorizations_complete(ord)
+        finalized = await client.order_finalize(ord, self.client_data.csr)
+        return await client.certificate_get(finalized)
 
     async def test_run(self):
         await self._run_one(self.client)
@@ -278,11 +278,15 @@ class TestOurClient(TestAcme, unittest.IsolatedAsyncioTestCase):
     async def test_revoke(self):
         full_chain = await self._run_one(self.client)
         certs = acme_broker.util.certs_from_fullchain(full_chain)
-        await self.client.revoke_certificate(certs[0])
+        await self.client.certificate_revoke(certs[0])
 
     async def test_unregister(self):
         await self.client.start()
-        await self.client.deactivate_account()
+        account = await self.client.account_lookup(self.client._account.kid)
+
+        self.assertEqual(account.kid, self.client._account.kid)
+
+        await self.client.account_deactivate()
 
         with self.assertRaises(acme.messages.Error):
-            await self.client.create_order(self.domains)
+            await self.client.order_create(self.domains)

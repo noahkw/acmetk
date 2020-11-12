@@ -561,10 +561,10 @@ class AcmeBroker(AcmeServerBase):
         async with self._session() as session:
             order = await self._db.get_order(session, kid, order_id)
 
-            order_ca = await self._client.create_order(list(names_of(order.csr)))
-            await self._client.complete_authorizations(order_ca)
-            finalized = await self._client.finalize_order(order_ca, order.csr)
-            full_chain = await self._client.get_certificate(finalized)
+            order_ca = await self._client.order_create(list(names_of(order.csr)))
+            await self._client.authorizations_complete(order_ca)
+            finalized = await self._client.order_finalize(order_ca, order.csr)
+            full_chain = await self._client.certificate_get(finalized)
 
             certs = certs_from_fullchain(full_chain)
 
@@ -627,7 +627,7 @@ class AcmeBroker(AcmeServerBase):
                 if not jws.verify(jwk):
                     raise acme.messages.Error.with_code("unauthorized")
 
-            revocation_succeeded = await self._client.revoke_certificate(cert)
+            revocation_succeeded = await self._client.certificate_revoke(cert)
             if not revocation_succeeded:
                 raise acme.messages.Error.with_code("unauthorized")
 

@@ -102,9 +102,9 @@ class AcmeClient:
                 "There is no challenge solver registered with the client. Certificate retrieval will likely fail."
             )
 
-        await self.register_account(**self._contact)
+        await self.account_register(**self._contact)
 
-    async def register_account(self, email=None, phone=None) -> None:
+    async def account_register(self, email=None, phone=None) -> None:
         reg = acme.messages.Registration.from_data(
             email=email, phone=phone, terms_of_service_agreed=True
         )
@@ -115,28 +115,19 @@ class AcmeClient:
         account_obj["kid"] = resp.headers["Location"]
         self._account = messages.Account.from_json(account_obj)
 
-    async def deactivate_account(self) -> None:
+    async def account_deactivate(self) -> None:
         reg = acme.messages.Registration(status=acme.messages.STATUS_DEACTIVATED)
 
         await self._signed_request(reg, self._account.kid)
         # self._account = None
 
-    async def get_orders(self) -> typing.List[str]:
-        if "orders" not in self._account:
-            return []
+    async def account_lookup(self, kid) -> messages.Account:
+        _, account_obj = await self._signed_request(None, kid)
+        account_obj["kid"] = kid
 
-        _, orders = await self._signed_request(None, self._account["orders"])
-        return orders
+        return messages.Account.from_json(account_obj)
 
-    async def get_order(self, order_url) -> acme.messages.Order:
-        resp, order = await self._signed_request(None, order_url)
-        return acme.messages.Order.from_json(order)
-
-    async def get_authorization(self, authorization_url) -> acme.messages.Authorization:
-        resp, authorization = await self._signed_request(None, authorization_url)
-        return acme.messages.Authorization.from_json(authorization)
-
-    async def create_order(
+    async def order_create(
         self, identifiers: typing.Union[typing.List[dict], typing.List[str]]
     ) -> acme.messages.Order:
         order = messages.NewOrder.from_data(identifiers=identifiers)
@@ -144,9 +135,47 @@ class AcmeClient:
         _, order_obj = await self._signed_request(order, self._directory["newOrder"])
         return acme.messages.Order.from_json(order_obj)
 
-    async def complete_authorizations(self, order: acme.messages.Order) -> None:
+    async def order_finalize(self, order, csr) -> acme.messages.Order:
+        cert_req = messages.CertificateRequest(csr=csr)
+
+        while True:
+            try:
+                resp, order_obj = await self._signed_request(cert_req, order.finalize)
+                break
+            except acme.messages.Error as e:
+                # Make sure that the order is in state READY before moving on.
+                if e.code == "orderNotReady":
+                    await asyncio.sleep(self.FINALIZE_DELAY)
+                else:
+                    raise e
+
+        finalized = await self._poll_until(
+            self.order_get,
+            resp.headers["Location"],
+            predicate=is_valid,
+            delay=3.0,
+            max_tries=15,
+        )
+        return finalized
+
+    async def order_get(self, order_url) -> acme.messages.Order:
+        resp, order = await self._signed_request(None, order_url)
+        return acme.messages.Order.from_json(order)
+
+    async def orders_get(self) -> typing.List[str]:
+        if "orders" not in self._account:
+            return []
+
+        _, orders = await self._signed_request(None, self._account["orders"])
+        return orders
+
+    async def authorization_get(self, authorization_url) -> acme.messages.Authorization:
+        resp, authorization = await self._signed_request(None, authorization_url)
+        return acme.messages.Authorization.from_json(authorization)
+
+    async def authorizations_complete(self, order: acme.messages.Order) -> None:
         authorizations = [
-            await self.get_authorization(authorization_url)
+            await self.authorization_get(authorization_url)
             for authorization_url in order.authorizations
         ]
 
@@ -187,7 +216,7 @@ class AcmeClient:
             await asyncio.gather(
                 *[
                     self._poll_until(
-                        self.get_challenge, challenge.uri, predicate=is_valid, delay=5.0
+                        self.challenge_get, challenge.uri, predicate=is_valid, delay=5.0
                     )
                     for challenge in processing_challenges
                 ]
@@ -200,48 +229,41 @@ class AcmeClient:
         await asyncio.gather(
             *[
                 self._poll_until(
-                    self.get_authorization, authorization_url, predicate=is_valid
+                    self.authorization_get, authorization_url, predicate=is_valid
                 )
                 for authorization_url in order.authorizations
             ]
         )
 
-    async def finalize_order(self, order, csr) -> acme.messages.Order:
-        cert_req = messages.CertificateRequest(csr=csr)
+    async def challenge_get(self, challenge_url) -> acme.messages.ChallengeBody:
+        _, challenge_obj = await self._signed_request(None, challenge_url)
+        return acme.messages.ChallengeBody.from_json(challenge_obj)
 
-        while True:
-            try:
-                resp, order_obj = await self._signed_request(cert_req, order.finalize)
-                break
-            except acme.messages.Error as e:
-                # Make sure that the order is in state READY before moving on.
-                if e.code == "orderNotReady":
-                    await asyncio.sleep(self.FINALIZE_DELAY)
-                else:
-                    raise e
-
-        finalized = await self._poll_until(
-            self.get_order,
-            resp.headers["Location"],
-            predicate=is_valid,
-            delay=3.0,
-            max_tries=15,
-        )
-        return finalized
-
-    async def get_certificate(self, order) -> str:
+    async def certificate_get(self, order) -> str:
         _, cert = await self._signed_request(None, order.certificate)
         return cert
 
-    async def revoke_certificate(self, certificate: x509.Certificate) -> bool:
+    async def certificate_revoke(self, certificate: x509.Certificate) -> bool:
         cert_rev = messages.Revocation(certificate=certificate)
         resp, _ = await self._signed_request(cert_rev, self._directory["revokeCert"])
 
         return resp.status == 200
 
-    async def get_challenge(self, challenge_url) -> acme.messages.ChallengeBody:
-        _, challenge_obj = await self._signed_request(None, challenge_url)
-        return acme.messages.ChallengeBody.from_json(challenge_obj)
+    def register_challenge_solver(
+        self,
+        types: typing.Iterable[ChallengeSolverType],
+        challenge_solver: ChallengeSolver,
+    ):
+        for type_ in types:
+            if self._challenge_solvers.get(type_, None):
+                raise ValueError(
+                    f"A challenge solver of type '{type_}' is already registered."
+                )
+            else:
+                logger.debug(
+                    f"Registering {type(challenge_solver).__name__} as the Challenge Solver for types {types}"
+                )
+                self._challenge_solvers[type_] = challenge_solver
 
     async def _poll_until(
         self, coro, *args, predicate=None, delay=3.0, max_tries=5, **kwargs
@@ -308,19 +330,3 @@ class AcmeClient:
 
             logger.debug(data)
             return resp, data
-
-    def register_challenge_solver(
-        self,
-        types: typing.Iterable[ChallengeSolverType],
-        challenge_solver: ChallengeSolver,
-    ):
-        for type_ in types:
-            if self._challenge_solvers.get(type_, None):
-                raise ValueError(
-                    f"A challenge solver of type '{type_}' is already registered."
-                )
-            else:
-                logger.debug(
-                    f"Registering {type(challenge_solver).__name__} as the Challenge Solver for types {types}"
-                )
-                self._challenge_solvers[type_] = challenge_solver
