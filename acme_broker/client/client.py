@@ -122,11 +122,16 @@ class AcmeClient:
         account_obj["kid"] = self._account.kid
         self._account = messages.Account.from_json(account_obj)
 
-    async def account_lookup(self, kid) -> messages.Account:
-        _, account_obj = await self._signed_request(None, kid)
-        account_obj["kid"] = kid
+    async def account_lookup(self) -> None:
+        reg = acme.messages.Registration.from_data(
+            terms_of_service_agreed=True, only_return_existing=True
+        )
 
-        return messages.Account.from_json(account_obj)
+        resp, account_obj = await self._signed_request(
+            reg, self._directory["newAccount"]
+        )
+        account_obj["kid"] = resp.headers["Location"]
+        self._account = messages.Account.from_json(account_obj)
 
     async def order_create(
         self, identifiers: typing.Union[typing.List[dict], typing.List[str]]

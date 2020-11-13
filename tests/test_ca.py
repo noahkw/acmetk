@@ -314,9 +314,13 @@ class TestOurClient(TestAcme):
 
     async def test_unregister(self):
         await self.client.start()
-        account = await self.client.account_lookup(self.client._account.kid)
 
-        self.assertEqual(account.kid, self.client._account.kid)
+        kid = self.client._account.kid
+        self.client._account = None
+
+        await self.client.account_lookup()
+
+        self.assertEqual(self.client._account.kid, kid)
 
         await self.client.account_update(status=acme.messages.STATUS_DEACTIVATED)
 
@@ -343,7 +347,7 @@ class TestCertBotCA(TestCertBot, unittest.IsolatedAsyncioTestCase):
         await super().test_register()
 
     async def test_unregister(self):
-        await super().test_renewal()
+        await super().test_unregister()
 
 
 class TestOurClientCA(TestOurClient, unittest.IsolatedAsyncioTestCase):
