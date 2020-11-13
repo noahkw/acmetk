@@ -1,6 +1,7 @@
 import abc
 import asyncio
 import enum
+import functools
 import logging
 import typing
 
@@ -9,6 +10,7 @@ import josepy
 from acme import jws
 from aiohttp import ClientSession
 from cryptography import x509
+from infoblox_client import connector, objects
 
 from acme_broker import messages
 
@@ -62,6 +64,41 @@ class ChallengeSolver(abc.ABC):
         :param challenge: The challenge to be completed
         :type challenge: acme.messages.ChallengeBody
         """
+        pass
+
+
+class InfobloxClient(ChallengeSolver):
+    def __init__(self, *, host, username, password):
+        self._creds = {"host": host, "username": username, "password": password}
+        self._loop = asyncio.get_event_loop()
+
+    async def connect(self):
+        self._conn = await self._loop.run_in_executor(
+            None, connector.Connector, self._creds
+        )
+
+    async def set_txt_record(self, name, text, views=None, ttl=60):
+        if views is None:
+            views = ["Intern", "Extern"]
+
+        logger.debug("Setting TXT record %s = %s, TTL %d", name, text, ttl)
+
+        # TODO: error handling
+        for view in views:
+            _ = await self._loop.run_in_executor(
+                None,
+                functools.partial(
+                    objects.TXTRecord.create,
+                    self._conn,
+                    name=name,
+                    text=text,
+                    view=view,
+                    ttl=ttl,
+                    update_if_exists=True,
+                ),
+            )
+
+    async def complete_challenge(self, challenge):
         pass
 
 

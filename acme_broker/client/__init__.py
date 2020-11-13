@@ -1,4 +1,4 @@
-from .client import AcmeClient
+from .client import AcmeClient, InfobloxClient
 
 
-__all__ = ["AcmeClient"]
+__all__ = ["AcmeClient", "InfobloxClient"]

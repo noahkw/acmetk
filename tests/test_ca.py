@@ -14,7 +14,7 @@ from acme_broker import AcmeCA
 from acme_broker.client import AcmeClient
 from acme_broker.main import load_config
 
-log = logging.getLogger("acme_broker.test_client")
+log = logging.getLogger("acme_broker.test_ca")
 
 ClientData = collections.namedtuple("ClientData", "key_path csr csr_path")
 CAData = collections.namedtuple("CADAta", "key_path cert_path")

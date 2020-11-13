@@ -185,7 +185,7 @@ class AcmeServerBase:
             else:
                 account = await self._db.get_account(session, key=sig.jwk)
         elif sig.kid:
-            kid = sig.kid.split("/")[-1]
+            kid = sig.kid.split("/")[-1]  # TODO: yarl
 
             if url_for(request, "accounts", kid=kid) != jws.signature.combined.kid:
                 raise acme.messages.Error.with_code("malformed")
