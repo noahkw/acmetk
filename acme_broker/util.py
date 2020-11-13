@@ -89,6 +89,12 @@ def load_cert(filename):
         return deserialize_cert(pem.read())
 
 
+def sha256_digest(data):
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(data)
+    return digest.finalize()
+
+
 def sha256_hex_digest(data):
     digest = hashes.Hash(hashes.SHA256())
     digest.update(data)

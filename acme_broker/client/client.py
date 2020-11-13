@@ -11,8 +11,10 @@ from acme import jws
 from aiohttp import ClientSession
 from cryptography import x509
 from infoblox_client import connector, objects
+from josepy import b64encode
 
 from acme_broker import messages
+from acme_broker.util import sha256_hex_digest
 
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
@@ -55,7 +57,7 @@ class ChallengeSolverType(enum.Enum):
 
 class ChallengeSolver(abc.ABC):
     @abc.abstractmethod
-    async def complete_challenge(self, challenge):
+    async def complete_challenge(self, thumbprint, identifier, challenge):
         """Complete the given challenge.
 
         This method should complete the given challenge and then delay
@@ -98,14 +100,22 @@ class InfobloxClient(ChallengeSolver):
                 ),
             )
 
-    async def complete_challenge(self, challenge):
-        pass
+    async def complete_challenge(self, thumbprint, identifier, challenge):
+        token = b64encode(challenge.chall.token).decode()
+        thumbprint_b64 = b64encode(thumbprint).decode()
+        key_authz = f"{token}.{thumbprint_b64}"
+
+        await self.set_txt_record(
+            f"{challenge.chall.LABEL}.{identifier.value}",
+            b64encode(sha256_hex_digest(key_authz.encode()).encode()),
+        )
+        await asyncio.sleep(3)
 
 
 class DummySolver(ChallengeSolver):
-    async def complete_challenge(self, challenge):
+    async def complete_challenge(self, thumbprint, identifier, challenge):
         logger.debug(
-            f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ}"
+            f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ}, identifier {identifier}"
         )
         # await asyncio.sleep(1)
 
@@ -250,7 +260,11 @@ class AcmeClient:
         for authorization in authorizations:
             for challenge in authorization.challenges:
                 if ChallengeSolverType(challenge.chall.typ) == chosen_challenge_type:
-                    await solver.complete_challenge(challenge)
+                    await solver.complete_challenge(
+                        self._private_key.thumbprint(),
+                        authorization.identifier,
+                        challenge,
+                    )
                     processing_challenges.append(challenge)
 
                     break
@@ -259,7 +273,11 @@ class AcmeClient:
             await asyncio.gather(
                 *[
                     self._poll_until(
-                        self.challenge_get, challenge.uri, predicate=is_valid, delay=5.0
+                        self.challenge_get,
+                        challenge.uri,
+                        predicate=is_valid,
+                        delay=5.0,
+                        max_tries=50,
                     )
                     for challenge in processing_challenges
                 ]

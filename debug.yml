@@ -29,6 +29,11 @@ infoblox:
   username: 'woehler-luis'
 infoblox_test:
   name: '_acme_test_ibclient.acmenoah.luis.uni-hannover.de'
+  le_name: 'acmenoah.luis.uni-hannover.de'
+  client:
+    directory: 'https://acme-staging-v02.api.letsencrypt.org/directory'
+    contact:
+      email: 'woehler+testclient@luis.uni-hannover.de'
 certbot:
   workdir: '/home/noah/workspace/acme-broker/certbot'
 logging:
