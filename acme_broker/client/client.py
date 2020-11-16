@@ -103,7 +103,7 @@ class InfobloxClient(ChallengeSolver):
             challenge.chall.validation_domain_name(identifier.value),
             challenge.chall.validation(key),
         )
-        await asyncio.sleep(3)
+        await asyncio.sleep(5)
 
 
 class DummySolver(ChallengeSolver):
@@ -116,6 +116,7 @@ class DummySolver(ChallengeSolver):
 
 class AcmeClient:
     FINALIZE_DELAY = 10.0
+    INVALID_NONCE_RETRIES = 5
 
     def __init__(self, *, directory_url, private_key, contact=None):
         self._session = ClientSession()
@@ -131,11 +132,15 @@ class AcmeClient:
 
         self._challenge_solvers = dict()
 
+        # Verify ssl certificates. Only disable this for debugging purposes,
+        # for example when testing against a Pebble instance.
+        self.ssl = True
+
     async def close(self):
         await self._session.close()
 
     async def start(self):
-        async with self._session.get(self._directory_url) as resp:
+        async with self._session.get(self._directory_url, ssl=self.ssl) as resp:
             self._directory = await resp.json()
 
         if not self._challenge_solvers.keys():
@@ -264,6 +269,13 @@ class AcmeClient:
 
                     break
 
+        await asyncio.gather(
+            *[
+                self.challenge_validate(challenge.uri)
+                for challenge in processing_challenges
+            ]
+        )
+
         try:
             await asyncio.gather(
                 *[
@@ -294,6 +306,9 @@ class AcmeClient:
     async def challenge_get(self, challenge_url) -> acme.messages.ChallengeBody:
         _, challenge_obj = await self._signed_request(None, challenge_url)
         return acme.messages.ChallengeBody.from_json(challenge_obj)
+
+    async def challenge_validate(self, challenge_url):
+        await self._signed_request(None, challenge_url, post_as_get=False)
 
     async def certificate_get(self, order) -> str:
         _, cert = await self._signed_request(None, order.certificate)
@@ -346,7 +361,9 @@ class AcmeClient:
     async def _get_nonce(self):
         async def fetch_nonce():
             try:
-                async with self._session.head(self._directory["newNonce"]) as resp:
+                async with self._session.head(
+                    self._directory["newNonce"], ssl=self.ssl
+                ) as resp:
                     logger.debug("Storing new nonce %s", resp.headers["Replay-Nonce"])
                     return resp.headers["Replay-Nonce"]
             except Exception as e:
@@ -357,8 +374,13 @@ class AcmeClient:
         except KeyError:
             return await self._poll_until(fetch_nonce, predicate=lambda x: x, delay=5.0)
 
-    def _wrap_in_jws(self, obj: typing.Optional[josepy.JSONDeSerializable], nonce, url):
-        jobj = obj.json_dumps(indent=2).encode() if obj else b""
+    def _wrap_in_jws(
+        self, obj: typing.Optional[josepy.JSONDeSerializable], nonce, url, post_as_get
+    ):
+        if post_as_get:
+            jobj = obj.json_dumps(indent=2).encode() if obj else b""
+        else:
+            jobj = b"{}"
         kwargs = {"nonce": acme.jose.b64decode(nonce), "url": url}
         if self._account is not None:
             kwargs["kid"] = self._account["kid"]
@@ -367,12 +389,27 @@ class AcmeClient:
         ).json_dumps(indent=2)
 
     async def _signed_request(
-        self, obj: typing.Optional[josepy.JSONDeSerializable], url
+        self, obj: typing.Optional[josepy.JSONDeSerializable], url, post_as_get=True
     ):
-        payload = self._wrap_in_jws(obj, await self._get_nonce(), url)
+        tries = self.INVALID_NONCE_RETRIES
+        while tries > 0:
+            try:
+                payload = self._wrap_in_jws(
+                    obj, await self._get_nonce(), url, post_as_get
+                )
+                return await self._make_request(payload, url)
+            except acme.messages.Error as e:
+                if e.code == "badNonce" and tries > 1:
+                    tries -= 1
+                    continue
+                raise e
 
+    async def _make_request(self, payload, url):
         async with self._session.post(
-            url, data=payload, headers={"Content-Type": "application/jose+json"}
+            url,
+            data=payload,
+            headers={"Content-Type": "application/jose+json"},
+            ssl=self.ssl,
         ) as resp:
             if "Replay-Nonce" in resp.headers:
                 self._nonces.add(resp.headers["Replay-Nonce"])

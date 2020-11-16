@@ -29,12 +29,19 @@ infoblox:
   username: 'woehler-luis'
 infoblox_test:
   name: '_acme_test_ibclient.acmenoah.luis.uni-hannover.de'
-  le_name: 'acmenoah.luis.uni-hannover.de'
+  domain_name: 'acmenoah.luis.uni-hannover.de'
   client:
-    directory: 'https://acme-staging-v02.api.letsencrypt.org/directory'
+    directory_url: 'https://acme-staging-v02.api.letsencrypt.org/directory'
     private_key: 'infoblox_test_account.key'
     contact:
       email: 'woehler+testclient@luis.uni-hannover.de'
+boulder_test:
+  domain_name: 'acmenoah.luis.uni-hannover.de'
+  client:
+    directory_url: 'https://0.0.0.0:14000/dir'
+    private_key: 'boulder_test_account.key'
+    contact:
+      email: 'woehler+testclient+boulder@luis.uni-hannover.de'
 certbot:
   workdir: '/home/noah/workspace/acme-broker/certbot'
 logging:
