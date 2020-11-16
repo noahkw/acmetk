@@ -31,6 +31,12 @@ class TestInfobloxClient(unittest.IsolatedAsyncioTestCase):
             dir_.mkdir(parents=True)
 
         self.path = dir_
+        self.account_key_path = (
+            dir_ / self.config["infoblox_test"]["client"]["private_key"]
+        )
+
+        if not self.account_key_path.exists():
+            acme_broker.util.generate_rsa_key(self.account_key_path)
 
     async def asyncSetUp(self) -> None:
         self.infoblox_client = InfobloxClient(**self.config["infoblox"])
@@ -61,9 +67,6 @@ class TestInfobloxClient(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(await self._query_txt_record(self.test_name), text_value)
 
     async def test_cert_acquisition(self):
-        client_account_key_path = self.path / "client_account.key"
-        acme_broker.util.generate_rsa_key(client_account_key_path)
-
         client_cert_key = acme_broker.util.generate_rsa_key(
             self.path / "client_cert.key"
         )
@@ -77,7 +80,7 @@ class TestInfobloxClient(unittest.IsolatedAsyncioTestCase):
 
         client = AcmeClient(
             directory_url=self.config["infoblox_test"]["client"]["directory"],
-            private_key=self.path / "client_cert.key",
+            private_key=self.account_key_path,
             contact=self.config["infoblox_test"]["client"]["contact"],
         )
 

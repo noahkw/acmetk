@@ -32,6 +32,7 @@ infoblox_test:
   le_name: 'acmenoah.luis.uni-hannover.de'
   client:
     directory: 'https://acme-staging-v02.api.letsencrypt.org/directory'
+    private_key: 'infoblox_test_account.key'
     contact:
       email: 'woehler+testclient@luis.uni-hannover.de'
 certbot:
