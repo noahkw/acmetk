@@ -11,10 +11,8 @@ from acme import jws
 from aiohttp import ClientSession
 from cryptography import x509
 from infoblox_client import connector, objects
-from josepy import b64encode
 
 from acme_broker import messages
-from acme_broker.util import sha256_hex_digest
 
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
@@ -57,7 +55,7 @@ class ChallengeSolverType(enum.Enum):
 
 class ChallengeSolver(abc.ABC):
     @abc.abstractmethod
-    async def complete_challenge(self, thumbprint, identifier, challenge):
+    async def complete_challenge(self, key, identifier, challenge):
         """Complete the given challenge.
 
         This method should complete the given challenge and then delay
@@ -100,20 +98,16 @@ class InfobloxClient(ChallengeSolver):
                 ),
             )
 
-    async def complete_challenge(self, thumbprint, identifier, challenge):
-        token = b64encode(challenge.chall.token).decode()
-        thumbprint_b64 = b64encode(thumbprint).decode()
-        key_authz = f"{token}.{thumbprint_b64}"
-
+    async def complete_challenge(self, key, identifier, challenge):
         await self.set_txt_record(
-            f"{challenge.chall.LABEL}.{identifier.value}",
-            b64encode(sha256_hex_digest(key_authz.encode()).encode()),
+            challenge.chall.validation_domain_name(identifier.value),
+            challenge.chall.validation(key),
         )
         await asyncio.sleep(3)
 
 
 class DummySolver(ChallengeSolver):
-    async def complete_challenge(self, thumbprint, identifier, challenge):
+    async def complete_challenge(self, key, identifier, challenge):
         logger.debug(
             f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ}, identifier {identifier}"
         )
@@ -145,8 +139,9 @@ class AcmeClient:
             self._directory = await resp.json()
 
         if not self._challenge_solvers.keys():
-            raise ValueError(
-                "There is no challenge solver registered with the client. Certificate retrieval will likely fail."
+            logger.warning(
+                "There is no challenge solver registered with the client. "
+                "Certificate retrieval will likely fail."
             )
 
         await self.account_register(**self._contact)
@@ -216,7 +211,7 @@ class AcmeClient:
         return acme.messages.Order.from_json(order)
 
     async def orders_get(self) -> typing.List[str]:
-        if "orders" not in self._account:
+        if not self._account.orders:
             return []
 
         _, orders = await self._signed_request(None, self._account["orders"])
@@ -261,7 +256,7 @@ class AcmeClient:
             for challenge in authorization.challenges:
                 if ChallengeSolverType(challenge.chall.typ) == chosen_challenge_type:
                     await solver.complete_challenge(
-                        self._private_key.thumbprint(),
+                        self._private_key,
                         authorization.identifier,
                         challenge,
                     )
