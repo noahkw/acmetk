@@ -207,7 +207,7 @@ class AcmeClient:
             self.order_get,
             resp.headers["Location"],
             predicate=is_valid,
-            delay=3.0,
+            delay=5.0,
             max_tries=15,
         )
         return finalized
