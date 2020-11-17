@@ -32,6 +32,7 @@ class TestAcme:
         return self._config["tests"]["LocalCA"]
 
     def setUp(self) -> None:
+        self._config = load_config("../debug.yml")
         self.log = logging.getLogger(f"acme_broker.tests.{self.name}")
         self.contact = f"woehler+{self.name}@luis.uni-hannover.de"
 
@@ -48,18 +49,16 @@ class TestAcme:
         acme_broker.util.generate_rsa_key(client_account_key_path)
         client_cert_key = acme_broker.util.generate_rsa_key(client_cert_key_path)
         csr = acme_broker.util.generate_csr(
-            f"{self.name}.test.de",
+            self.config_sec["names"][0],
             client_cert_key,
             csr_path,
-            names=[f"{self.name}.test.de", f"{self.name}2.test.de"],
+            names=self.config_sec["names"],
         )
 
         self.client_data = ClientData(client_account_key_path, csr, csr_path)
 
         ca_key_path = dir_ / "root.key"
         ca_cert_path = dir_ / "root.crt"
-
-        self._config = load_config("../debug.yml")
 
         self.config_sec["ca"].update(
             {

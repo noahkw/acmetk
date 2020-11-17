@@ -6,7 +6,8 @@ from aiohttp import web
 
 import acme_broker.util
 from acme_broker import AcmeCA, AcmeBroker
-from acme_broker.client import AcmeClient
+from acme_broker.client import AcmeClient, InfobloxClient
+from acme_broker.client.client import ChallengeSolverType
 from tests.test_ca import TestAcme, TestAcmetiny, TestCertBot, TestOurClient
 
 log = logging.getLogger("acme_broker.test_broker")
@@ -62,8 +63,6 @@ class TestBroker(TestAcme):
 
 
 class TestBrokerLocalCA(TestBroker):
-    DIRECTORY = "http://localhost:8000/broker/directory"
-
     @property
     def config_sec(self):
         return self._config["tests"]["BrokerLocalCA"]
@@ -107,14 +106,14 @@ class TestBrokerLocalCA(TestBroker):
         self.broker_client = broker_client
 
 
-class TestAcmetinyBroker(
+class TestAcmetinyBrokerLocalCA(
     TestAcmetiny, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase
 ):
     async def test_run(self):
         await super().test_run()
 
 
-class TestCertBotBroker(
+class TestCertBotBrokerLocalCA(
     TestCertBot, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase
 ):
     async def test_run(self):
@@ -133,7 +132,7 @@ class TestCertBotBroker(
         await super().test_renewal()
 
 
-class TestOurClientBroker(
+class TestOurClientBrokerLocalCA(
     TestOurClient, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase
 ):
     async def test_run(self):
@@ -152,15 +151,64 @@ class TestOurClientBroker(
         await super().test_unregister()
 
 
-# class TestOurClientBrokerLE(TestOurClient, TestBrokerLE, unittest.IsolatedAsyncioTestCase):
-#     def setup(self):
-#         super().setUp()
-#
-#         with open("../infoblox", "r") as f:
-#             self.config["infoblox"]["password"] = f.read().strip()
-#
-#     async def asyncSetUp(self) -> None:
-#         await super().asyncSetUp()
-#
-#         self.infoblox_client = InfobloxClient(**self.config["infoblox"])
-#         await self.infoblox_client.connect()
+class TestBrokerLE(TestBroker):
+    @property
+    def config_sec(self):
+        return self._config["tests"]["BrokerLE"]
+
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+
+        with open("../infoblox", "r") as f:
+            self._config["infoblox"]["password"] = f.read().strip()
+
+        self.infoblox_client = InfobloxClient(**self._config["infoblox"])
+        await self.infoblox_client.connect()
+
+        self.broker_client.register_challenge_solver(
+            (ChallengeSolverType.DNS_01,), self.infoblox_client
+        )
+
+
+class TestAcmetinyBrokerLE(
+    TestAcmetiny, TestBrokerLE, unittest.IsolatedAsyncioTestCase
+):
+    async def test_run(self):
+        await super().test_run()
+
+
+class TestCertBotBrokerLE(TestCertBot, TestBrokerLE, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
+
+    async def test_skey_revocation(self):
+        await super().test_skey_revocation()
+
+    async def test_renewal(self):
+        await super().test_renewal()
+
+    async def test_register(self):
+        await super().test_register()
+
+    async def test_unregister(self):
+        await super().test_renewal()
+
+
+class TestOurClientBrokerLE(
+    TestOurClient, TestBrokerLE, unittest.IsolatedAsyncioTestCase
+):
+    async def test_run(self):
+        await super().test_run()
+
+    async def test_run_stress(self):
+        # rate limits!
+        pass
+
+    async def test_revoke(self):
+        await super().test_revoke()
+
+    async def test_account_update(self):
+        await super().test_account_update()
+
+    async def test_unregister(self):
+        await super().test_unregister()

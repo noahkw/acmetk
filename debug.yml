@@ -18,6 +18,9 @@ boulder_test:
       email: 'woehler+testclient+boulder@luis.uni-hannover.de'
 tests:
   LocalCA:
+    names:
+      - 'localca.test.de'
+      - 'localca2.test.de'
     ca:
       hostname: '127.0.0.1'
       port: 8000
@@ -30,6 +33,9 @@ tests:
         # phone: ''
         email: 'woehler+testclient@luis.uni-hannover.de'
   BrokerLocalCA:
+    names:
+      - 'brokerlocalca.test.de'
+      - 'brokerlocalca2.test.de'
     broker:
       hostname: '127.0.0.1'
       port: 8000
@@ -51,6 +57,29 @@ tests:
       db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-ca'
       rsa_min_keysize: 2048
       tos_url: 'http://localhost:8000/ca/tos'
+  BrokerLE:
+    names:
+      - 'acmenoah.luis.uni-hannover.de'
+      - 'srv.acmenoah.luis.uni-hannover.de'
+    broker:
+      hostname: '127.0.0.1'
+      port: 8000
+      db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
+      rsa_min_keysize: 2048
+      tos_url: 'http://localhost:8000/broker/tos'
+      client:
+        directory: 'https://acme-staging-v02.api.letsencrypt.org/directory'
+        private_key: 'broker_client_account.key'
+        contact:
+          # phone: ''
+          email: 'woehler+testbrokerclient@luis.uni-hannover.de'
+    client:
+      directory: 'http://localhost:8000/broker/directory'
+      contact:
+        # phone: ''
+        email: 'woehler+testclient@luis.uni-hannover.de'
+    ca:
+      directory: 'UNUSED'
 certbot:
   workdir: '/tmp/certbot'
 logging:
