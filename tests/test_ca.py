@@ -27,6 +27,10 @@ class TestAcme:
     def name(self):
         return type(self).__name__[4:]
 
+    @property
+    def config_sec(self):
+        return self._config["tests"]["LocalCA"]
+
     def setUp(self) -> None:
         self.log = logging.getLogger(f"acme_broker.tests.{self.name}")
         self.contact = f"woehler+{self.name}@luis.uni-hannover.de"
@@ -55,9 +59,9 @@ class TestAcme:
         ca_key_path = dir_ / "root.key"
         ca_cert_path = dir_ / "root.crt"
 
-        self.config = load_config("../debug.yml")
+        self._config = load_config("../debug.yml")
 
-        self.config["ca"].update(
+        self.config_sec["ca"].update(
             {
                 "cert": ca_cert_path,
                 "private_key": ca_key_path,
@@ -87,7 +91,7 @@ class TestAcme:
 
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
-        runner, ca = await AcmeCA.runner(self.config["ca"])
+        runner, ca = await AcmeCA.runner(self.config_sec["ca"])
         self.runner = runner
 
     async def asyncTearDown(self) -> None:
@@ -126,8 +130,8 @@ class TestCertBot(TestAcme):
             f.write(
                 f"""server = {self.DIRECTORY}
 config-dir = ./{self.path}/etc/letsencrypt
-work-dir = {self.config["certbot"]["workdir"]}/
-logs-dir = {self.config["certbot"]["workdir"]}/logs
+work-dir = {self._config["certbot"]["workdir"]}/
+logs-dir = {self._config["certbot"]["workdir"]}/logs
 """
             )
 
@@ -159,7 +163,7 @@ logs-dir = {self.config["certbot"]["workdir"]}/logs
             "patched certbot._internal.log.post_arg_parse_setup"
         )
 
-        logging.config.dictConfig(self.config["logging"])
+        logging.config.dictConfig(self._config["logging"])
 
         r = await self.loop.run_in_executor(None, cbm.main, argv)
         return r
@@ -309,8 +313,8 @@ class TestOurClient(TestAcme):
 
         new_contact = ("mailto:newmail.test.de", "tel:555-1234")
         await self.client.account_update(contact=new_contact)
-        account = await self.client.account_lookup(self.client._account.kid)
-        self.assertEqual(account.contact, new_contact)
+        await self.client.account_lookup()
+        self.assertEqual(self.client._account.contact, new_contact)
 
     async def test_unregister(self):
         await self.client.start()

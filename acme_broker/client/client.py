@@ -174,6 +174,7 @@ class AcmeClient:
             terms_of_service_agreed=True, only_return_existing=True
         )
 
+        self._account = None  # Otherwise the kid is sent instead of the JWK. Results in the request failing.
         resp, account_obj = await self._signed_request(
             reg, self._directory["newAccount"]
         )

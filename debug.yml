@@ -1,29 +1,3 @@
-ca:
-  hostname: 'localhost'
-  port: 8000
-  db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-ca'
-  rsa_min_keysize: 2048
-  tos_url: 'http://localhost:8000/ca/tos'
-  cert: './root.crt'
-  private_key: './root.key'
-broker:
-  hostname: 'localhost'
-  port: 8000
-  db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
-  rsa_min_keysize: 2048
-  tos_url: 'http://localhost:8000/broker/tos'
-  client:
-    directory: 'http://localhost:8000/ca/directory'
-    private_key: './account.key'
-    contact:
-      # phone: ''
-      email: 'woehler+testbrokerclient@luis.uni-hannover.de'
-client:
-  directory: 'http://localhost:8000/directory'
-#  private_key: './account.key'
-  contact:
-    # phone: ''
-    email: 'woehler+testclient@luis.uni-hannover.de'
 infoblox:
   host: 'ipam.uni-hannover.de'
   username: 'woehler-luis'
@@ -42,8 +16,43 @@ boulder_test:
     private_key: 'boulder_test_account.key'
     contact:
       email: 'woehler+testclient+boulder@luis.uni-hannover.de'
+tests:
+  LocalCA:
+    ca:
+      hostname: '127.0.0.1'
+      port: 8000
+      db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-ca'
+      rsa_min_keysize: 2048
+      tos_url: 'http://localhost:8000/tos'
+    client:
+      directory: 'http://localhost:8000/directory'
+      contact:
+        # phone: ''
+        email: 'woehler+testclient@luis.uni-hannover.de'
+  BrokerLocalCA:
+    broker:
+      hostname: '127.0.0.1'
+      port: 8000
+      db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
+      rsa_min_keysize: 2048
+      tos_url: 'http://localhost:8000/broker/tos'
+      client:
+        directory: 'http://localhost:8000/ca/directory'
+        private_key: 'broker_client_account.key'
+        contact:
+          # phone: ''
+          email: 'woehler+testbrokerclient@luis.uni-hannover.de'
+    client:
+      directory: 'http://localhost:8000/broker/directory'
+      contact:
+        # phone: ''
+        email: 'woehler+testclient@luis.uni-hannover.de'
+    ca:
+      db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-ca'
+      rsa_min_keysize: 2048
+      tos_url: 'http://localhost:8000/ca/tos'
 certbot:
-  workdir: '/home/noah/workspace/acme-broker/certbot'
+  workdir: '/tmp/certbot'
 logging:
   version: 1
   formatters:
