@@ -120,6 +120,18 @@ class AcmeServerBase:
 
         return runner, instance
 
+    @classmethod
+    async def unix_socket(cls, config, path, **kwargs):
+        instance = await cls.create_app(config, **kwargs)
+
+        runner = web.AppRunner(instance.app)
+        await runner.setup()
+
+        site = web.UnixSite(runner, path)
+        await site.start()
+
+        return runner, instance
+
     def _response(self, request, data=None, text=None, *args, **kwargs):
         if data and text:
             raise ValueError("only one of data, text, or body should be specified")

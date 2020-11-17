@@ -8,5 +8,13 @@ services:
     environment:
       POSTGRES_PASSWORD: ${ACME_BROKER_PG_PW}
       POSTGRES_USER: acme-broker
+  app:
+    image: broker_app
+    restart: always
     ports:
-      - "5432:5432"
+      - "5000:5000"
+    depends_on:
+      - db
+    volumes:
+      #- ${PWD}/prod.yml:/app/prod.yml
+      - .:/app

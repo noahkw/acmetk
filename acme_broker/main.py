@@ -6,11 +6,15 @@ from pathlib import Path
 import click
 import yaml
 
-from acme_broker import AcmeBroker
-from acme_broker.client import AcmeClient
-from acme_broker.client.client import DummySolver, ChallengeSolverType
-from acme_broker.server import AcmeCA
-from acme_broker.util import generate_root_cert, generate_rsa_key
+import sys
+
+sys.path.append("/app/")  # for supervisord inside docker
+
+from acme_broker import AcmeBroker  # noqa
+from acme_broker.client import AcmeClient  # noqa
+from acme_broker.client.client import ChallengeSolverType, InfobloxClient  # noqa
+from acme_broker.server import AcmeCA  # noqa
+from acme_broker.util import generate_root_cert, generate_rsa_key  # noqa
 
 logger = logging.getLogger(__name__)
 
@@ -67,12 +71,18 @@ def ca(config_file):
 
 @main.command()
 @click.argument("config-file", type=click.Path())
-def broker(config_file):
+@click.argument("path", type=click.Path())
+def broker(config_file, path):
     """Starts the ACME Broker"""
     config = load_config(config_file)
-    click.echo(f'Starting ACME Broker on port {config["broker"]["port"]}')
+    click.echo(f"Starting ACME Broker at {path}")
+
+    loop = asyncio.get_event_loop()
 
     async def serve_forever():
+        infoblox_client = InfobloxClient(**config["broker"]["infoblox"])
+        await infoblox_client.connect()
+
         broker_client = AcmeClient(
             directory_url=config["broker"]["client"]["directory"],
             private_key=config["broker"]["client"]["private_key"],
@@ -81,15 +91,16 @@ def broker(config_file):
 
         broker_client.register_challenge_solver(
             (ChallengeSolverType.DNS_01,),
-            DummySolver(),
+            infoblox_client,
         )
 
-        await AcmeBroker.runner(config["broker"], client=broker_client)
+        await broker_client.start()
+        await AcmeBroker.unix_socket(config["broker"], path, client=broker_client)
 
         while True:
             await asyncio.sleep(3600)
 
-    asyncio.run(serve_forever())
+    loop.run_until_complete(serve_forever())
 
 
 if __name__ == "__main__":
