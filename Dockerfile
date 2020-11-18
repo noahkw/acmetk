@@ -9,7 +9,8 @@ COPY ./docker_conf/nginx/conf.d /etc/nginx/conf.d
 COPY ./docker_conf/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY ./docker_conf/supervisor/conf.d /etc/supervisor/conf.d
 
-EXPOSE 5000
+EXPOSE 80
+EXPOSE 443
 
 WORKDIR /app
 
