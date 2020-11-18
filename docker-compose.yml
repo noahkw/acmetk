@@ -19,4 +19,4 @@ services:
       - .:/app
       - ./certs:/app/certs
     environment:
-      APP_CONFIG_FILE: /app/prod_ca.yml
+      APP_CONFIG_FILE: /app/prod_broker.yml

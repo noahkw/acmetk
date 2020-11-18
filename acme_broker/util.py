@@ -101,17 +101,27 @@ def sha256_hex_digest(data):
     return digest.finalize().hex()
 
 
-def build_url(r, app, p, **kwargs):
-    return str(r.url.with_path(str(app.router[p].url_for(**kwargs))))
+def forwarded_url(request):
+    """Looks for the X-Forwarded-Proto header and replaces the request URL's
+    protocol scheme if applicable."""
+    if forwarded_protocol := request.headers.get("X-Forwarded-Proto"):
+        return request.url.with_scheme(forwarded_protocol)
+    else:
+        return request.url
 
 
-def url_for(r, p, **kwargs):
+def build_url(request, app, path, **kwargs):
+    url = forwarded_url(request)
+    return str(url.with_path(str(app.router[path].url_for(**kwargs))))
+
+
+def url_for(request, path, **kwargs):
     try:
-        return build_url(r, r.app, p, **kwargs)
+        return build_url(request, request.app, path, **kwargs)
     except KeyError:
         # search subapps for route
-        for subapp in r.app._subapps:
-            return build_url(r, subapp, p, **kwargs)
+        for subapp in request.app._subapps:
+            return build_url(request, subapp, path, **kwargs)
 
 
 def serialize_cert(cert):

@@ -23,6 +23,7 @@ from acme_broker.util import (
     load_key,
     names_of,
     certs_from_fullchain,
+    forwarded_url,
 )
 
 logger = logging.getLogger(__name__)
@@ -173,7 +174,7 @@ class AcmeServerBase:
 
         sig = jws.signature.combined
 
-        if sig.url != str(request.url):
+        if sig.url != str(forwarded_url(request)):
             raise acme.messages.Error.with_code("unauthorized")
 
         if sig.alg not in self.SUPPORTED_JWS_ALGORITHMS:

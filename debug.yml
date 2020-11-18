@@ -20,6 +20,21 @@ tests:
       contact:
         # phone: ''
         email: 'woehler+testclient@luis.uni-hannover.de'
+  LocalCADeployment:
+    names:
+      - 'localcadeployment.test.de'
+      - 'localcadeployment.test.de'
+    ca:
+      db: 'postgresql+asyncpg://acme-broker:acme-broker-prod-pw@db:5432/acme-broker' # TODO: consider using a different db
+      rsa_min_keysize: 2048
+      tos_url: 'https://acmenoah.luis.uni-hannover.de/non-existent-tos'
+      cert: '/app/certs/root.crt'
+      private_key: '/app/certs/root.key'
+    client:
+      directory: 'https://127.0.0.1/directory'
+      contact:
+        # phone: ''
+        email: 'woehler+testclientcadeployment@luis.uni-hannover.de'
   BrokerLocalCA:
     names:
       - 'brokerlocalca.test.de'
