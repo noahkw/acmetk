@@ -19,6 +19,9 @@ from acme_broker.util import generate_root_cert, generate_rsa_key  # noqa
 logger = logging.getLogger(__name__)
 
 
+APP_NAMES = ("broker", "ca")
+
+
 def load_config(config_file):
     with open(config_file, "r") as stream:
         config = yaml.safe_load(stream)
@@ -54,53 +57,56 @@ def generate_keys(root_key_file, account_key_file):
 
 
 @main.command()
-@click.argument("config-file", type=click.Path())
-def ca(config_file):
-    """Starts the ACME CA"""
+@click.option("--config-file", envvar="APP_CONFIG_FILE", type=click.Path())
+@click.option("--path", type=click.Path())
+def run(config_file, path):
+    """Starts the app as defined in the config file"""
     config = load_config(config_file)
-    click.echo(f'Starting ACME CA on port {config["ca"]["port"]}')
 
-    async def serve_forever():
-        await AcmeCA.runner(config["ca"])
-
-        while True:
-            await asyncio.sleep(3600)
-
-    asyncio.run(serve_forever())
-
-
-@main.command()
-@click.argument("config-file", type=click.Path())
-@click.argument("path", type=click.Path())
-def broker(config_file, path):
-    """Starts the ACME Broker"""
-    config = load_config(config_file)
-    click.echo(f"Starting ACME Broker at {path}")
+    if (app := list(config.keys())[0]) not in APP_NAMES:
+        raise click.UsageError(
+            f"Cannot run app '{app}'. Valid options: {', '.join(APP_NAMES)}. "
+            f"Please check your config file '{config_file}' and rename the main section accordingly."
+        )
 
     loop = asyncio.get_event_loop()
 
-    async def serve_forever():
-        infoblox_client = InfobloxClient(**config["broker"]["infoblox"])
-        await infoblox_client.connect()
+    if app == "broker":
+        loop.run_until_complete(run_broker(config, path))
+    elif app == "ca":
+        loop.run_until_complete(run_ca(config, path))
 
-        broker_client = AcmeClient(
-            directory_url=config["broker"]["client"]["directory"],
-            private_key=config["broker"]["client"]["private_key"],
-            contact=config["broker"]["client"]["contact"],
-        )
 
-        broker_client.register_challenge_solver(
-            (ChallengeSolverType.DNS_01,),
-            infoblox_client,
-        )
+async def run_ca(config, path):
+    click.echo(f"Starting ACME CA at {path}")
+    await AcmeCA.unix_socket(config["ca"], path)
 
-        await broker_client.start()
-        await AcmeBroker.unix_socket(config["broker"], path, client=broker_client)
+    while True:
+        await asyncio.sleep(3600)
 
-        while True:
-            await asyncio.sleep(3600)
 
-    loop.run_until_complete(serve_forever())
+async def run_broker(config, path):
+    click.echo(f"Starting ACME Broker at {path}")
+
+    infoblox_client = InfobloxClient(**config["broker"]["infoblox"])
+    await infoblox_client.connect()
+
+    broker_client = AcmeClient(
+        directory_url=config["broker"]["client"]["directory"],
+        private_key=config["broker"]["client"]["private_key"],
+        contact=config["broker"]["client"]["contact"],
+    )
+
+    broker_client.register_challenge_solver(
+        (ChallengeSolverType.DNS_01,),
+        infoblox_client,
+    )
+
+    await broker_client.start()
+    await AcmeBroker.unix_socket(config["broker"], path, client=broker_client)
+
+    while True:
+        await asyncio.sleep(3600)
 
 
 if __name__ == "__main__":

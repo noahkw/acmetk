@@ -16,6 +16,7 @@ services:
     depends_on:
       - db
     volumes:
-      #- ${PWD}/prod.yml:/app/prod.yml
       - .:/app
       - ./certs:/app/certs
+    environment:
+      APP_CONFIG_FILE: /app/prod_ca.yml
