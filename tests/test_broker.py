@@ -8,12 +8,12 @@ import acme_broker.util
 from acme_broker import AcmeCA, AcmeBroker
 from acme_broker.client import AcmeClient, InfobloxClient
 from acme_broker.client.client import ChallengeSolverType
-from tests.test_ca import TestAcme, TestAcmetiny, TestCertBot, TestOurClient
+from tests.test_ca import TestCA, TestAcmetiny, TestCertBot, TestOurClient
 
 log = logging.getLogger("acme_broker.test_broker")
 
 
-class TestBroker(TestAcme):
+class TestBroker(TestCA):
     DIRECTORY = "http://localhost:8000/broker/directory"
 
     def setUp(self) -> None:

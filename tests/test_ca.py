@@ -22,6 +22,11 @@ CAData = collections.namedtuple("CADAta", "key_path cert_path")
 
 class TestAcme:
     DIRECTORY = "http://localhost:8000/directory"
+    _config: dict
+    log: logging.Logger
+    contact: str
+    path: Path
+    client_data: ClientData
 
     @property
     def name(self):
@@ -29,9 +34,10 @@ class TestAcme:
 
     @property
     def config_sec(self):
-        return self._config["tests"]["LocalCA"]
+        return NotImplementedError
 
     def setUp(self) -> None:
+        """Sets up our test object with the necessary properties for testing using a client"""
         self._config = load_config("../debug.yml")
         self.log = logging.getLogger(f"acme_broker.tests.{self.name}")
         self.contact = f"woehler+{self.name}@luis.uni-hannover.de"
@@ -57,8 +63,20 @@ class TestAcme:
 
         self.client_data = ClientData(client_account_key_path, csr, csr_path)
 
-        ca_key_path = dir_ / "root.key"
-        ca_cert_path = dir_ / "root.crt"
+    async def asyncSetUp(self) -> None:
+        self.loop = asyncio.get_event_loop()
+
+
+class TestCA(TestAcme):
+    @property
+    def config_sec(self):
+        return self._config["tests"]["LocalCA"]
+
+    def setUp(self) -> None:
+        super().setUp()
+
+        ca_key_path = self.path / "root.key"
+        ca_cert_path = self.path / "root.crt"
 
         self.config_sec["ca"].update(
             {
@@ -89,7 +107,8 @@ class TestAcme:
                 path.unlink()
 
     async def asyncSetUp(self) -> None:
-        self.loop = asyncio.get_event_loop()
+        await super().asyncSetUp()
+
         runner, ca = await AcmeCA.runner(self.config_sec["ca"])
         self.runner = runner
 
@@ -98,7 +117,7 @@ class TestAcme:
         await self.runner.cleanup()
 
 
-class TestAcmetiny(TestAcme):
+class TestAcmetiny:
     def setUp(self) -> None:
         super().setUp()
         for n in ["challenge"]:
@@ -121,7 +140,7 @@ class TestAcmetiny(TestAcme):
         )
 
 
-class TestCertBot(TestAcme):
+class TestCertBot:
     def setUp(self) -> None:
         super().setUp()
 
@@ -225,7 +244,7 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
         await self._run("unregister --agree-tos")
 
 
-class TestOurClient(TestAcme):
+class TestOurClient:
     def setUp(self) -> None:
         super().setUp()
 
@@ -331,12 +350,12 @@ class TestOurClient(TestAcme):
             await self.client.order_create(self.domains)
 
 
-class TestAcmetinyCA(TestAcmetiny, unittest.IsolatedAsyncioTestCase):
+class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
 
-class TestCertBotCA(TestCertBot, unittest.IsolatedAsyncioTestCase):
+class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
@@ -353,7 +372,7 @@ class TestCertBotCA(TestCertBot, unittest.IsolatedAsyncioTestCase):
         await super().test_unregister()
 
 
-class TestOurClientCA(TestOurClient, unittest.IsolatedAsyncioTestCase):
+class TestOurClientCA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
