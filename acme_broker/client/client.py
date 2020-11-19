@@ -115,7 +115,7 @@ class DummySolver(ChallengeSolver):
 
 
 class AcmeClient:
-    FINALIZE_DELAY = 10.0
+    FINALIZE_DELAY = 3.0
     INVALID_NONCE_RETRIES = 5
 
     def __init__(self, *, directory_url, private_key, contact=None):

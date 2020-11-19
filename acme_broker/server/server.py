@@ -10,6 +10,7 @@ import yarl
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
+from cryptography import x509
 
 from acme_broker import models, messages
 from acme_broker.database import Database
@@ -427,50 +428,57 @@ class AcmeServerBase:
 
             return self._response(request, {"orders": account.orders_list(request)})
 
+    async def _validate_order(
+        self, request, session
+    ) -> (models.Order, x509.CertificateSigningRequest):
+        jws, account = await self._verify_request(request, session, key_auth=False)
+        order_id = request.match_info["id"]
+
+        order = await self._db.get_order(session, account.kid, order_id)
+        if not order:
+            raise web.HTTPNotFound
+
+        await order.validate()
+
+        if order.status == models.OrderStatus.INVALID:
+            raise acme.messages.Error(
+                typ="orderInvalid",
+                detail="This order cannot be finalized because it is invalid.",
+            )
+
+        if order.status != models.OrderStatus.READY:
+            raise acme.messages.Error.with_code("orderNotReady")
+
+        csr = messages.CertificateRequest.json_loads(jws.payload).csr
+
+        if csr.public_key().key_size < self._rsa_min_keysize:
+            raise acme.messages.Error.with_code(
+                "badPublicKey",
+                detail=f"Only RSA keys with more than {self._rsa_min_keysize} bits are accepted.",
+            )
+        elif not csr.is_signature_valid:
+            raise acme.messages.Error.with_code(
+                "badCSR", detail="The CSR's signature is invalid."
+            )
+        elif not order.validate_csr(csr):
+            raise acme.messages.Error.with_code(
+                "badCSR",
+                detail="The requested identifiers in the CSR differ from those "
+                "that this order has authorizations for.",
+            )
+
+        return order, csr
+
     async def _finalize_order(self, request):
         async with self._session() as session:
-            jws, account = await self._verify_request(request, session, key_auth=False)
-            order_id = request.match_info["id"]
-
-            order = await self._db.get_order(session, account.kid, order_id)
-            if not order:
-                raise web.HTTPNotFound
-
-            await order.validate()
-
-            if order.status == models.OrderStatus.INVALID:
-                raise acme.messages.Error(
-                    typ="orderInvalid",
-                    detail="This order cannot be finalized because it is invalid.",
-                )
-
-            if order.status != models.OrderStatus.READY:
-                raise acme.messages.Error.with_code("orderNotReady")
-
-            cert_request = messages.CertificateRequest.json_loads(jws.payload)
-            csr = cert_request.csr
-
-            if csr.public_key().key_size < self._rsa_min_keysize:
-                raise acme.messages.Error.with_code(
-                    "badPublicKey",
-                    detail="Only RSA keys with more than 2048 bits are accepted.",
-                )
-            elif not csr.is_signature_valid:
-                raise acme.messages.Error.with_code(
-                    "badCSR", detail="The CSR's signature is invalid."
-                )
-            elif not order.validate_csr(csr):
-                raise acme.messages.Error.with_code(
-                    "badCSR",
-                    detail="The requested identifiers in the CSR differ from those "
-                    "that this order has authorizations for.",
-                )
+            order, csr = await self._validate_order(request, session)
 
             order.csr = csr
             order.status = models.OrderStatus.PROCESSING
 
             serialized = order.serialize(request)
-            kid = account.kid
+            order_id = str(order.order_id)
+            kid = order.account_kid
             await session.commit()
 
         asyncio.ensure_future(self._handle_order_finalize(kid, order_id))
@@ -614,7 +622,7 @@ class AcmeServerClientBase(AcmeServerBase):
         return self._response(request, status=200)
 
 
-class AcmeBroker(AcmeServerBase):
+class AcmeBroker(AcmeServerClientBase):
     async def _handle_order_finalize(self, kid, order_id):
         logger.debug("Finalizing order %s", order_id)
 
@@ -656,14 +664,58 @@ class AcmeProxy(AcmeServerClientBase):
 
             await session.flush()
             serialized = order.serialize(request)
+            kid = account.kid
             order_id = order.order_id
             await session.commit()
 
+        asyncio.ensure_future(self._complete_challenges(kid, order_id))
         return self._response(
             request,
             serialized,
             status=201,
             headers={"Location": url_for(request, "order", id=str(order_id))},
+        )
+
+    async def _complete_challenges(self, kid, order_id):
+        logger.debug("Completing challenges for order %s", order_id)
+        async with self._session() as session:
+            order = await self._db.get_order(session, kid, order_id)
+
+            order_ca = await self._client.order_get(order.proxied_url)
+            # TODO: handle errors during completion
+            await self._client.authorizations_complete(order_ca)
+
+    async def _finalize_order(self, request):
+        async with self._session() as session:
+            order, csr = await self._validate_order(request, session)
+            order_ca = await self._client.order_get(order.proxied_url)
+
+            try:
+                # AcmeClient.order_finalize does not return if the order never becomes valid.
+                # Thus, we handle that case here and set the order's status to invalid
+                # if the CA takes too long.
+                await asyncio.wait_for(self._client.order_finalize(order_ca, csr), 10.0)
+            except asyncio.TimeoutError:
+                # TODO: consider returning notReady instead to let the client try again
+                order.status = models.OrderStatus.INVALID
+            else:
+                # The CA's order is valid, we can set our order's status to PROCESSING and
+                # request the certificate from the CA in _handle_order_finalize.
+                order.status = models.OrderStatus.PROCESSING
+
+            order.csr = csr
+            serialized = order.serialize(request)
+            kid = order.account_kid
+            order_id = str(order.order_id)
+            await session.commit()
+
+        if order.status == models.OrderStatus.PROCESSING:
+            asyncio.ensure_future(self._handle_order_finalize(kid, order_id))
+
+        return self._response(
+            request,
+            serialized,
+            headers={"Location": url_for(request, "order", id=order_id)},
         )
 
     async def _handle_order_finalize(self, kid, order_id):
@@ -673,9 +725,7 @@ class AcmeProxy(AcmeServerClientBase):
             order = await self._db.get_order(session, kid, order_id)
 
             order_ca = await self._client.order_get(order.proxied_url)
-            await self._client.authorizations_complete(order_ca)
-            finalized = await self._client.order_finalize(order_ca, order.csr)
-            full_chain = await self._client.certificate_get(finalized)
+            full_chain = await self._client.certificate_get(order_ca)
 
             certs = certs_from_fullchain(full_chain)
 
