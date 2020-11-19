@@ -221,6 +221,41 @@ class AcmeServerBase:
 
         return jws, account
 
+    async def _verify_revocation(self, request, session) -> models.Certificate:
+        try:
+            # check whether the message is signed using an account key
+            jws, account = await self._verify_request(request, session, key_auth=False)
+        except acme.messages.Error:
+            data = await request.text()
+            jws = acme.jws.JWS.json_loads(
+                data
+            )  # TODO: raise acme error on deserialization error
+            account = None
+
+        revocation = messages.Revocation.json_loads(jws.payload)
+        cert = revocation.certificate
+
+        certificate = await self._db.get_certificate(session, certificate=cert)
+        if not certificate:
+            raise web.HTTPNotFound
+
+        if account:
+            # check that the account holds authorizations for all of the identifiers in the certificate
+            if not account.validate_cert(cert):
+                raise acme.messages.Error.with_code("unauthorized")
+        else:
+            # the request was probably signed with the certificate's key pair
+            jwk = jws.signature.combined.jwk
+            cert_key = josepy.util.ComparableRSAKey(cert.public_key())
+
+            if cert_key != jwk.key:
+                raise acme.messages.Error.with_code("malformed")
+
+            if not jws.verify(jwk):
+                raise acme.messages.Error.with_code("unauthorized")
+
+        return certificate
+
     async def _get_directory(self, request):
         directory = acme.messages.Directory(
             {
@@ -366,39 +401,7 @@ class AcmeServerBase:
 
     async def _revoke_cert(self, request):
         async with self._session() as session:
-            try:
-                # check whether the message is signed using an account key
-                jws, account = await self._verify_request(
-                    request, session, key_auth=False
-                )
-            except acme.messages.Error:
-                data = await request.text()
-                jws = acme.jws.JWS.json_loads(
-                    data
-                )  # TODO: raise acme error on deserialization error
-                account = None
-
-            revocation = messages.Revocation.json_loads(jws.payload)
-            cert = revocation.certificate
-
-            certificate = await self._db.get_certificate(session, certificate=cert)
-            if not certificate:
-                raise web.HTTPNotFound
-
-            if account:
-                # check that the account holds authorizations for all of the identifiers in the certificate
-                if not account.validate_cert(cert):
-                    raise acme.messages.Error.with_code("unauthorized")
-            else:
-                # the request was probably signed with the certificate's key pair
-                jwk = jws.signature.combined.jwk
-                cert_key = josepy.util.ComparableRSAKey(cert.public_key())
-
-                if cert_key != jwk.key:
-                    raise acme.messages.Error.with_code("malformed")
-
-                if not jws.verify(jwk):
-                    raise acme.messages.Error.with_code("unauthorized")
+            certificate = await self._verify_revocation(request, session)
 
             # TODO: do actual revocation logic
             certificate.status = models.CertificateStatus.REVOKED
@@ -614,43 +617,13 @@ class AcmeBroker(AcmeServerBase):
                 text=certificate.full_chain,
             )
 
-    async def _revoke_cert(self, request):  # TODO: reduce code duplication
+    async def _revoke_cert(self, request):
         async with self._session() as session:
-            try:
-                # check whether the message is signed using an account key
-                jws, account = await self._verify_request(
-                    request, session, key_auth=False
-                )
-            except acme.messages.Error:
-                data = await request.text()
-                jws = acme.jws.JWS.json_loads(
-                    data
-                )  # TODO: raise acme error on deserialization error
-                account = None
+            certificate = await self._verify_revocation(request, session)
 
-            revocation = messages.Revocation.json_loads(jws.payload)
-            cert = revocation.certificate
-
-            certificate = await self._db.get_certificate(session, certificate=cert)
-            if not certificate:
-                raise web.HTTPNotFound
-
-            if account:
-                # check that the account holds authorizations for all of the identifiers in the certificate
-                if not account.validate_cert(cert):
-                    raise acme.messages.Error.with_code("unauthorized")
-            else:
-                # the request was probably signed with the certificate's key pair
-                jwk = jws.signature.combined.jwk
-                cert_key = josepy.util.ComparableRSAKey(cert.public_key())
-
-                if cert_key != jwk.key:
-                    raise acme.messages.Error.with_code("malformed")
-
-                if not jws.verify(jwk):
-                    raise acme.messages.Error.with_code("unauthorized")
-
-            revocation_succeeded = await self._client.certificate_revoke(cert)
+            revocation_succeeded = await self._client.certificate_revoke(
+                certificate.cert
+            )
             if not revocation_succeeded:
                 raise acme.messages.Error.with_code("unauthorized")
 
