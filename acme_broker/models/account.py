@@ -58,6 +58,8 @@ class Account(Entity, Serializer):
         ]
 
     def authorized_identifiers(self, lower=False):
+        # We deliberately don't check whether the identifiers' authorizations have expired,
+        # so that older certs may still be revoked.
         identifiers = [
             identifier for order in self.orders for identifier in order.identifiers
         ]

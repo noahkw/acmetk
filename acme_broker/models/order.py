@@ -109,7 +109,7 @@ class Order(Entity, Serializer):
             if identifier.authorization.status == AuthorizationStatus.INVALID:
                 self.status = OrderStatus.INVALID
                 break
-            if identifier.authorization.status != AuthorizationStatus.VALID:
+            if not identifier.authorization.is_valid():
                 break
         else:
             self.status = OrderStatus.READY
@@ -120,17 +120,23 @@ class Order(Entity, Serializer):
         d = Serializer.serialize(self)
         d["identifiers"] = Serializer.serialize_list(self.identifiers)
 
-        authorizations_to_show = (
-            (AuthorizationStatus.PENDING, AuthorizationStatus.VALID)
-            if self.status == OrderStatus.PENDING
-            else (AuthorizationStatus.VALID,)
-        )
+        # Section on which authorizations to include:
+        # https://tools.ietf.org/html/rfc8555#section-7.1.3
+        def show_authz(authorization) -> bool:
+            if self.status in (OrderStatus.VALID, OrderStatus.INVALID):
+                return authorization.is_valid()
+            else:  # self.status in (OrderStatus.PENDING, OrderStatus.PROCESSING, OrderStatus.READY):
+                return (
+                    authorization.status == AuthorizationStatus.PENDING
+                    or authorization.is_valid()
+                )
 
         d["authorizations"] = [
             identifier.authorization.url(request)
             for identifier in self.identifiers
-            if identifier.authorization.status in authorizations_to_show
+            if show_authz(identifier.authorization)
         ]
+
         d["finalize"] = self.finalize_url(request)
 
         if self.status == OrderStatus.VALID:

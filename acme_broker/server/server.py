@@ -707,9 +707,10 @@ class AcmeProxy(AcmeServerClientBase):
             serialized = order.serialize(request)
             kid = order.account_kid
             order_id = str(order.order_id)
+            order_processing = order.status == models.OrderStatus.PROCESSING
             await session.commit()
 
-        if order.status == models.OrderStatus.PROCESSING:
+        if order_processing:
             asyncio.ensure_future(self._handle_order_finalize(kid, order_id))
 
         return self._response(

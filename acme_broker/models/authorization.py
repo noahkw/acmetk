@@ -1,5 +1,6 @@
 import enum
 import uuid
+from datetime import datetime, timezone, timedelta
 
 from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer, Boolean
 from sqlalchemy.dialects.postgresql import UUID
@@ -63,6 +64,10 @@ class Authorization(Entity, Serializer):
         return url_for(request, "authz", id=str(self.authorization_id))
 
     async def validate(self, session):
+        if self.is_expired():
+            self.status = AuthorizationStatus.EXPIRED
+            return self.status
+
         if self.status != AuthorizationStatus.PENDING:
             return self.status
 
@@ -76,6 +81,12 @@ class Authorization(Entity, Serializer):
 
         await self.identifier.order.validate()
         return self.status
+
+    def is_valid(self):
+        return self.status == AuthorizationStatus.VALID and not self.is_expired()
+
+    def is_expired(self):
+        return datetime.now(timezone.utc) > self.expires
 
     def update(self, upd):
         # the only allowed state transition is VALID -> DEACTIVATED if requested by the client
@@ -98,4 +109,5 @@ class Authorization(Entity, Serializer):
         return cls(
             status=AuthorizationStatus.PENDING,
             wildcard=identifier.value.startswith("*"),
+            expires=datetime.now(timezone.utc) + timedelta(days=7),
         )

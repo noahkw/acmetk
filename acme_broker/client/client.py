@@ -18,6 +18,10 @@ logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
 
 
+# Monkey patch acme's status codes to allow 'expired' for authorizations
+STATUS_EXPIRED = acme.messages.Status("expired")
+
+
 class AcmeClientException(Exception):
     pass
 
