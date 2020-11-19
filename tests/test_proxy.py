@@ -27,7 +27,7 @@ class TestProxyLocalCA(TestProxy, TestBrokerLocalCA):
         return self._config["tests"]["ProxyLocalCA"]
 
 
-class TestAcmetinyBrokerLocalCA(
+class TestAcmetinyProxyLocalCA(
     TestAcmetiny, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
 ):
     async def test_run(self):

@@ -60,6 +60,7 @@ class Order(Entity, Serializer):
     order_id = Column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
     )
+    proxied_url = Column(String, nullable=True, unique=True)
     status = Column("status", Enum(OrderStatus), nullable=False)
     expires = Column(DateTime(timezone=True), nullable=False)
     identifiers = relationship(

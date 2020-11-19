@@ -6,6 +6,7 @@ import typing
 import acme.messages
 import acme.jws
 import josepy
+import yarl
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
@@ -396,7 +397,7 @@ class AcmeServerBase:
             authz_url = challenge.authorization.url(request)
             await session.commit()
 
-        asyncio.ensure_future(self._handle_challenge_finalize(kid, challenge_id))
+        asyncio.ensure_future(self._handle_challenge_validate(kid, challenge_id))
         return self._response(request, serialized, links=[f'<{authz_url}>; rel="up"'])
 
     async def _revoke_cert(self, request):
@@ -482,8 +483,8 @@ class AcmeServerBase:
     async def _certificate(self, request):
         raise NotImplementedError
 
-    async def _handle_challenge_finalize(self, kid, challenge_id):
-        logger.debug("Finalizing challenge %s", challenge_id)
+    async def _handle_challenge_validate(self, kid, challenge_id):
+        logger.debug("Validating challenge %s", challenge_id)
 
         async with self._session() as session:
             challenge = await self._db.get_challenge(session, kid, challenge_id)
@@ -574,32 +575,12 @@ class AcmeCA(AcmeServerBase):
             )
 
 
-class AcmeBroker(AcmeServerBase):
+class AcmeServerClientBase(AcmeServerBase):
+    """Base for an ACME server that talks to a CA using an ACME client."""
+
     def __init__(self, *, client, **kwargs):
         super().__init__(**kwargs)
         self._client = client
-
-    async def _handle_order_finalize(self, kid, order_id):
-        logger.debug("Finalizing order %s", order_id)
-
-        async with self._session() as session:
-            order = await self._db.get_order(session, kid, order_id)
-
-            order_ca = await self._client.order_create(list(names_of(order.csr)))
-            await self._client.authorizations_complete(order_ca)
-            finalized = await self._client.order_finalize(order_ca, order.csr)
-            full_chain = await self._client.certificate_get(finalized)
-
-            certs = certs_from_fullchain(full_chain)
-
-            order.certificate = models.Certificate(
-                status=models.CertificateStatus.VALID,
-                cert=certs[0],
-                full_chain=full_chain,
-            )
-
-            order.status = models.OrderStatus.VALID
-            await session.commit()
 
     async def _certificate(self, request):
         async with self._session() as session:
@@ -633,5 +614,76 @@ class AcmeBroker(AcmeServerBase):
         return self._response(request, status=200)
 
 
-class AcmeProxy(AcmeServerBase):
-    pass
+class AcmeBroker(AcmeServerBase):
+    async def _handle_order_finalize(self, kid, order_id):
+        logger.debug("Finalizing order %s", order_id)
+
+        async with self._session() as session:
+            order = await self._db.get_order(session, kid, order_id)
+
+            order_ca = await self._client.order_create(list(names_of(order.csr)))
+            await self._client.authorizations_complete(order_ca)
+            finalized = await self._client.order_finalize(order_ca, order.csr)
+            full_chain = await self._client.certificate_get(finalized)
+
+            certs = certs_from_fullchain(full_chain)
+
+            order.certificate = models.Certificate(
+                status=models.CertificateStatus.VALID,
+                cert=certs[0],
+                full_chain=full_chain,
+            )
+
+            order.status = models.OrderStatus.VALID
+            await session.commit()
+
+
+class AcmeProxy(AcmeServerClientBase):
+    async def _new_order(self, request):
+        async with self._session() as session:
+            jws, account = await self._verify_request(request, session)
+            obj = acme.messages.NewOrder.json_loads(jws.payload)
+
+            identifiers = [
+                {"type": identifier.typ, "value": identifier.value}
+                for identifier in obj.identifiers
+            ]
+            ca_order = await self._client.order_create(identifiers)
+
+            order = models.Order.from_obj(account, obj)
+            order.proxied_url = str(yarl.URL(ca_order.finalize).parent)
+            session.add(order)
+
+            await session.flush()
+            serialized = order.serialize(request)
+            order_id = order.order_id
+            await session.commit()
+
+        return self._response(
+            request,
+            serialized,
+            status=201,
+            headers={"Location": url_for(request, "order", id=str(order_id))},
+        )
+
+    async def _handle_order_finalize(self, kid, order_id):
+        logger.debug("Finalizing order %s", order_id)
+
+        async with self._session() as session:
+            order = await self._db.get_order(session, kid, order_id)
+
+            order_ca = await self._client.order_get(order.proxied_url)
+            await self._client.authorizations_complete(order_ca)
+            finalized = await self._client.order_finalize(order_ca, order.csr)
+            full_chain = await self._client.certificate_get(finalized)
+
+            certs = certs_from_fullchain(full_chain)
+
+            order.certificate = models.Certificate(
+                status=models.CertificateStatus.VALID,
+                cert=certs[0],
+                full_chain=full_chain,
+            )
+
+            order.status = models.OrderStatus.VALID
+            await session.commit()
