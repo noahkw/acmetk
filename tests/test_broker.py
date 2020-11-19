@@ -14,6 +14,9 @@ log = logging.getLogger("acme_broker.test_broker")
 
 
 class TestBroker(TestCA):
+    """Tests for the AcmeBroker class."""
+
+    _cls = AcmeBroker
     DIRECTORY = "http://localhost:8000/broker/directory"
 
     def setUp(self) -> None:
@@ -35,7 +38,7 @@ class TestBroker(TestCA):
             contact=self.config_sec["broker"]["client"]["contact"],
         )
 
-        broker = await AcmeBroker.create_app(
+        broker = await self._cls.create_app(
             self.config_sec["broker"], client=broker_client
         )
 
@@ -82,7 +85,7 @@ class TestBrokerLocalCA(TestBroker):
             acme_broker.client.client.DummySolver(),
         )
 
-        broker = await AcmeBroker.create_app(
+        broker = await self._cls.create_app(
             self.config_sec["broker"], client=broker_client
         )
 
