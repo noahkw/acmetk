@@ -3,7 +3,9 @@ import asyncio
 import enum
 import functools
 import logging
+import ssl
 import typing
+from pathlib import Path
 
 import acme.messages
 import josepy
@@ -122,7 +124,15 @@ class AcmeClient:
     FINALIZE_DELAY = 3.0
     INVALID_NONCE_RETRIES = 5
 
-    def __init__(self, *, directory_url, private_key, contact=None):
+    def __init__(
+        self, *, directory_url, private_key, contact=None, server_cert: Path = None
+    ):
+        self._ssl_context = ssl.create_default_context()
+
+        if server_cert:
+            # Add our self-signed server cert for testing purposes.
+            self._ssl_context.load_verify_locations(cafile=server_cert)
+
         self._session = ClientSession()
 
         self._directory_url = directory_url
@@ -136,15 +146,13 @@ class AcmeClient:
 
         self._challenge_solvers = dict()
 
-        # Verify ssl certificates. Only disable this for debugging purposes,
-        # for example when testing against a Pebble instance.
-        self.ssl = True
-
     async def close(self):
         await self._session.close()
 
     async def start(self):
-        async with self._session.get(self._directory_url, ssl=self.ssl) as resp:
+        async with self._session.get(
+            self._directory_url, ssl=self._ssl_context
+        ) as resp:
             self._directory = await resp.json()
 
         if not self._challenge_solvers.keys():
@@ -367,7 +375,7 @@ class AcmeClient:
         async def fetch_nonce():
             try:
                 async with self._session.head(
-                    self._directory["newNonce"], ssl=self.ssl
+                    self._directory["newNonce"], ssl=self._ssl_context
                 ) as resp:
                     logger.debug("Storing new nonce %s", resp.headers["Replay-Nonce"])
                     return resp.headers["Replay-Nonce"]
@@ -414,7 +422,7 @@ class AcmeClient:
             url,
             data=payload,
             headers={"Content-Type": "application/jose+json"},
-            ssl=self.ssl,
+            ssl=self._ssl_context,
         ) as resp:
             if "Replay-Nonce" in resp.headers:
                 self._nonces.add(resp.headers["Replay-Nonce"])

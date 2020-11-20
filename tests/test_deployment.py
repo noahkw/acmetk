@@ -47,11 +47,6 @@ class TestAcmetinyCADeployment(
 class TestOurClientCADeployment(
     TestOurClient, TestDeployment, unittest.IsolatedAsyncioTestCase
 ):
-    async def asyncSetUp(self) -> None:
-        await super().asyncSetUp()
-        # We disable cert verification to address self-signed cert errors when testing locally.
-        self.client.ssl = False
-
     async def test_run(self):
         await super().test_run()
 

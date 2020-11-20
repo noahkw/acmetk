@@ -35,6 +35,7 @@ tests:
       contact:
         # phone: ''
         email: 'woehler+testclientcadeployment@luis.uni-hannover.de'
+      server_cert: '/app/certs/fullchain.pem'
   BrokerLocalCA:
     names:
       - 'brokerlocalca.test.de'

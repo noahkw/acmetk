@@ -258,6 +258,7 @@ class TestOurClient:
             directory_url=self.DIRECTORY,
             private_key=key_path,
             contact={"email": email},
+            server_cert=self.config_sec.get("client", {}).get("server_cert", None),
         )
 
         client.register_challenge_solver(
