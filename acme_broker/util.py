@@ -1,19 +1,13 @@
 import re
 import typing
-import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import josepy
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509 import NameOID
-
-
-def generate_nonce():
-    return uuid.uuid4().hex
 
 
 def generate_csr(
@@ -37,68 +31,17 @@ def generate_csr(
 
 def generate_rsa_key(path: Path):
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    save_key(private_key, path)
 
-    return private_key
-
-
-def serialize_key(pk):
-    return pk.private_bytes(
+    pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
         encryption_algorithm=serialization.NoEncryption(),
     )
 
-
-def serialize_pubkey(pubkey):
-    key = getattr(
-        pubkey, "key", pubkey
-    )  # this allows JWKRSA objects to be passed directly
-
-    return key.public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
-
-
-def deserialize_pubkey(pem):
-    return serialization.load_pem_public_key(pem)
-
-
-def deserialize_privatekey(pem):
-    return serialization.load_pem_private_key(pem, None)
-
-
-def deserialize_cert(pem):
-    return x509.load_pem_x509_certificate(pem)
-
-
-def save_key(pk, filename):
-    pem = serialize_key(pk)
-    with open(filename, "wb") as pem_out:
+    with open(path, "wb") as pem_out:
         pem_out.write(pem)
 
-
-def load_key(filename):
-    with open(filename, "rb") as pem:
-        return deserialize_privatekey(pem.read())
-
-
-def load_cert(filename):
-    with open(filename, "rb") as pem:
-        return deserialize_cert(pem.read())
-
-
-def sha256_digest(data):
-    digest = hashes.Hash(hashes.SHA256())
-    digest.update(data)
-    return digest.finalize()
-
-
-def sha256_hex_digest(data):
-    digest = hashes.Hash(hashes.SHA256())
-    digest.update(data)
-    return digest.finalize().hex()
+    return private_key
 
 
 def forwarded_url(request):
@@ -110,22 +53,12 @@ def forwarded_url(request):
         return request.url
 
 
-def build_url(request, app, path, **kwargs):
-    url = forwarded_url(request)
-    return str(url.with_path(str(app.router[path].url_for(**kwargs))))
-
-
 def url_for(request, path, **kwargs):
-    try:
-        return build_url(request, request.app, path, **kwargs)
-    except KeyError:
-        # search subapps for route
-        for subapp in request.app._subapps:
-            return build_url(request, subapp, path, **kwargs)
-
-
-def serialize_cert(cert):
-    return cert.public_bytes(serialization.Encoding.PEM)
+    return str(
+        forwarded_url(request).with_path(
+            str(request.app.router[path].url_for(**kwargs))
+        )
+    )
 
 
 def generate_cert_from_csr(csr, root_cert, root_key):
@@ -179,16 +112,11 @@ def generate_root_cert(path: Path, country, state, locality, org_name, common_na
 
     root_cert = root_cert_builder.sign(root_key, hashes.SHA256())
 
-    pem = serialize_cert(root_cert)
+    pem = root_cert.public_bytes(serialization.Encoding.PEM)
     with open(path.parent / "root.crt", "wb") as pem_out:
         pem_out.write(pem)
 
     return root_cert, root_key
-
-
-def decode_csr(b64der):
-    decoded = josepy.decode_csr(b64der)
-    return decoded.wrapped.to_cryptography()
 
 
 def names_of(csr, lower=False):
@@ -205,21 +133,23 @@ def names_of(csr, lower=False):
     return set([name.lower() if lower else name for name in names])
 
 
-CERT_PEM_REGEX = re.compile(
-    b"""-----BEGIN CERTIFICATE-----\r?
+def pem_split(pem):
+    _PEM_TO_CLASS = {
+        b"CERTIFICATE": x509.load_pem_x509_certificate,
+        b"CERTIFICATE REQUEST": x509.load_pem_x509_csr,
+    }
+
+    _PEM_RE = re.compile(
+        b"-----BEGIN (?P<cls>"
+        + b"|".join(_PEM_TO_CLASS.keys())
+        + b""")-----"""
+        + b"""\r?
 .+?\r?
------END CERTIFICATE-----\r?
-""",
-    re.DOTALL,  # DOTALL (/s) because the base64text may include newlines
-)
+-----END \\1-----\r?\n?""",
+        re.DOTALL,
+    )
 
-
-def certs_from_fullchain(fullchain_pem):
-    certs = CERT_PEM_REGEX.findall(fullchain_pem.encode())
-    if len(certs) < 2:
-        raise ValueError(
-            "failed to parse fullchain into cert and chain: "
-            + "less than 2 certificates in chain"
-        )
-
-    return [deserialize_cert(cert) for cert in certs]
+    return [
+        _PEM_TO_CLASS[match.groupdict()["cls"]](match.group(0))
+        for match in _PEM_RE.finditer(pem.encode())
+    ]

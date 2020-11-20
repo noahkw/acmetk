@@ -1,13 +1,15 @@
 import enum
+import hashlib
 import json
 
 import josepy
+from cryptography.hazmat.primitives import serialization
 from sqlalchemy import Column, Enum, String, types, JSON, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 
 from . import OrderStatus
 from .base import Serializer, Entity
-from ..util import serialize_pubkey, url_for, names_of
+from ..util import url_for, names_of
 
 
 class AccountStatus(str, enum.Enum):
@@ -21,7 +23,10 @@ class JWKType(types.TypeDecorator):
     impl = types.LargeBinary
 
     def process_bind_param(self, value, dialect):
-        return serialize_pubkey(value)
+        return value.key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
 
     def process_result_value(self, value, dialect):
         return josepy.jwk.JWK.load(data=value)
@@ -89,3 +94,17 @@ class Account(Entity, Serializer):
         d["orders"] = self.orders_url(request)
         d["contact"] = json.loads(self.contact)
         return d
+
+    @classmethod
+    def from_obj(cls, jwk, obj):
+        pem = jwk.key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+
+        return Account(
+            key=jwk,
+            kid=hashlib.sha256(pem).hexdigest(),
+            status=AccountStatus.VALID,
+            contact=json.dumps(obj.contact),
+        )

@@ -324,7 +324,7 @@ class TestOurClient:
 
     async def test_revoke(self):
         full_chain = await self._run_one(self.client, self.client_data.csr)
-        certs = acme_broker.util.certs_from_fullchain(full_chain)
+        certs = acme_broker.util.pem_split(full_chain)
         await self.client.certificate_revoke(certs[0])
 
     async def test_account_update(self):

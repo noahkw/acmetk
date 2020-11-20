@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import typing
+import uuid
 
 import acme.messages
 import acme.jws
@@ -11,21 +12,16 @@ from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
 from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 
 from acme_broker import models, messages
 from acme_broker.database import Database
 from acme_broker.util import (
-    generate_nonce,
-    sha256_hex_digest,
-    serialize_pubkey,
     url_for,
     generate_cert_from_csr,
-    serialize_cert,
-    load_cert,
-    load_key,
     names_of,
-    certs_from_fullchain,
     forwarded_url,
+    pem_split,
 )
 
 logger = logging.getLogger(__name__)
@@ -153,7 +149,7 @@ class AcmeServerBase:
         )
 
     def _issue_nonce(self):
-        nonce = generate_nonce()
+        nonce = uuid.uuid4().hex
         logger.debug("Storing new nonce %s", nonce)
         self._nonces.add(nonce)
         return nonce
@@ -305,12 +301,7 @@ class AcmeServerBase:
                         title=f"The client must agree to the terms of service: {self._tos_url}.",
                     )
                 else:  # create new account
-                    new_account = models.Account(
-                        key=jwk,
-                        kid=sha256_hex_digest(serialize_pubkey(jwk)),
-                        status=models.AccountStatus.VALID,
-                        contact=json.dumps(reg.contact),
-                    )
+                    new_account = models.Account.from_obj(jwk, reg)
                     session.add(new_account)
                     await session.flush()
 
@@ -529,8 +520,11 @@ class AcmeCA(AcmeServerBase):
     def __init__(self, *, cert, private_key, **kwargs):
         super().__init__(**kwargs)
 
-        self._cert = load_cert(cert)
-        self._private_key = load_key(private_key)
+        with open(cert, "rb") as pem:
+            self._cert = x509.load_pem_x509_certificate(pem.read())
+
+        with open(private_key, "rb") as pem:
+            self._private_key = serialization.load_pem_private_key(pem.read(), None)
 
     @classmethod
     async def create_app(cls, config, **kwargs):
@@ -578,8 +572,8 @@ class AcmeCA(AcmeServerBase):
 
             return self._response(
                 request,
-                text=serialize_cert(certificate.cert).decode()
-                + serialize_cert(self._cert).decode(),
+                text=certificate.cert.public_bytes(serialization.Encoding.PEM).decode()
+                + self._cert.public_bytes(serialization.Encoding.PEM).decode(),
             )
 
 
@@ -621,6 +615,27 @@ class AcmeServerClientBase(AcmeServerBase):
 
         return self._response(request, status=200)
 
+    async def _obtain_and_store_cert(
+        self, order: models.Order, order_ca: acme.messages.Order
+    ):
+        full_chain = await self._client.certificate_get(order_ca)
+        certs = pem_split(full_chain)
+
+        if len(certs) < 2:
+            logger.info(
+                "Less than two certs in full chain for order %s. Cannot store client cert",
+                order.order_id,
+            )
+            order.status = models.OrderStatus.INVALID
+        else:
+            order.certificate = models.Certificate(
+                status=models.CertificateStatus.VALID,
+                cert=certs[0],
+                full_chain=full_chain,
+            )
+
+            order.status = models.OrderStatus.VALID
+
 
 class AcmeBroker(AcmeServerClientBase):
     async def _handle_order_finalize(self, kid, order_id):
@@ -632,17 +647,8 @@ class AcmeBroker(AcmeServerClientBase):
             order_ca = await self._client.order_create(list(names_of(order.csr)))
             await self._client.authorizations_complete(order_ca)
             finalized = await self._client.order_finalize(order_ca, order.csr)
-            full_chain = await self._client.certificate_get(finalized)
+            await self._obtain_and_store_cert(order, finalized)
 
-            certs = certs_from_fullchain(full_chain)
-
-            order.certificate = models.Certificate(
-                status=models.CertificateStatus.VALID,
-                cert=certs[0],
-                full_chain=full_chain,
-            )
-
-            order.status = models.OrderStatus.VALID
             await session.commit()
 
 
@@ -726,15 +732,6 @@ class AcmeProxy(AcmeServerClientBase):
             order = await self._db.get_order(session, kid, order_id)
 
             order_ca = await self._client.order_get(order.proxied_url)
-            full_chain = await self._client.certificate_get(order_ca)
+            await self._obtain_and_store_cert(order, order_ca)
 
-            certs = certs_from_fullchain(full_chain)
-
-            order.certificate = models.Certificate(
-                status=models.CertificateStatus.VALID,
-                cert=certs[0],
-                full_chain=full_chain,
-            )
-
-            order.status = models.OrderStatus.VALID
             await session.commit()
