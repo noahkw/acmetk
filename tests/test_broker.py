@@ -6,8 +6,12 @@ from aiohttp import web
 
 import acme_broker.util
 from acme_broker import AcmeCA, AcmeBroker
-from acme_broker.client import AcmeClient, InfobloxClient
-from acme_broker.client.client import ChallengeSolverType
+from acme_broker.client import (
+    AcmeClient,
+    InfobloxClient,
+    ChallengeSolverType,
+    DummySolver,
+)
 from tests.test_ca import TestCA, TestAcmetiny, TestCertBot, TestOurClient
 
 log = logging.getLogger("acme_broker.test_broker")
@@ -81,8 +85,8 @@ class TestBrokerLocalCA(TestBroker):
         )
 
         broker_client.register_challenge_solver(
-            (acme_broker.client.client.ChallengeSolverType.DNS_01,),
-            acme_broker.client.client.DummySolver(),
+            (ChallengeSolverType.DNS_01,),
+            DummySolver(),
         )
 
         broker = await self._cls.create_app(

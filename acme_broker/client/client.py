@@ -1,7 +1,4 @@
-import abc
 import asyncio
-import enum
-import functools
 import logging
 import ssl
 import typing
@@ -12,9 +9,10 @@ import josepy
 from acme import jws
 from aiohttp import ClientSession
 from cryptography import x509
-from infoblox_client import connector, objects
 
 from acme_broker import messages
+from acme_broker.client.challenge_solver import ChallengeSolver
+from acme_broker.client.challenge_solver import ChallengeSolverType
 
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
@@ -44,80 +42,8 @@ class PollingException(AcmeClientException):
         self.obj = obj
 
 
-def load_key(filename):
-    with open(filename, "rb") as pem:
-        return pem.read()
-
-
 def is_valid(obj):
     return obj.status == acme.messages.STATUS_VALID
-
-
-class ChallengeSolverType(enum.Enum):
-    HTTP_01 = "http-01"
-    DNS_01 = "dns-01"
-    TLS_ALPN_01 = "tls-alpn-01"
-
-
-class ChallengeSolver(abc.ABC):
-    @abc.abstractmethod
-    async def complete_challenge(self, key, identifier, challenge):
-        """Complete the given challenge.
-
-        This method should complete the given challenge and then delay
-        returning until the server is allowed to check for completion.
-
-        :param challenge: The challenge to be completed
-        :type challenge: acme.messages.ChallengeBody
-        """
-        pass
-
-
-class InfobloxClient(ChallengeSolver):
-    def __init__(self, *, host, username, password):
-        self._creds = {"host": host, "username": username, "password": password}
-        self._loop = asyncio.get_event_loop()
-
-    async def connect(self):
-        self._conn = await self._loop.run_in_executor(
-            None, connector.Connector, self._creds
-        )
-
-    async def set_txt_record(self, name, text, views=None, ttl=60):
-        if views is None:
-            views = ["Intern", "Extern"]
-
-        logger.debug("Setting TXT record %s = %s, TTL %d", name, text, ttl)
-
-        # TODO: error handling
-        for view in views:
-            _ = await self._loop.run_in_executor(
-                None,
-                functools.partial(
-                    objects.TXTRecord.create,
-                    self._conn,
-                    name=name,
-                    text=text,
-                    view=view,
-                    ttl=ttl,
-                    update_if_exists=True,
-                ),
-            )
-
-    async def complete_challenge(self, key, identifier, challenge):
-        await self.set_txt_record(
-            challenge.chall.validation_domain_name(identifier.value),
-            challenge.chall.validation(key),
-        )
-        await asyncio.sleep(5)
-
-
-class DummySolver(ChallengeSolver):
-    async def complete_challenge(self, key, identifier, challenge):
-        logger.debug(
-            f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ}, identifier {identifier}"
-        )
-        # await asyncio.sleep(1)
 
 
 class AcmeClient:
@@ -136,7 +62,10 @@ class AcmeClient:
         self._session = ClientSession()
 
         self._directory_url = directory_url
-        self._private_key = josepy.jwk.JWKRSA.load(load_key(private_key))
+
+        with open(private_key, "rb") as pem:
+            self._private_key = josepy.jwk.JWKRSA.load(pem.read())
+
         self._contact = {k: v for k, v in contact.items() if len(v) > 0}
 
         self._directory = dict()
@@ -273,14 +202,17 @@ class AcmeClient:
         for authorization in authorizations:
             for challenge in authorization.challenges:
                 if ChallengeSolverType(challenge.chall.typ) == chosen_challenge_type:
-                    await solver.complete_challenge(
-                        self._private_key,
-                        authorization.identifier,
-                        challenge,
-                    )
-                    processing_challenges.append(challenge)
+                    try:
+                        await solver.complete_challenge(
+                            self._private_key,
+                            authorization.identifier,
+                            challenge,
+                        )
+                        processing_challenges.append(challenge)
 
-                    break
+                        break
+                    except asyncio.TimeoutError:
+                        raise CouldNotCompleteChallenge(challenge)
 
         await asyncio.gather(
             *[

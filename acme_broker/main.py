@@ -11,8 +11,7 @@ import sys
 sys.path.append("/app/")  # for supervisord inside docker
 
 from acme_broker import AcmeBroker  # noqa
-from acme_broker.client import AcmeClient  # noqa
-from acme_broker.client.client import ChallengeSolverType, InfobloxClient  # noqa
+from acme_broker.client import AcmeClient, ChallengeSolverType, InfobloxClient  # noqa
 from acme_broker.server import AcmeCA  # noqa
 from acme_broker.util import generate_root_cert, generate_rsa_key  # noqa
 

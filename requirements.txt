@@ -5,6 +5,7 @@ asyncpg==0.21.0
 certbot==1.9.0
 click==7.1.2
 cryptography==3.1.1
+dnspython==2.0.0
 git+https://github.com/sqlalchemy/sqlalchemy.git@8d588b06d984cb053be53e779cfa11b1d5166f03
 infoblox-client==0.5.0
 PyYAML==5.3.1
