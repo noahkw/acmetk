@@ -109,6 +109,30 @@ tests:
       db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-ca'
       rsa_min_keysize: 2048
       tos_url: 'http://localhost:8000/ca/tos'
+  ProxyLE:
+    names:
+      - 'acmenoah.luis.uni-hannover.de'
+      - 'acmeproxy.acmenoah.luis.uni-hannover.de'
+      - 'acmeproxy1.acmenoah.luis.uni-hannover.de'
+    broker:
+      hostname: '127.0.0.1'
+      port: 8000
+      db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
+      rsa_min_keysize: 2048
+      tos_url: 'http://localhost:8000/proxy/tos'
+      client:
+        directory: 'https://acme-staging-v02.api.letsencrypt.org/directory'
+        private_key: 'proxy_client_account.key'
+        contact:
+          # phone: ''
+          email: 'woehler+testproxyclient@luis.uni-hannover.de'
+    client:
+      directory: 'http://localhost:8000/broker/directory'
+      contact:
+        # phone: ''
+        email: 'woehler+testclient@luis.uni-hannover.de'
+    ca:
+      directory: 'UNUSED'
 certbot:
   workdir: '/tmp/certbot'
 logging:

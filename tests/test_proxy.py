@@ -2,7 +2,7 @@ import logging
 import unittest
 
 from acme_broker import AcmeProxy
-from tests.test_broker import TestBrokerLocalCA
+from tests.test_broker import TestBrokerLocalCA, TestBrokerLE
 from tests.test_ca import TestAcmetiny, TestOurClient, TestCertBot
 
 log = logging.getLogger("acme_broker.test_proxy")
@@ -61,6 +61,54 @@ class TestOurClientProxyLocalCA(
 
     async def test_run_stress(self):
         await super().test_run_stress()
+
+    async def test_revoke(self):
+        await super().test_revoke()
+
+    async def test_account_update(self):
+        await super().test_account_update()
+
+    async def test_unregister(self):
+        await super().test_unregister()
+
+
+class TestProxyLE(TestProxy, TestBrokerLE):
+    @property
+    def config_sec(self):
+        return self._config["tests"]["ProxyLE"]
+
+
+class TestAcmetinyProxyLE(TestAcmetiny, TestProxyLE, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
+
+
+class TestCertBotProxyLE(TestCertBot, TestProxyLE, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
+
+    async def test_skey_revocation(self):
+        await super().test_skey_revocation()
+
+    async def test_renewal(self):
+        await super().test_renewal()
+
+    async def test_register(self):
+        await super().test_register()
+
+    async def test_unregister(self):
+        await super().test_renewal()
+
+
+class TestOurClientProxyLE(
+    TestOurClient, TestProxyLE, unittest.IsolatedAsyncioTestCase
+):
+    async def test_run(self):
+        await super().test_run()
+
+    async def test_run_stress(self):
+        # rate limits!
+        pass
 
     async def test_revoke(self):
         await super().test_revoke()

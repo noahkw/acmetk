@@ -11,7 +11,11 @@ import acme.messages
 
 import acme_broker.util
 from acme_broker import AcmeCA
-from acme_broker.client import AcmeClient
+from acme_broker.client import (
+    AcmeClient,
+    ChallengeSolverType,
+    DummySolver,
+)
 from acme_broker.main import load_config
 
 log = logging.getLogger("acme_broker.test_ca")
@@ -262,8 +266,8 @@ class TestOurClient:
         )
 
         client.register_challenge_solver(
-            (acme_broker.client.client.ChallengeSolverType.DNS_01,),
-            acme_broker.client.client.DummySolver(),
+            (ChallengeSolverType.DNS_01,),
+            DummySolver(),
         )
 
         return client
