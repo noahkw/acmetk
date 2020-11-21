@@ -124,13 +124,14 @@ class AcmeClient:
 
     async def order_create(
         self, identifiers: typing.Union[typing.List[dict], typing.List[str]]
-    ) -> acme.messages.Order:
+    ) -> messages.Order:
         order = messages.NewOrder.from_data(identifiers=identifiers)
 
-        _, order_obj = await self._signed_request(order, self._directory["newOrder"])
-        return acme.messages.Order.from_json(order_obj)
+        resp, order_obj = await self._signed_request(order, self._directory["newOrder"])
+        order_obj["url"] = resp.headers["Location"]
+        return messages.Order.from_json(order_obj)
 
-    async def order_finalize(self, order, csr) -> acme.messages.Order:
+    async def order_finalize(self, order, csr) -> messages.Order:
         cert_req = messages.CertificateRequest(csr=csr)
 
         while True:
@@ -153,9 +154,10 @@ class AcmeClient:
         )
         return finalized
 
-    async def order_get(self, order_url) -> acme.messages.Order:
+    async def order_get(self, order_url) -> messages.Order:
         resp, order = await self._signed_request(None, order_url)
-        return acme.messages.Order.from_json(order)
+        order["url"] = order_url
+        return messages.Order.from_json(order)
 
     async def orders_get(self) -> typing.List[str]:
         if not self._account.orders:

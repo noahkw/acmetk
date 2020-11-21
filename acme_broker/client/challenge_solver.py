@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import contextlib
 import enum
 import functools
 import logging
@@ -88,10 +89,16 @@ class InfobloxClient(ChallengeSolver):
 
     async def _query_until_completed(self, name, text):
         while True:
-            actual_text = await self.query_txt_record(name)
-            await asyncio.sleep(1.0)
+            actual_text = None
+
+            # Ignore exceptions that indicate that the record has not been propagated yet.
+            with contextlib.suppress(dns.asyncresolver.NXDOMAIN):
+                actual_text = await self.query_txt_record(name)
+
             if actual_text == text:
                 return
+
+            await asyncio.sleep(1.0)
 
     async def complete_challenge(self, key, identifier, challenge):
         name = challenge.chall.validation_domain_name(identifier.value)

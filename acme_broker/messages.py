@@ -115,3 +115,29 @@ class Account(ResourceBody):
     contact = josepy.Field("contact", omitempty=True)
     orders = josepy.Field("orders", omitempty=True)
     kid = josepy.Field("kid")
+
+
+class Order(ResourceBody):
+    """Order Resource Body.
+
+    Patched version of the acme module's order.
+    Allows storing the order's url."""
+
+    url = josepy.Field("url", omitempty=True)
+    identifiers = josepy.Field("identifiers", omitempty=True)
+    status = josepy.Field(
+        "status", decoder=acme.messages.Status.from_json, omitempty=True
+    )
+    authorizations = josepy.Field("authorizations", omitempty=True)
+    certificate = josepy.Field("certificate", omitempty=True)
+    finalize = josepy.Field("finalize", omitempty=True)
+    expires = acme.messages.fields.RFC3339Field("expires", omitempty=True)
+    error = josepy.Field("error", omitempty=True, decoder=acme.messages.Error.from_json)
+
+    @identifiers.decoder
+    def identifiers(
+        value,
+    ):  # pylint: disable=no-self-argument,missing-function-docstring
+        return tuple(
+            acme.messages.Identifier.from_json(identifier) for identifier in value
+        )

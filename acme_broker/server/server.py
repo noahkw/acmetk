@@ -4,10 +4,9 @@ import logging
 import typing
 import uuid
 
-import acme.messages
 import acme.jws
+import acme.messages
 import josepy
-import yarl
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
@@ -665,7 +664,7 @@ class AcmeProxy(AcmeServerClientBase):
             ca_order = await self._client.order_create(identifiers)
 
             order = models.Order.from_obj(account, obj)
-            order.proxied_url = str(yarl.URL(ca_order.finalize).parent)
+            order.proxied_url = ca_order.url
             session.add(order)
 
             await session.flush()
