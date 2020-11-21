@@ -14,6 +14,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 
 from acme_broker import models, messages
+from acme_broker.client import CouldNotCompleteChallenge
 from acme_broker.database import Database
 from acme_broker.util import (
     url_for,
@@ -644,9 +645,18 @@ class AcmeBroker(AcmeServerClientBase):
             order = await self._db.get_order(session, kid, order_id)
 
             order_ca = await self._client.order_create(list(names_of(order.csr)))
-            await self._client.authorizations_complete(order_ca)
-            finalized = await self._client.order_finalize(order_ca, order.csr)
-            await self._obtain_and_store_cert(order, finalized)
+
+            try:
+                await self._client.authorizations_complete(order_ca)
+                finalized = await self._client.order_finalize(order_ca, order.csr)
+                await self._obtain_and_store_cert(order, finalized)
+            except CouldNotCompleteChallenge as e:
+                logger.info(
+                    "Could not complete challenge %s associated with order %s",
+                    e.challenge.uri,
+                    order_id,
+                )
+                order.status = models.OrderStatus.INVALID
 
             await session.commit()
 
@@ -687,8 +697,17 @@ class AcmeProxy(AcmeServerClientBase):
             order = await self._db.get_order(session, kid, order_id)
 
             order_ca = await self._client.order_get(order.proxied_url)
-            # TODO: handle errors during completion
-            await self._client.authorizations_complete(order_ca)
+            try:
+                await self._client.authorizations_complete(order_ca)
+            except CouldNotCompleteChallenge as e:
+                logger.info(
+                    "Could not complete challenge %s associated with order %s",
+                    e.challenge.uri,
+                    order_id,
+                )
+                order.status = models.OrderStatus.INVALID
+
+            await session.commit()
 
     async def _finalize_order(self, request):
         async with self._session() as session:
