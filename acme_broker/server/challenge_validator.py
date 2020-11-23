@@ -1,5 +1,6 @@
 import abc
 import contextlib
+import ipaddress
 import itertools
 import logging
 import typing
@@ -50,7 +51,12 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
             dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer
         ):
             resp = await dns.asyncresolver.resolve(name, type_)
-            resolved_ips.extend([record.address for record in resp.rrset.items.keys()])
+            resolved_ips.extend(
+                [
+                    ipaddress.ip_address(record.address)
+                    for record in resp.rrset.items.keys()
+                ]
+            )
 
         return resolved_ips
 
@@ -69,13 +75,9 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
             identifier,
         )
 
-        # Read the X-Forwarded-For header if the server is behind a reverse proxy.
-        # Otherwise, use the remote address directly.
-        ip_addr = request.headers.get("X-Forwarded-For") or request.remote
-
         resolved_ips = await self.query_records(identifier)
 
-        if ip_addr not in resolved_ips:
+        if request["actual_ip"] not in resolved_ips:
             raise CouldNotValidateChallenge
 
 

@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 import json
 import logging
 import re
@@ -65,13 +66,24 @@ class AcmeServerBase:
     )
 
     def __init__(
-        self, *, rsa_min_keysize=2048, tos_url=None, mail_suffixes=None, **kwargs
+        self,
+        *,
+        rsa_min_keysize=2048,
+        tos_url=None,
+        mail_suffixes=None,
+        subnets=None,
+        **kwargs,
     ):
         self._rsa_min_keysize = rsa_min_keysize
         self._tos_url = tos_url
         self._mail_suffixes = mail_suffixes
+        self._subnets = (
+            [ipaddress.ip_network(subnet) for subnet in subnets] if subnets else None
+        )
 
-        self.app = web.Application(middlewares=[self._error_middleware])
+        self.app = web.Application(
+            middlewares=[self._host_addr_middleware, self._error_middleware]
+        )
 
         self.app.add_routes(
             [
@@ -112,6 +124,7 @@ class AcmeServerBase:
             rsa_min_keysize=config.get("rsa_min_keysize"),
             tos_url=config.get("tos_url"),
             mail_suffixes=config.get("mail_suffixes"),
+            subnets=config.get("subnets"),
             **kwargs,
         )
         ca._db = db
@@ -543,6 +556,24 @@ class AcmeServerBase:
         raise NotImplementedError
 
     @middleware
+    async def _host_addr_middleware(self, request, handler):
+        # Read the X-Forwarded-For header if the server is behind a reverse proxy.
+        # Otherwise, use the remote address directly.
+        ip_addr = ipaddress.ip_address(
+            request.headers.get("X-Forwarded-For") or request.remote
+        )
+        request["actual_ip"] = ip_addr
+
+        if not self._subnets or any([ip_addr in subnet for subnet in self._subnets]):
+            return await handler(request)
+        else:
+            return web.Response(
+                status=403,
+                text="This service is only available from within certain networks."
+                " Please contact your system administrator.",
+            )
+
+    @middleware
     async def _error_middleware(self, request, handler):
         """
         Converts errors thrown in handlers to ACME compliant JSON and
@@ -582,6 +613,7 @@ class AcmeCA(AcmeServerBase):
             rsa_min_keysize=config.get("rsa_min_keysize"),
             tos_url=config.get("tos_url"),
             mail_suffixes=config.get("mail_suffixes"),
+            subnets=config.get("subnets"),
             cert=config["cert"],
             private_key=config["private_key"],
             **kwargs,
@@ -721,7 +753,7 @@ class AcmeProxy(AcmeServerClientBase):
             ]
             ca_order = await self._client.order_create(identifiers)
 
-            order = models.Order.from_obj(account, obj)
+            order = models.Order.from_obj(account, obj, self.supported_challenges())
             order.proxied_url = ca_order.url
             session.add(order)
 
