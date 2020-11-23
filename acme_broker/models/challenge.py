@@ -61,9 +61,11 @@ class Challenge(Entity, Serializer):
 
     @classmethod
     def create_all(cls):
-        return [
-            cls(type=type_, status=ChallengeStatus.PENDING) for type_ in ChallengeType
-        ]
+        return cls.create_types(ChallengeType)
+
+    @classmethod
+    def create_types(cls, types):
+        return [cls(type=type_, status=ChallengeStatus.PENDING) for type_ in types]
 
     async def validate(self, session):
         """

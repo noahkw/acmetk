@@ -382,7 +382,7 @@ class AcmeServerBase:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
 
-            order = models.Order.from_obj(account, obj)
+            order = models.Order.from_obj(account, obj, self.supported_challenges())
             session.add(order)
 
             await session.flush()

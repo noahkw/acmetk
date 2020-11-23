@@ -145,13 +145,16 @@ class Order(Entity, Serializer):
         return d
 
     @classmethod
-    def from_obj(cls, account, obj):
+    def from_obj(cls, account, obj, challenge_types):
         identifiers = [
             Identifier.from_obj(identifier) for identifier in obj.identifiers
         ]
+
         for identifier in identifiers:
             identifier.authorization = Authorization.for_identifier(identifier)
-            identifier.authorization.challenges = Challenge.create_all()
+            identifier.authorization.challenges = Challenge.create_types(
+                challenge_types
+            )
 
         order = Order(
             expires=datetime.now(timezone.utc) + timedelta(days=7),
