@@ -18,6 +18,11 @@ from cryptography.hazmat.primitives import serialization
 from acme_broker import models, messages
 from acme_broker.client import CouldNotCompleteChallenge
 from acme_broker.database import Database
+from acme_broker.server.challenge_validator import (
+    RequestIPDNSChallengeValidator,
+    ChallengeValidator,
+    CouldNotValidateChallenge,
+)
 from acme_broker.util import (
     url_for,
     generate_cert_from_csr,
@@ -97,6 +102,9 @@ class AcmeServerBase:
         self._db: typing.Optional[Database] = None
         self._session = None
 
+        self._challenge_validators = {}
+        self.register_challenge_validator(RequestIPDNSChallengeValidator())
+
     @classmethod
     async def create_app(cls, config, **kwargs):
         db = Database(config["db"])
@@ -136,6 +144,18 @@ class AcmeServerBase:
         await site.start()
 
         return runner, instance
+
+    def register_challenge_validator(self, validator: ChallengeValidator):
+        for challenge_type in validator.SUPPORTED_CHALLENGES:
+            if self._challenge_validators.get(challenge_type):
+                raise ValueError(
+                    f"A challenge validator for type {challenge_type} is already registered"
+                )
+            else:
+                self._challenge_validators[challenge_type] = validator
+
+    def supported_challenges(self):
+        return self._challenge_validators.keys()
 
     def _response(self, request, data=None, text=None, *args, **kwargs):
         if data and text:
@@ -512,9 +532,15 @@ class AcmeServerBase:
 
         async with self._session() as session:
             challenge = await self._db.get_challenge(session, kid, challenge_id)
-            # simulate requests to Let's Encrypt CA
-            # await asyncio.sleep(3)
+
+            validator = self._challenge_validators[challenge.type]
+            try:
+                await validator.validate_challenge(challenge)
+            except CouldNotValidateChallenge:
+                challenge.status = models.ChallengeStatus.INVALID
+
             await challenge.validate(session)
+
             await session.commit()
 
     async def _handle_order_finalize(self, kid, order_id):

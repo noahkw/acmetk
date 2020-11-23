@@ -69,10 +69,9 @@ class Challenge(Entity, Serializer):
         """
         Sets the challenge's status and calls its parent authorization's finalize() method.
         """
-        if self.status not in [ChallengeStatus.PENDING, ChallengeStatus.PROCESSING]:
-            return self.status
+        if self.status in (ChallengeStatus.PENDING, ChallengeStatus.PROCESSING):
+            self.status = ChallengeStatus.VALID
+            self.validated = datetime.datetime.now(datetime.timezone.utc)
 
-        self.status = ChallengeStatus.VALID
-        self.validated = datetime.datetime.now(datetime.timezone.utc)
         await self.authorization.validate(session)
         return self.status

@@ -46,6 +46,10 @@ def is_valid(obj):
     return obj.status == acme.messages.STATUS_VALID
 
 
+def is_invalid(obj):
+    return obj.status in [acme.messages.STATUS_INVALID, STATUS_EXPIRED]
+
+
 class AcmeClient:
     FINALIZE_DELAY = 3.0
     INVALID_NONCE_RETRIES = 5
@@ -149,6 +153,7 @@ class AcmeClient:
             self.order_get,
             resp.headers["Location"],
             predicate=is_valid,
+            negative_predicate=is_invalid,
             delay=5.0,
             max_tries=15,
         )
@@ -230,6 +235,7 @@ class AcmeClient:
                         self.challenge_get,
                         challenge.uri,
                         predicate=is_valid,
+                        negative_predicate=is_invalid,
                         delay=5.0,
                         max_tries=50,
                     )
@@ -244,7 +250,10 @@ class AcmeClient:
         await asyncio.gather(
             *[
                 self._poll_until(
-                    self.authorization_get, authorization_url, predicate=is_valid
+                    self.authorization_get,
+                    authorization_url,
+                    predicate=is_valid,
+                    negative_predicate=is_invalid,
                 )
                 for authorization_url in order.authorizations
             ]
@@ -284,7 +293,14 @@ class AcmeClient:
                 self._challenge_solvers[type_] = challenge_solver
 
     async def _poll_until(
-        self, coro, *args, predicate=None, delay=3.0, max_tries=5, **kwargs
+        self,
+        coro,
+        *args,
+        predicate=None,
+        negative_predicate=None,
+        delay=3.0,
+        max_tries=5,
+        **kwargs,
     ):
         tries = max_tries
         result = await coro(*args, **kwargs)
@@ -294,6 +310,11 @@ class AcmeClient:
             )
             if predicate(result):
                 break
+
+            if negative_predicate(result):
+                raise PollingException(
+                    f"Polling unsuccessful: {coro.__name__}{args}", result
+                )
 
             await asyncio.sleep(delay)
             result = await coro(*args, **kwargs)
