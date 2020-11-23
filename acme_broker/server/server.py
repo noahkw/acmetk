@@ -19,7 +19,6 @@ from acme_broker import models, messages
 from acme_broker.client import CouldNotCompleteChallenge
 from acme_broker.database import Database
 from acme_broker.server.challenge_validator import (
-    RequestIPDNSChallengeValidator,
     ChallengeValidator,
     CouldNotValidateChallenge,
 )
@@ -103,7 +102,6 @@ class AcmeServerBase:
         self._session = None
 
         self._challenge_validators = {}
-        self.register_challenge_validator(RequestIPDNSChallengeValidator())
 
     @classmethod
     async def create_app(cls, config, **kwargs):
@@ -176,13 +174,11 @@ class AcmeServerBase:
 
     def _issue_nonce(self):
         nonce = uuid.uuid4().hex
-        logger.debug("Storing new nonce %s", nonce)
         self._nonces.add(nonce)
         return nonce
 
     def _verify_nonce(self, nonce):
         if nonce in self._nonces:
-            logger.debug("Successfully verified nonce %s", nonce)
             self._nonces.remove(nonce)
         else:
             raise acme.messages.Error.with_code("badNonce", detail=nonce)
@@ -213,8 +209,6 @@ class AcmeServerBase:
         # Check whether we have *either* a jwk or a kid
         if not ((sig.jwk is not None) ^ (sig.kid is not None)):
             raise acme.messages.Error.with_code("malformed")
-
-        logger.debug("Request has a %s", "jwk" if sig.jwk else "kid")
 
         if key_auth:
             if not jws.verify(sig.jwk):
@@ -434,7 +428,9 @@ class AcmeServerBase:
             authz_url = challenge.authorization.url(request)
             await session.commit()
 
-        asyncio.ensure_future(self._handle_challenge_validate(kid, challenge_id))
+        asyncio.ensure_future(
+            self._handle_challenge_validate(request, kid, challenge_id)
+        )
         return self._response(request, serialized, links=[f'<{authz_url}>; rel="up"'])
 
     async def _revoke_cert(self, request):
@@ -527,7 +523,7 @@ class AcmeServerBase:
     async def _certificate(self, request):
         raise NotImplementedError
 
-    async def _handle_challenge_validate(self, kid, challenge_id):
+    async def _handle_challenge_validate(self, request, kid, challenge_id):
         logger.debug("Validating challenge %s", challenge_id)
 
         async with self._session() as session:
@@ -535,7 +531,7 @@ class AcmeServerBase:
 
             validator = self._challenge_validators[challenge.type]
             try:
-                await validator.validate_challenge(challenge)
+                await validator.validate_challenge(challenge, request=request)
             except CouldNotValidateChallenge:
                 challenge.status = models.ChallengeStatus.INVALID
 

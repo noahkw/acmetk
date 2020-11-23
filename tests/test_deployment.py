@@ -3,6 +3,7 @@ import subprocess
 import unittest
 
 from acme_broker import AcmeCA
+from acme_broker.server import RequestIPDNSChallengeValidator
 from tests.test_ca import TestAcmetiny, TestAcme, TestOurClient
 
 
@@ -30,6 +31,8 @@ class TestDeployment(TestAcme):
             ),
         )
         runner, ca = await AcmeCA.unix_socket(self.config_sec["ca"], "/tmp/app_1.sock")
+        ca.register_challenge_validator(RequestIPDNSChallengeValidator())
+
         self.runner = runner
 
     async def asyncTearDown(self) -> None:

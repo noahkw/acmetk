@@ -12,6 +12,7 @@ from acme_broker.client import (
     ChallengeSolverType,
     DummySolver,
 )
+from acme_broker.server import DummyValidator
 from tests.test_ca import TestCA, TestAcmetiny, TestCertBot, TestOurClient
 
 log = logging.getLogger("acme_broker.test_broker")
@@ -45,6 +46,7 @@ class TestBroker(TestCA):
         broker = await self._cls.create_app(
             self.config_sec["broker"], client=broker_client
         )
+        broker.register_challenge_validator(DummyValidator())
 
         main_app = web.Application()
         main_app.add_subapp("/broker", broker.app)
@@ -77,6 +79,7 @@ class TestBrokerLocalCA(TestBroker):
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
         ca = await AcmeCA.create_app(self.config_sec["ca"])
+        ca.register_challenge_validator(DummyValidator())
 
         broker_client = AcmeClient(
             directory_url=self.config_sec["broker"]["client"]["directory"],
@@ -92,6 +95,7 @@ class TestBrokerLocalCA(TestBroker):
         broker = await self._cls.create_app(
             self.config_sec["broker"], client=broker_client
         )
+        broker.register_challenge_validator(DummyValidator())
 
         main_app = web.Application()
         main_app.add_subapp("/ca", ca.app)

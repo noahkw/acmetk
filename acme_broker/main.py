@@ -12,7 +12,7 @@ sys.path.append("/app/")  # for supervisord inside docker
 
 from acme_broker import AcmeBroker  # noqa
 from acme_broker.client import AcmeClient, ChallengeSolverType, InfobloxClient  # noqa
-from acme_broker.server import AcmeCA  # noqa
+from acme_broker.server import AcmeCA, RequestIPDNSChallengeValidator  # noqa
 from acme_broker.util import generate_root_cert, generate_rsa_key  # noqa
 
 logger = logging.getLogger(__name__)
@@ -78,7 +78,8 @@ def run(config_file, path):
 
 async def run_ca(config, path):
     click.echo(f"Starting ACME CA at {path}")
-    await AcmeCA.unix_socket(config["ca"], path)
+    _, ca = await AcmeCA.unix_socket(config["ca"], path)
+    ca.register_challenge_validator(RequestIPDNSChallengeValidator())
 
     while True:
         await asyncio.sleep(3600)
@@ -102,7 +103,10 @@ async def run_broker(config, path):
     )
 
     await broker_client.start()
-    await AcmeBroker.unix_socket(config["broker"], path, client=broker_client)
+    _, broker = await AcmeBroker.unix_socket(
+        config["broker"], path, client=broker_client
+    )
+    broker.register_challenge_validator(RequestIPDNSChallengeValidator())
 
     while True:
         await asyncio.sleep(3600)

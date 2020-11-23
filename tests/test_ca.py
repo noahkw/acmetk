@@ -17,6 +17,7 @@ from acme_broker.client import (
     DummySolver,
 )
 from acme_broker.main import load_config
+from acme_broker.server import DummyValidator
 
 log = logging.getLogger("acme_broker.test_ca")
 
@@ -114,6 +115,8 @@ class TestCA(TestAcme):
         await super().asyncSetUp()
 
         runner, ca = await AcmeCA.runner(self.config_sec["ca"])
+        ca.register_challenge_validator(DummyValidator())
+
         self.runner = runner
 
     async def asyncTearDown(self) -> None:
