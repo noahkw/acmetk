@@ -1,8 +1,10 @@
 import asyncio
 import json
 import logging
+import re
 import typing
 import uuid
+from email.utils import parseaddr
 
 import acme.jws
 import acme.messages
@@ -58,9 +60,12 @@ class AcmeServerBase:
         josepy.PS512,
     )
 
-    def __init__(self, *, rsa_min_keysize=2048, tos_url=None, **kwargs):
+    def __init__(
+        self, *, rsa_min_keysize=2048, tos_url=None, mail_suffixes=None, **kwargs
+    ):
         self._rsa_min_keysize = rsa_min_keysize
         self._tos_url = tos_url
+        self._mail_suffixes = mail_suffixes
 
         self.app = web.Application(middlewares=[self._error_middleware])
 
@@ -98,8 +103,9 @@ class AcmeServerBase:
         await db.begin()
 
         ca = cls(
-            rsa_min_keysize=config["rsa_min_keysize"],
-            tos_url=config["tos_url"],
+            rsa_min_keysize=config.get("rsa_min_keysize"),
+            tos_url=config.get("tos_url"),
+            mail_suffixes=config.get("mail_suffixes"),
             **kwargs,
         )
         ca._db = db
@@ -254,20 +260,35 @@ class AcmeServerBase:
 
         return certificate
 
-    async def _get_directory(self, request):
-        directory = acme.messages.Directory(
-            {
-                "newAccount": url_for(request, "new-account"),
-                "newNonce": url_for(request, "new-nonce"),
-                "newOrder": url_for(request, "new-order"),
-                "revokeCert": url_for(request, "revoke-cert"),
-                "meta": {
-                    "termsOfService": self._tos_url,
-                },
-            }
-        )
+    def _validate_contact_info(self, reg: acme.messages.Registration):
+        for contact_url in reg.contact:
+            if address := parseaddr(contact_url)[1]:
+                # parseaddr also returns things like phone numbers as valid email addresses, skip these.
+                if not re.match(r"[^@]+@[^@]+\.[^@]+", address):
+                    continue
 
-        return self._response(request, directory.to_json())
+                # The contact URL contains an email address, validate it.
+                if self._mail_suffixes and not any(
+                    [address.endswith(suffix) for suffix in self._mail_suffixes]
+                ):
+                    raise acme.messages.Error.with_code(
+                        "invalidContact",
+                        detail=f"The contact email '{address}' is not supported.",
+                    )
+
+    async def _get_directory(self, request):
+        directory = {
+            "newAccount": url_for(request, "new-account"),
+            "newNonce": url_for(request, "new-nonce"),
+            "newOrder": url_for(request, "new-order"),
+            "revokeCert": url_for(request, "revoke-cert"),
+            "meta": {},
+        }
+
+        if self._tos_url:
+            directory["meta"]["termsOfService"] = self._tos_url
+
+        return self._response(request, directory)
 
     async def _new_nonce(self, request):
         return self._response(request, status=204)
@@ -301,6 +322,8 @@ class AcmeServerBase:
                         title=f"The client must agree to the terms of service: {self._tos_url}.",
                     )
                 else:  # create new account
+                    self._validate_contact_info(reg)
+
                     new_account = models.Account.from_obj(jwk, reg)
                     session.add(new_account)
                     await session.flush()
@@ -320,6 +343,8 @@ class AcmeServerBase:
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             upd = messages.AccountUpdate.json_loads(jws.payload)
+
+            self._validate_contact_info(upd)
 
             try:
                 account.update(upd)
@@ -532,8 +557,9 @@ class AcmeCA(AcmeServerBase):
         await db.begin()
 
         ca = cls(
-            rsa_min_keysize=config["rsa_min_keysize"],
-            tos_url=config["tos_url"],
+            rsa_min_keysize=config.get("rsa_min_keysize"),
+            tos_url=config.get("tos_url"),
+            mail_suffixes=config.get("mail_suffixes"),
             cert=config["cert"],
             private_key=config["private_key"],
             **kwargs,

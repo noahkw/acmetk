@@ -15,6 +15,9 @@ tests:
       db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-ca'
       rsa_min_keysize: 2048
       tos_url: 'http://localhost:8000/tos'
+      mail_suffixes:
+        - 'uni-hannover.de'
+        - 'tib.eu'
     client:
       directory: 'http://localhost:8000/directory'
       contact:
@@ -30,6 +33,9 @@ tests:
       tos_url: 'https://acmenoah.luis.uni-hannover.de/non-existent-tos'
       cert: '/app/certs/root.crt'
       private_key: '/app/certs/root.key'
+      mail_suffixes:
+        - 'uni-hannover.de'
+        - 'tib.eu'
     client:
       directory: 'https://127.0.0.1/directory'
       contact:
@@ -46,6 +52,9 @@ tests:
       db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
       rsa_min_keysize: 2048
       tos_url: 'http://localhost:8000/broker/tos'
+      mail_suffixes:
+        - 'uni-hannover.de'
+        - 'tib.eu'
       client:
         directory: 'http://localhost:8000/ca/directory'
         private_key: 'broker_client_account.key'
@@ -71,6 +80,9 @@ tests:
       db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
       rsa_min_keysize: 2048
       tos_url: 'http://localhost:8000/broker/tos'
+      mail_suffixes:
+        - 'uni-hannover.de'
+        - 'tib.eu'
       client:
         directory: 'https://acme-staging-v02.api.letsencrypt.org/directory'
         private_key: 'broker_client_account.key'
@@ -94,6 +106,9 @@ tests:
       db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
       rsa_min_keysize: 2048
       tos_url: 'http://localhost:8000/broker/tos'
+      mail_suffixes:
+        - 'uni-hannover.de'
+        - 'tib.eu'
       client:
         directory: 'http://localhost:8000/ca/directory'
         private_key: 'proxy_client_account.key'
@@ -120,6 +135,9 @@ tests:
       db: 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:5432/acme-broker'
       rsa_min_keysize: 2048
       tos_url: 'http://localhost:8000/proxy/tos'
+      mail_suffixes:
+        - 'uni-hannover.de'
+        - 'tib.eu'
       client:
         directory: 'https://acme-staging-v02.api.letsencrypt.org/directory'
         private_key: 'proxy_client_account.key'

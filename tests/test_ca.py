@@ -334,10 +334,26 @@ class TestOurClient:
     async def test_account_update(self):
         await self.client.start()
 
-        new_contact = ("mailto:newmail.test.de", "tel:555-1234")
+        new_contact = (
+            "mailto:newmail@tib.eu",
+            "woehler@luis.uni-hannover.de",
+            "tel:555-1234",
+        )
         await self.client.account_update(contact=new_contact)
         await self.client.account_lookup()
         self.assertEqual(self.client._account.contact, new_contact)
+
+    async def test_email_validation(self):
+        await self.client.start()
+
+        new_contact = (
+            "mailto:newmail@tib.de",
+            "woehler@test.de",
+            "tel:555-1234",
+        )
+
+        with self.assertRaises(acme.messages.Error):
+            await self.client.account_update(contact=new_contact)
 
     async def test_unregister(self):
         await self.client.start()
@@ -392,3 +408,6 @@ class TestOurClientCA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
 
     async def test_unregister(self):
         await super().test_unregister()
+
+    async def test_email_validation(self):
+        await super().test_email_validation()
