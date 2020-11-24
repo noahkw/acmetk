@@ -10,6 +10,7 @@ from email.utils import parseaddr
 import acme.jws
 import acme.messages
 import josepy
+import yarl
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
@@ -238,9 +239,9 @@ class AcmeServerBase:
             else:
                 account = await self._db.get_account(session, key=sig.jwk)
         elif sig.kid:
-            kid = sig.kid.split("/")[-1]  # TODO: yarl
+            kid = yarl.URL(sig.kid).name
 
-            if url_for(request, "accounts", kid=kid) != jws.signature.combined.kid:
+            if url_for(request, "accounts", kid=kid) != sig.kid:
                 raise acme.messages.Error.with_code("malformed")
             elif "kid" in request.match_info and request.match_info["kid"] != kid:
                 raise acme.messages.Error.with_code("malformed")
