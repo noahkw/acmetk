@@ -21,7 +21,7 @@ from acme_broker import models
 from acme_broker.models import messages
 from acme_broker.client import CouldNotCompleteChallenge
 from acme_broker.database import Database
-from acme_broker.server.challenge_validator import (
+from acme_broker.server import (
     ChallengeValidator,
     CouldNotValidateChallenge,
 )
@@ -117,6 +117,14 @@ class AcmeServerBase:
 
     @classmethod
     async def create_app(cls, config, **kwargs):
+        """A class factory that also creates and initializes the database and session objects,
+        reading the necessary arguments from the passed config dict.
+
+        :param config: A dictionary holding the configuration. See :doc:`configuration` for supported options.
+        :type config: :class:`dict`
+        :return: The server instance
+        :rtype: :class:`AcmeServerBase`
+        """
         db = Database(config["db"])
         await db.begin()
 
@@ -134,6 +142,15 @@ class AcmeServerBase:
 
     @classmethod
     async def runner(cls, config, **kwargs):
+        """A factory that starts the server on the given hostname and port using an AppRunner
+        after constructing a server instance using :meth:`.create_app`.
+
+        :param config: A dictionary holding the configuration. See :doc:`configuration` for supported options.
+        :type config: :class:`dict`
+        :param kwargs: Additional kwargs are passed to the :meth:`.create_app` call.
+        :return: A tuple containing the app runner as well as the server instance.
+        :rtype: :class:`tuple` (:class:`aiohttp.web.AppRunner`, :class:`AcmeServerBase`)
+        """
         instance = await cls.create_app(config, **kwargs)
 
         runner = web.AppRunner(instance.app)
@@ -146,6 +163,17 @@ class AcmeServerBase:
 
     @classmethod
     async def unix_socket(cls, config, path, **kwargs):
+        """A factory that starts the server on a Unix socket bound to the given path using an AppRunner
+        after constructing a server instance using :meth:`.create_app`.
+
+        :param config: A dictionary holding the configuration. See :doc:`configuration` for supported options.
+        :type config: :class:`dict`
+        :param path: Path of the unix socket.
+        :type path: :class:`str`
+        :param kwargs: Additional kwargs are passed to the :meth:`.create_app` call.
+        :return: A tuple containing the app runner as well as the server instance.
+        :rtype: :class:`tuple` (:class:`aiohttp.web.AppRunner`, :class:`AcmeServerBase`)
+        """
         instance = await cls.create_app(config, **kwargs)
 
         runner = web.AppRunner(instance.app)
@@ -157,6 +185,16 @@ class AcmeServerBase:
         return runner, instance
 
     def register_challenge_validator(self, validator: ChallengeValidator):
+        """Registers a :meth:`ChallengeValidator` with the server.
+
+        The validator is subsequently used to validate challenges of all types that it
+        supports.
+
+        :param validator: The challenge validator to be registered.
+        :type validator: :class:`ChallengeValidator`
+        :raises: :class:`ValueError` If a challenge validator is already registered that supports any of
+            the challenge types that *validator* supports.
+        """
         for challenge_type in validator.SUPPORTED_CHALLENGES:
             if self._challenge_validators.get(challenge_type):
                 raise ValueError(
@@ -165,7 +203,8 @@ class AcmeServerBase:
             else:
                 self._challenge_validators[challenge_type] = validator
 
-    def supported_challenges(self):
+    @property
+    def _supported_challenges(self):
         return self._challenge_validators.keys()
 
     def _response(self, request, data=None, text=None, *args, **kwargs):
@@ -408,7 +447,7 @@ class AcmeServerBase:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
 
-            order = models.Order.from_obj(account, obj, self.supported_challenges())
+            order = models.Order.from_obj(account, obj, self._supported_challenges)
             session.add(order)
 
             await session.flush()
@@ -625,6 +664,8 @@ class AcmeServerBase:
 
 
 class AcmeCA(AcmeServerBase):
+    """ACME compliant Certificate Authority."""
+
     def __init__(self, *, cert, private_key, **kwargs):
         super().__init__(**kwargs)
 
@@ -792,7 +833,7 @@ class AcmeProxy(AcmeServerClientBase):
             ]
             ca_order = await self._client.order_create(identifiers)
 
-            order = models.Order.from_obj(account, obj, self.supported_challenges())
+            order = models.Order.from_obj(account, obj, self._supported_challenges)
             order.proxied_url = ca_order.url
             session.add(order)
 

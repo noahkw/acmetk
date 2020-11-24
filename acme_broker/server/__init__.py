@@ -1,10 +1,10 @@
-from .server import AcmeCA, AcmeBroker, AcmeProxy
 from .challenge_validator import (
     RequestIPDNSChallengeValidator,
     DummyValidator,
     ChallengeValidator,
     CouldNotValidateChallenge,
 )
+from .server import AcmeCA, AcmeBroker, AcmeProxy
 
 
 __all__ = [

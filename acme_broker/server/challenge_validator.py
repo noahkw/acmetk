@@ -6,7 +6,7 @@ import logging
 import typing
 import dns.asyncresolver
 
-from acme_broker import models
+from acme_broker.models import ChallengeType
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ class CouldNotValidateChallenge(Exception):
 
 
 class ChallengeValidator(abc.ABC):
-    SUPPORTED_CHALLENGES: typing.Iterable[models.ChallengeType]
+    SUPPORTED_CHALLENGES: typing.Iterable[ChallengeType]
 
     @abc.abstractmethod
     async def validate_challenge(self, challenge, **kwargs):
@@ -40,9 +40,7 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
     request is being made from by checking for a A/AAAA record.
     """
 
-    SUPPORTED_CHALLENGES = frozenset(
-        [models.ChallengeType.DNS_01, models.ChallengeType.HTTP_01]
-    )
+    SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
 
     async def _query_record(self, name, type_):
         resolved_ips = []
@@ -84,9 +82,7 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
 class DummyValidator(ChallengeValidator):
     """Does not do any validation and reports every challenge as valid."""
 
-    SUPPORTED_CHALLENGES = frozenset(
-        [models.ChallengeType.DNS_01, models.ChallengeType.HTTP_01]
-    )
+    SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
 
     async def validate_challenge(self, challenge, **kwargs):
         pass
