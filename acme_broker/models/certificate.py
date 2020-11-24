@@ -16,6 +16,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from .base import Serializer, Entity
+from acme_broker.models.messages import RevocationReason
 
 
 class x509Certificate(TypeDecorator):
@@ -83,3 +84,8 @@ class Certificate(Entity, Serializer):
     order = relationship("Order", back_populates="certificate", foreign_keys=order_id)
     cert = Column(x509Certificate, nullable=True, index=True)
     full_chain = Column(Text, nullable=True)
+    reason = Column(Enum(RevocationReason), nullable=True)
+
+    def revoke(self, reason: RevocationReason):
+        self.status = CertificateStatus.REVOKED
+        self.reason = reason or RevocationReason.unspecified

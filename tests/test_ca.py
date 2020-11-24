@@ -17,6 +17,7 @@ from acme_broker.client import (
     DummySolver,
 )
 from acme_broker.main import load_config
+from acme_broker.models.messages import RevocationReason
 from acme_broker.server import DummyValidator
 
 log = logging.getLogger("acme_broker.test_ca")
@@ -332,7 +333,9 @@ class TestOurClient:
     async def test_revoke(self):
         full_chain = await self._run_one(self.client, self.client_data.csr)
         certs = acme_broker.util.pem_split(full_chain)
-        await self.client.certificate_revoke(certs[0])
+        await self.client.certificate_revoke(
+            certs[0], reason=RevocationReason.keyCompromise
+        )
 
     async def test_account_update(self):
         await self.client.start()

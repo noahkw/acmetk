@@ -6,7 +6,7 @@ from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer, Boolean
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from . import ChallengeStatus
+from .challenge import ChallengeStatus
 from .base import Serializer, Entity
 from ..util import url_for
 

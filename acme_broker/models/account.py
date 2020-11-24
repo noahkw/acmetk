@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives import serialization
 from sqlalchemy import Column, Enum, String, types, JSON, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 
-from . import OrderStatus
+from .order import OrderStatus
 from .base import Serializer, Entity
 from ..util import url_for, names_of
 

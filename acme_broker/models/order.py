@@ -16,7 +16,9 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from . import Identifier, AuthorizationStatus, Authorization, Challenge
+from .identifier import Identifier
+from .authorization import AuthorizationStatus, Authorization
+from .challenge import Challenge
 from .base import Serializer, Entity
 from ..util import url_for, names_of
 

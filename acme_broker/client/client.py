@@ -10,7 +10,7 @@ from acme import jws
 from aiohttp import ClientSession
 from cryptography import x509
 
-from acme_broker import messages
+from acme_broker.models import messages
 from acme_broker.client.challenge_solver import ChallengeSolver
 from acme_broker.client.challenge_solver import ChallengeSolverType
 
@@ -270,8 +270,10 @@ class AcmeClient:
         _, cert = await self._signed_request(None, order.certificate)
         return cert
 
-    async def certificate_revoke(self, certificate: x509.Certificate) -> bool:
-        cert_rev = messages.Revocation(certificate=certificate)
+    async def certificate_revoke(
+        self, certificate: x509.Certificate, reason: messages.RevocationReason = None
+    ) -> bool:
+        cert_rev = messages.Revocation(certificate=certificate, reason=reason)
         resp, _ = await self._signed_request(cert_rev, self._directory["revokeCert"])
 
         return resp.status == 200

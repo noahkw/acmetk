@@ -1,3 +1,4 @@
+import enum
 import json
 
 import OpenSSL
@@ -7,7 +8,8 @@ import josepy
 from acme.messages import ResourceBody
 from cryptography import x509
 
-from acme_broker import models
+from acme_broker.models.authorization import AuthorizationStatus
+from acme_broker.models.account import AccountStatus
 
 ERROR_CODE_STATUS = {
     "unauthorized": 401,
@@ -30,6 +32,20 @@ def encode_cert(cert):
     )
 
 
+class RevocationReason(enum.Enum):
+    unspecified = 0
+    keyCompromise = 1
+    cACompromise = 2
+    affiliationChanged = 3
+    superseded = 4
+    cessationOfOperation = 5
+    certificateHold = 6
+    # value 7 is unused
+    removeFromCRL = 8
+    privilegeWithdrawn = 9
+    aACompromise = 10
+
+
 class Revocation(josepy.JSONObjectWithFields):
     """Revocation message.
 
@@ -39,7 +55,12 @@ class Revocation(josepy.JSONObjectWithFields):
     """
 
     certificate = josepy.Field("certificate", decoder=decode_cert, encoder=encode_cert)
-    reason = josepy.Field("reason")
+    reason = josepy.Field(
+        "reason",
+        decoder=RevocationReason,
+        encoder=lambda reason: reason.value,
+        omitempty=True,
+    )
 
 
 def encode_csr(csr):
@@ -74,11 +95,11 @@ class JSONDeSerializableAllowEmpty:
 
 
 class AuthorizationUpdate(JSONDeSerializableAllowEmpty, josepy.JSONObjectWithFields):
-    status = josepy.Field("status", decoder=models.AuthorizationStatus, omitempty=True)
+    status = josepy.Field("status", decoder=AuthorizationStatus, omitempty=True)
 
 
 class AccountUpdate(JSONDeSerializableAllowEmpty, acme.messages.Registration):
-    status = josepy.Field("status", decoder=models.AccountStatus, omitempty=True)
+    status = josepy.Field("status", decoder=AccountStatus, omitempty=True)
 
 
 class NewOrder(ResourceBody):

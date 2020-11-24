@@ -16,7 +16,8 @@ from aiohttp.web_middlewares import middleware
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 
-from acme_broker import models, messages
+from acme_broker import models
+from acme_broker.models import messages
 from acme_broker.client import CouldNotCompleteChallenge
 from acme_broker.database import Database
 from acme_broker.server.challenge_validator import (
@@ -260,7 +261,9 @@ class AcmeServerBase:
 
         return jws, account
 
-    async def _verify_revocation(self, request, session) -> models.Certificate:
+    async def _verify_revocation(
+        self, request, session
+    ) -> (models.Certificate, messages.Revocation):
         try:
             # check whether the message is signed using an account key
             jws, account = await self._verify_request(request, session)
@@ -271,7 +274,11 @@ class AcmeServerBase:
             )  # TODO: raise acme error on deserialization error
             account = None
 
-        revocation = messages.Revocation.json_loads(jws.payload)
+        try:
+            revocation = messages.Revocation.json_loads(jws.payload)
+        except ValueError:
+            raise acme.messages.Error.with_code("badRevocationReason")
+
         cert = revocation.certificate
 
         certificate = await self._db.get_certificate(session, certificate=cert)
@@ -293,7 +300,7 @@ class AcmeServerBase:
             if not jws.verify(jwk):
                 raise acme.messages.Error.with_code("unauthorized")
 
-        return certificate
+        return certificate, revocation
 
     def _validate_contact_info(self, reg: acme.messages.Registration):
         for contact_url in reg.contact:
@@ -456,10 +463,10 @@ class AcmeServerBase:
 
     async def _revoke_cert(self, request):
         async with self._session() as session:
-            certificate = await self._verify_revocation(request, session)
+            certificate, revocation = await self._verify_revocation(request, session)
 
-            # TODO: do actual revocation logic
-            certificate.status = models.CertificateStatus.REVOKED
+            certificate.revoke(revocation.reason)
+
             await session.commit()
 
         return self._response(request, status=200)
@@ -698,15 +705,16 @@ class AcmeServerClientBase(AcmeServerBase):
 
     async def _revoke_cert(self, request):
         async with self._session() as session:
-            certificate = await self._verify_revocation(request, session)
+            certificate, revocation = await self._verify_revocation(request, session)
 
             revocation_succeeded = await self._client.certificate_revoke(
-                certificate.cert
+                certificate.cert, reason=revocation.reason
             )
             if not revocation_succeeded:
                 raise acme.messages.Error.with_code("unauthorized")
 
-            certificate.status = models.CertificateStatus.REVOKED
+            certificate.revoke(revocation.reason)
+
             await session.commit()
 
         return self._response(request, status=200)
