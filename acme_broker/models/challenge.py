@@ -55,7 +55,7 @@ class Challenge(Entity, Serializer):
         return url_for(request, "challenge", id=str(self.challenge_id))
 
     def serialize(self, request=None):
-        d = Serializer.serialize(self)
+        d = super().serialize(request)
         d["url"] = self.url(request)
         return d
 

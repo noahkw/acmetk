@@ -99,8 +99,29 @@ class Authorization(Entity, Serializer):
             raise ValueError(f"Cannot set an authorizations's status to {upd.status}")
 
     def serialize(self, request=None):
-        d = Serializer.serialize(self)
-        d["challenges"] = Serializer.serialize_list(self.challenges, request=request)
+        d = super().serialize(self)
+
+        # Section on which challenges to include:
+        # https://tools.ietf.org/html/rfc8555#section-7.1.4
+        def show_chall(challenge) -> bool:
+            if self.status == AuthorizationStatus.PENDING:
+                return challenge.status in [
+                    ChallengeStatus.PENDING,
+                    ChallengeStatus.PROCESSING,
+                ]
+            elif self.status == AuthorizationStatus.VALID:
+                return challenge.status == ChallengeStatus.VALID
+            elif self.status == AuthorizationStatus.INVALID:
+                return challenge.status == ChallengeStatus.INVALID
+            else:
+                return False
+
+        d["challenges"] = [
+            challenge.serialize(request)
+            for challenge in self.challenges
+            if show_chall(challenge)
+        ]
+
         d["identifier"] = self.identifier.serialize()
         return d
 

@@ -119,8 +119,8 @@ class Order(Entity, Serializer):
         return self.status
 
     def serialize(self, request=None):
-        d = Serializer.serialize(self)
-        d["identifiers"] = Serializer.serialize_list(self.identifiers)
+        d = super().serialize(request)
+        d["identifiers"] = super().serialize_list(self.identifiers)
 
         # Section on which authorizations to include:
         # https://tools.ietf.org/html/rfc8555#section-7.1.3
