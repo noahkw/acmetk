@@ -39,9 +39,11 @@ def main(ctx):
 @click.argument("root-key-file", type=click.Path())
 @click.argument("account-key-file", type=click.Path())
 def generate_keys(root_key_file, account_key_file):
+    # TODO: separate account key function
     """Generates a self-signed root key pair/cert for the CA
     and an account key pair for the broker client"""
     click.echo("Generating root key pair/cert")
+    # TODO: swap out info
     generate_root_cert(
         Path(root_key_file),
         "DE",
