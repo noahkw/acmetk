@@ -120,17 +120,17 @@ class AcmeServerBase:
         db = Database(config["db"])
         await db.begin()
 
-        ca = cls(
+        instance = cls(
             rsa_min_keysize=config.get("rsa_min_keysize"),
             tos_url=config.get("tos_url"),
             mail_suffixes=config.get("mail_suffixes"),
             subnets=config.get("subnets"),
             **kwargs,
         )
-        ca._db = db
-        ca._session = db.session
+        instance._db = db
+        instance._session = db.session
 
-        return ca
+        return instance
 
     @classmethod
     async def runner(cls, config, **kwargs):
@@ -196,13 +196,21 @@ class AcmeServerBase:
         else:
             raise acme.messages.Error.with_code("badNonce", detail=nonce)
 
-    async def _verify_request(self, request, session, key_auth=False):
+    async def _verify_request(
+        self, request, session, key_auth=False, post_as_get=False
+    ):
         data = await request.text()
         try:
             jws = acme.jws.JWS.json_loads(data)
         except josepy.errors.DeserializationError:
             raise acme.messages.Error.with_code(
                 "malformed", detail="The request does not contain a valid JWS."
+            )
+
+        if post_as_get and jws.payload != b"":
+            raise acme.messages.Error.with_code(
+                "malformed",
+                detail='The request payload must be b"" in a POST-as-GET request.',
             )
 
         sig = jws.signature.combined
@@ -255,7 +263,7 @@ class AcmeServerBase:
     async def _verify_revocation(self, request, session) -> models.Certificate:
         try:
             # check whether the message is signed using an account key
-            jws, account = await self._verify_request(request, session, key_auth=False)
+            jws, account = await self._verify_request(request, session)
         except acme.messages.Error:
             data = await request.text()
             jws = acme.jws.JWS.json_loads(
@@ -458,7 +466,9 @@ class AcmeServerBase:
 
     async def _order(self, request):
         async with self._session() as session:
-            jws, account = await self._verify_request(request, session, key_auth=False)
+            jws, account = await self._verify_request(
+                request, session, post_as_get=True
+            )
             order_id = request.match_info["id"]
 
             order = await self._db.get_order(session, account.kid, order_id)
@@ -469,14 +479,16 @@ class AcmeServerBase:
 
     async def _orders(self, request):
         async with self._session() as session:
-            jws, account = await self._verify_request(request, session, key_auth=False)
+            jws, account = await self._verify_request(
+                request, session, post_as_get=True
+            )
 
             return self._response(request, {"orders": account.orders_list(request)})
 
     async def _validate_order(
         self, request, session
     ) -> (models.Order, x509.CertificateSigningRequest):
-        jws, account = await self._verify_request(request, session, key_auth=False)
+        jws, account = await self._verify_request(request, session)
         order_id = request.match_info["id"]
 
         order = await self._db.get_order(session, account.kid, order_id)
@@ -641,7 +653,9 @@ class AcmeCA(AcmeServerBase):
 
     async def _certificate(self, request):
         async with self._session() as session:
-            jws, account = await self._verify_request(request, session, key_auth=False)
+            jws, account = await self._verify_request(
+                request, session, post_as_get=True
+            )
             certificate_id = request.match_info["id"]
 
             certificate = await self._db.get_certificate(
@@ -666,7 +680,9 @@ class AcmeServerClientBase(AcmeServerBase):
 
     async def _certificate(self, request):
         async with self._session() as session:
-            jws, account = await self._verify_request(request, session, key_auth=False)
+            jws, account = await self._verify_request(
+                request, session, post_as_get=True
+            )
             certificate_id = request.match_info["id"]
 
             certificate = await self._db.get_certificate(
