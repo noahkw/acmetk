@@ -150,7 +150,9 @@ dmypy.json
 # config
 *.key
 *.crt
+*.pem
 certbot/
+prod*.yml
 
 # db
 db_data/
