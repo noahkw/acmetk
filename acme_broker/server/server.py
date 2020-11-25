@@ -35,6 +35,8 @@ from acme_broker.util import (
 
 logger = logging.getLogger(__name__)
 
+routes = web.RouteTableDef()
+
 
 async def handle_get(request):
     return web.Response(status=405)
@@ -87,28 +89,7 @@ class AcmeServerBase:
             middlewares=[self._host_addr_middleware, self._error_middleware]
         )
 
-        self.app.add_routes(
-            [
-                web.post("/new-account", self._new_account, name="new-account"),
-                web.head("/new-nonce", self._new_nonce, name="new-nonce"),
-                web.post("/new-order", self._new_order, name="new-order"),
-                web.post("/revoke-cert", self._revoke_cert, name="revoke-cert"),
-                web.post("/order/{id}", self._order, name="order"),
-                web.post(
-                    "/order/{id}/finalize", self._finalize_order, name="finalize-order"
-                ),
-                web.post("/orders/{id}", self._orders, name="orders"),
-                web.post("/accounts/{kid}", self._accounts, name="accounts"),
-                web.post("/authz/{id}", self._authz, name="authz"),
-                web.post("/challenge/{id}", self._challenge, name="challenge"),
-                web.post("/certificate/{id}", self._certificate, name="certificate"),
-                web.get("/directory", self._get_directory, name="directory"),
-            ]
-        )
-        self.app.router.add_route("GET", "/new-nonce", self._new_nonce)
-
-        # catch-all get
-        self.app.router.add_route("GET", "/{tail:.*}", handle_get),
+        self._add_routes()
 
         self._nonces = set()
 
@@ -116,6 +97,23 @@ class AcmeServerBase:
         self._session = None
 
         self._challenge_validators = {}
+
+    def _add_routes(self):
+        specific_routes = []
+
+        for route_def in routes:
+            specific_routes.append(
+                web.RouteDef(
+                    route_def.method,
+                    route_def.path,
+                    getattr(self, route_def.handler.__name__),
+                    route_def.kwargs.copy(),
+                )
+            )
+
+        self.app.add_routes(specific_routes)
+        # catch-all get
+        self.app.router.add_route("GET", "/{tail:.*}", handle_get)
 
     @classmethod
     async def create_app(cls, config, **kwargs):
@@ -319,7 +317,8 @@ class AcmeServerBase:
                         detail=f"The contact email '{address}' is not supported.",
                     )
 
-    async def _get_directory(self, request):
+    @routes.get("/directory", name="directory")
+    async def directory(self, request):
         directory = {
             "newAccount": url_for(request, "new-account"),
             "newNonce": url_for(request, "new-nonce"),
@@ -333,10 +332,12 @@ class AcmeServerBase:
 
         return self._response(request, directory)
 
-    async def _new_nonce(self, request):
+    @routes.get("/new-nonce", name="new-nonce", allow_head=True)
+    async def new_nonce(self, request):
         return self._response(request, status=204)
 
-    async def _new_account(self, request):
+    @routes.post("/new-account", name="new-account")
+    async def new_account(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(request, session, key_auth=True)
             reg = acme.messages.Registration.json_loads(jws.payload)
@@ -382,7 +383,8 @@ class AcmeServerBase:
                         headers={"Location": url_for(request, "accounts", kid=kid)},
                     )
 
-    async def _accounts(self, request):
+    @routes.post("/accounts/{kid}", name="accounts")
+    async def accounts(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             upd = messages.AccountUpdate.json_loads(jws.payload)
@@ -400,7 +402,8 @@ class AcmeServerBase:
 
         return self._response(request, serialized)
 
-    async def _new_order(self, request):
+    @routes.post("/new-order", name="new-order")
+    async def new_order(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
@@ -420,7 +423,8 @@ class AcmeServerBase:
             headers={"Location": url_for(request, "order", id=str(order_id))},
         )
 
-    async def _authz(self, request):
+    @routes.post("/authz/{id}", name="authz")
+    async def authz(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             authz_id = request.match_info["id"]
@@ -440,7 +444,8 @@ class AcmeServerBase:
 
         return self._response(request, serialized)
 
-    async def _challenge(self, request):
+    @routes.post("/challenge/{id}", name="challenge")
+    async def challenge(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             challenge_id = request.match_info["id"]
@@ -462,7 +467,8 @@ class AcmeServerBase:
         )
         return self._response(request, serialized, links=[f'<{authz_url}>; rel="up"'])
 
-    async def _revoke_cert(self, request):
+    @routes.post("/revoke-cert", name="revoke-cert")
+    async def revoke_cert(self, request):
         async with self._session() as session:
             certificate, revocation = await self._verify_revocation(request, session)
 
@@ -472,7 +478,8 @@ class AcmeServerBase:
 
         return self._response(request, status=200)
 
-    async def _order(self, request):
+    @routes.post("/order/{id}", name="order")
+    async def order(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
@@ -485,7 +492,8 @@ class AcmeServerBase:
 
             return self._response(request, order.serialize(request))
 
-    async def _orders(self, request):
+    @routes.post("/orders/{id}", name="orders")
+    async def orders(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
@@ -534,7 +542,8 @@ class AcmeServerBase:
 
         return order, csr
 
-    async def _finalize_order(self, request):
+    @routes.post("/order/{id}/finalize", name="finalize-order")
+    async def finalize_order(self, request):
         async with self._session() as session:
             order, csr = await self._validate_order(request, session)
 
@@ -546,14 +555,15 @@ class AcmeServerBase:
             kid = order.account_kid
             await session.commit()
 
-        asyncio.ensure_future(self._handle_order_finalize(kid, order_id))
+        asyncio.ensure_future(self.handle_order_finalize(kid, order_id))
         return self._response(
             request,
             serialized,
             headers={"Location": url_for(request, "order", id=order_id)},
         )
 
-    async def _certificate(self, request):
+    @routes.post("/certificate/{id}", name="certificate")
+    async def certificate(self, request):
         raise NotImplementedError
 
     async def _handle_challenge_validate(self, request, kid, challenge_id):
@@ -572,7 +582,7 @@ class AcmeServerBase:
 
             await session.commit()
 
-    async def _handle_order_finalize(self, kid, order_id):
+    async def handle_order_finalize(self, kid, order_id):
         raise NotImplementedError
 
     @middleware
@@ -643,7 +653,7 @@ class AcmeCA(AcmeServerBase):
 
         return ca
 
-    async def _handle_order_finalize(self, kid, order_id):
+    async def handle_order_finalize(self, kid, order_id):
         logger.debug("Finalizing order %s", order_id)
 
         async with self._session() as session:
@@ -659,7 +669,8 @@ class AcmeCA(AcmeServerBase):
             order.status = models.OrderStatus.VALID
             await session.commit()
 
-    async def _certificate(self, request):
+    # @routes.post("/certificate/{id}", name="certificate")
+    async def certificate(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
@@ -686,7 +697,8 @@ class AcmeServerClientBase(AcmeServerBase):
         super().__init__(**kwargs)
         self._client = client
 
-    async def _certificate(self, request):
+    # @routes.post("/certificate/{id}", name="certificate")
+    async def certificate(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
@@ -704,7 +716,8 @@ class AcmeServerClientBase(AcmeServerBase):
                 text=certificate.full_chain,
             )
 
-    async def _revoke_cert(self, request):
+    # @routes.post("/revoke-cert", name="revoke-cert")
+    async def revoke_cert(self, request):
         async with self._session() as session:
             certificate, revocation = await self._verify_revocation(request, session)
 
@@ -743,7 +756,7 @@ class AcmeServerClientBase(AcmeServerBase):
 
 
 class AcmeBroker(AcmeServerClientBase):
-    async def _handle_order_finalize(self, kid, order_id):
+    async def handle_order_finalize(self, kid, order_id):
         logger.debug("Finalizing order %s", order_id)
 
         async with self._session() as session:
@@ -767,7 +780,8 @@ class AcmeBroker(AcmeServerClientBase):
 
 
 class AcmeProxy(AcmeServerClientBase):
-    async def _new_order(self, request):
+    # @routes.post("/new-order", name="new-order")
+    async def new_order(self, request):
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
@@ -814,7 +828,8 @@ class AcmeProxy(AcmeServerClientBase):
 
             await session.commit()
 
-    async def _finalize_order(self, request):
+    # @routes.post("/order/{id}/finalize", name="finalize-order")
+    async def finalize_order(self, request):
         async with self._session() as session:
             order, csr = await self._validate_order(request, session)
             order_ca = await self._client.order_get(order.proxied_url)
@@ -840,7 +855,7 @@ class AcmeProxy(AcmeServerClientBase):
             await session.commit()
 
         if order_processing:
-            asyncio.ensure_future(self._handle_order_finalize(kid, order_id))
+            asyncio.ensure_future(self.handle_order_finalize(kid, order_id))
 
         return self._response(
             request,
@@ -848,7 +863,7 @@ class AcmeProxy(AcmeServerClientBase):
             headers={"Location": url_for(request, "order", id=order_id)},
         )
 
-    async def _handle_order_finalize(self, kid, order_id):
+    async def handle_order_finalize(self, kid, order_id):
         logger.debug("Finalizing order %s", order_id)
 
         async with self._session() as session:
