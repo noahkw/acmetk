@@ -51,6 +51,8 @@ def is_invalid(obj):
 
 
 class AcmeClient:
+    """ACME compliant client."""
+
     FINALIZE_DELAY = 3.0
     INVALID_NONCE_RETRIES = 5
 
