@@ -5,3 +5,8 @@ API
     :members:
     :show-inheritance:
     :inherited-members:
+
+.. automodule:: acme_broker.client
+    :members:
+    :show-inheritance:
+    :inherited-members:
