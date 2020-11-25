@@ -30,7 +30,10 @@ author = "Noah Wöhler"
 # ones.
 extensions = ["sphinx.ext.autodoc", "sphinx.ext.intersphinx"]
 
-intersphinx_mapping = {"aiohttp": ("https://docs.aiohttp.org/en/latest/", None)}
+intersphinx_mapping = {
+    "aiohttp": ("https://docs.aiohttp.org/en/latest/", None),
+    "acme": ("https://acme-python.readthedocs.io/en/latest/", None),
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]

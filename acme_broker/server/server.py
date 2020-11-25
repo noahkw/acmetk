@@ -86,7 +86,7 @@ class AcmeServerBase:
         )
 
         self.app = web.Application(
-            middlewares=[self._host_addr_middleware, self._error_middleware]
+            middlewares=[self.host_ip_middleware, self.error_middleware]
         )
 
         self._add_routes()
@@ -185,7 +185,7 @@ class AcmeServerBase:
         return runner, instance
 
     def register_challenge_validator(self, validator: ChallengeValidator):
-        """Registers a :meth:`ChallengeValidator` with the server.
+        """Registers a :class:`ChallengeValidator` with the server.
 
         The validator is subsequently used to validate challenges of all types that it
         supports.
@@ -358,6 +358,14 @@ class AcmeServerBase:
 
     @routes.get("/directory", name="directory")
     async def directory(self, request):
+        """Handler that returns the server's directory.
+
+        `7.1.1. Directory <https://tools.ietf.org/html/rfc8555#section-7.1.1>`_
+
+        Only adds the URL to the ToS if *tos_url* was set during construction.
+
+        :return: The directory object.
+        """
         directory = {
             "newAccount": url_for(request, "new-account"),
             "newNonce": url_for(request, "new-nonce"),
@@ -373,10 +381,33 @@ class AcmeServerBase:
 
     @routes.get("/new-nonce", name="new-nonce", allow_head=True)
     async def new_nonce(self, request):
+        """Handler that returns a new nonce.
+
+        `7.2. Getting a Nonce <https://tools.ietf.org/html/rfc8555#section-7.2>`_
+
+        :return: The nonce inside the *Replay-Nonce* header.
+        """
         return self._response(request, status=204)
 
     @routes.post("/new-account", name="new-account")
     async def new_account(self, request):
+        """Handler that registers a new account.
+
+        `7.3. Account Management <https://tools.ietf.org/html/rfc8555#section-7.3>`_
+
+        May also be used to find an existing account given a key.
+
+        `7.3.1. Finding an Account URL Given a Key <https://tools.ietf.org/html/rfc8555#section-7.3.1>`_
+
+        :raises: :class:`acme.messages.Error` if any of the following are true:
+
+            * The public key's key size is insufficient
+            * The account exists but its status is not :attr:`acme_broker.models.AccountStatus.VALID`
+            * The client specified *only_return_existing* but no account with that public key exists
+            * The client wants to create a new account but did not agree to the terms of service
+
+        :return: The account object.
+        """
         async with self._session() as session:
             jws, account = await self._verify_request(request, session, key_auth=True)
             reg = acme.messages.Registration.json_loads(jws.payload)
@@ -424,6 +455,20 @@ class AcmeServerBase:
 
     @routes.post("/accounts/{kid}", name="accounts")
     async def accounts(self, request):
+        """Handler that updates or queries the given account.
+
+        `7.3.2.  Account Update <https://tools.ietf.org/html/rfc8555#section-7.3.2>`_
+
+        Only updates to the account's status and contact fields are allowed.
+        Returns the current account object if no updates were specified.
+
+        :raises:
+
+            * :class:`acme.messages.Error` If the requested update is not allowed.
+            * :class:`aiohttp.web.HTTPNotFound` If the account does not exist.
+
+        :return: The account object.
+        """
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             upd = messages.AccountUpdate.json_loads(jws.payload)
@@ -443,6 +488,12 @@ class AcmeServerBase:
 
     @routes.post("/new-order", name="new-order")
     async def new_order(self, request):
+        """Handler that creates a new order.
+
+        `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
+
+        :return: The order object.
+        """
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
@@ -464,6 +515,21 @@ class AcmeServerBase:
 
     @routes.post("/authz/{id}", name="authz")
     async def authz(self, request):
+        """Handler that updates or queries the given authorization.
+
+        `7.5. Identifier Authorization <https://tools.ietf.org/html/rfc8555#section-7.5>`_
+
+        Only updates to the authorization's status field are allowed.
+
+        `7.5.2.  Deactivating an Authorization <https://tools.ietf.org/html/rfc8555#section-7.5.2>`_
+
+        :raises:
+
+            * :class:`acme.messages.Error` If the requested update is not allowed.
+            * :class:`aiohttp.web.HTTPNotFound` If the authorization does not exist.
+
+        :return: The authorization object.
+        """
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             authz_id = request.match_info["id"]
@@ -485,6 +551,14 @@ class AcmeServerBase:
 
     @routes.post("/challenge/{id}", name="challenge")
     async def challenge(self, request):
+        """Handler that queries the given challenge and initiates its validation.
+
+        `7.5.1. Responding to Challenges <https://tools.ietf.org/html/rfc8555#section-7.5.1>`_
+
+        :raises: :class:`aiohttp.web.HTTPNotFound` If the challenge does not exist.
+
+        :return: The challenge object.
+        """
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             challenge_id = request.match_info["id"]
@@ -508,6 +582,24 @@ class AcmeServerBase:
 
     @routes.post("/revoke-cert", name="revoke-cert")
     async def revoke_cert(self, request):
+        """Handler that initiates revocation of the given certificate.
+
+        `7.6.  Certificate Revocation <https://tools.ietf.org/html/rfc8555#section-7.6>`_
+
+        :raises:
+
+            * :class:`aiohttp.web.HTTPNotFound` If the certificate does not exist.
+            * :class:`acme.messages.Error` if any of the following are true:
+
+                * The client specified an unsupported revocation reason
+                * The client's account does not hold authorizations for all identifiers in the certificate
+                * If the message was signed using the certificate's private key
+
+                    * The public key of the certificate and the JWK differ
+                    * The JWS' signature is invalid
+
+        :return: HTTP status code *200* if the revocation succeeded.
+        """
         async with self._session() as session:
             certificate, revocation = await self._verify_revocation(request, session)
 
@@ -519,6 +611,13 @@ class AcmeServerBase:
 
     @routes.post("/order/{id}", name="order")
     async def order(self, request):
+        """Handler that queries the given order.
+
+        `7.1.3. Order Objects <https://tools.ietf.org/html/rfc8555#section-7.1.3>`_
+
+        :raises: :class:`aiohttp.web.HTTPNotFound` If the order does not exist.
+        :return: The order object.
+        """
         async with self._session() as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
@@ -533,6 +632,12 @@ class AcmeServerBase:
 
     @routes.post("/orders/{id}", name="orders")
     async def orders(self, request):
+        """Handler that retrieves the account's orders list.
+
+        `7.1.2.1.  Orders List <https://tools.ietf.org/html/rfc8555#section-7.1.2.1>`_
+
+        :return: An object with key *orders* that holds the account's orders list.
+        """
         async with self._session() as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
@@ -583,6 +688,24 @@ class AcmeServerBase:
 
     @routes.post("/order/{id}/finalize", name="finalize-order")
     async def finalize_order(self, request):
+        """Handler that initiates finalization of the given order.
+
+        `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
+        Specifically: https://tools.ietf.org/html/rfc8555#page-47
+
+        :raises:
+
+            * :class:`aiohttp.web.HTTPNotFound` If the order does not exist.
+            * :class:`acme.messages.Error` if any of the following are true:
+
+                * The order is not in state :class:`acme_broker.models.OrderStatus.READY`
+                * The CSR's public key size is insufficient
+                * The CSR's signature is invalid
+                * The identifiers that the CSR requests differ from those that the\
+                    order has authorizations for
+
+        :return: The updated order object.
+        """
         async with self._session() as session:
             order, csr = await self._validate_order(request, session)
 
@@ -603,6 +726,13 @@ class AcmeServerBase:
 
     @routes.post("/certificate/{id}", name="certificate")
     async def certificate(self, request):
+        """Handler that queries the given certificate.
+
+        `7.4.2. Downloading the Certificate <https://tools.ietf.org/html/rfc8555#section-7.4.2>`_
+
+        :raises: :class:`aiohttp.web.HTTPNotFound` If the certificate does not exist.
+        :return: The certificate's full chain in PEM format.
+        """
         raise NotImplementedError
 
     async def _handle_challenge_validate(self, request, kid, challenge_id):
@@ -622,10 +752,36 @@ class AcmeServerBase:
             await session.commit()
 
     async def handle_order_finalize(self, kid, order_id):
+        """Method that handles the actual finalization of an order.
+
+        This method should be called after the order's status has been set
+        to :class:`acme_broker.models.OrderStatus.PROCESSING` in :meth:`finalize_order`.
+
+        It should retrieve the order from the database and either generate
+        the certificate from the stored CSR itself or submit it to another
+        CA.
+
+        Afterwards the certificate should be stored alongside the order.
+        The *full_chain* attribute needs to be populated and returned
+        to the client in :meth:`certificate` if the certificate was
+        generated by another CA.
+
+        :param kid: The account's id
+        :type kid: :class:`str`
+        :param order_id: The order's id
+        :type order_id: :class:`str`
+        """
         raise NotImplementedError
 
     @middleware
-    async def _host_addr_middleware(self, request, handler):
+    async def host_ip_middleware(self, request, handler):
+        """Middleware that checks whether the requesting host's IP
+        is part of any of the subnets that are whitelisted.
+
+        :returns: HTTP status code *403* if the host's IP is not part of any of\
+            any of the whitelisted subnets.
+        """
+
         # Read the X-Forwarded-For header if the server is behind a reverse proxy.
         # Otherwise, use the remote address directly.
         ip_addr = ipaddress.ip_address(
@@ -643,10 +799,11 @@ class AcmeServerBase:
             )
 
     @middleware
-    async def _error_middleware(self, request, handler):
-        """
-        Converts errors thrown in handlers to ACME compliant JSON and
+    async def error_middleware(self, request, handler):
+        """Middleware that converts errors thrown in handlers to ACME compliant JSON and
         attaches the specified status code to the response.
+
+        :returns: The ACME error converted to JSON.
         """
         try:
             response = await handler(request)
