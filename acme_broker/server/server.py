@@ -60,6 +60,8 @@ class AcmeResponse(web.Response):
 
 
 class AcmeServerBase:
+    """Base class for an ACME compliant server."""
+
     SUPPORTED_JWS_ALGORITHMS = (
         josepy.RS256,
         josepy.RS384,
@@ -68,6 +70,7 @@ class AcmeServerBase:
         josepy.PS384,
         josepy.PS512,
     )
+    """The JWS signing algorithms that the server supports."""
 
     def __init__(
         self,
@@ -238,6 +241,39 @@ class AcmeServerBase:
     async def _verify_request(
         self, request, session, key_auth=False, post_as_get=False
     ):
+        """Verifies an ACME request whose payload is encapsulated in a JWS.
+
+        `6.2. Request Authentication <https://tools.ietf.org/html/rfc8555#section-6.2>`_
+
+        All requests to handlers apart from :meth:`new_nonce` and :meth:`directory`
+        are authenticated.
+
+        :param key_auth: True if the JWK inside the JWS should be used to \
+            verify its signature. False otherwise
+        :type key_auth: :class:`bool`
+        :param post_as_get: True if a `POST-as-GET <https://tools.ietf.org/html/rfc8555#section-6.3>`_ \
+            request is expected. False otherwise
+        :type post_as_get: :class:`bool`
+        :raises:
+
+            * :class:`aiohttp.web.HTTPNotFound` if the JWS contains a kid, \
+                but the corresponding account does not exist.
+
+            * :class:`acme.messages.Error` if any of the following are true:
+
+                * The request does not contain a valid JWS
+                * The handler expects a `POST-as-GET <https://tools.ietf.org/html/rfc8555#section-6.3>`_ request, \
+                    but got a non-empty payload
+                * The URL inside the JWS' signature is not equal to the actual request URL
+                * The signature was created using an algorithm that the server does not support, \
+                    see :attr:`SUPPORTED_JWS_ALGORITHMS`
+                * The client supplied a bad nonce in the JWS signature
+                * The JWS does not have *either* a JWK *or* a kid
+                * The JWS' signature is invalid
+                * There is a mismatch between the URL's kid and the JWS' kid
+                * The account corresponding to the kid does not have status \
+                    :attr:`acme_broker.models.AccountStatus.VALID`
+        """
         data = await request.text()
         try:
             jws = acme.jws.JWS.json_loads(data)
