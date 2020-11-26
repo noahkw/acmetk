@@ -892,8 +892,6 @@ class AcmeCA(AcmeServerBase):
 
         async with self._session() as session:
             order = await self._db.get_order(session, kid, order_id)
-            # simulate requests to Let's Encrypt CA
-            # await asyncio.sleep(3)
 
             cert = generate_cert_from_csr(order.csr, self._cert, self._private_key)
             order.certificate = models.Certificate(
@@ -933,6 +931,15 @@ class AcmeServerClientBase(AcmeServerBase):
 
     # @routes.post("/certificate/{id}", name="certificate")
     async def certificate(self, request):
+        """Handler that queries the given certificate.
+
+        `7.4.2. Downloading the Certificate <https://tools.ietf.org/html/rfc8555#section-7.4.2>`_
+
+        Returns the full chain as retrieved from the CA by the internal client.
+
+        :raises: :class:`aiohttp.web.HTTPNotFound` If the certificate does not exist.
+        :return: The certificate's full chain in PEM format.
+        """
         async with self._session() as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
@@ -952,6 +959,27 @@ class AcmeServerClientBase(AcmeServerBase):
 
     # @routes.post("/revoke-cert", name="revoke-cert")
     async def revoke_cert(self, request):
+        """Handler that initiates revocation of the given certificate.
+
+        `7.6.  Certificate Revocation <https://tools.ietf.org/html/rfc8555#section-7.6>`_
+
+        The revocation is first relayed to the remote CA using the internal client
+        before being processed internally.
+
+        :raises:
+
+            * :class:`aiohttp.web.HTTPNotFound` If the certificate does not exist.
+            * :class:`acme.messages.Error` if any of the following are true:
+
+                * The client specified an unsupported revocation reason
+                * The client's account does not hold authorizations for all identifiers in the certificate
+                * If the message was signed using the certificate's private key
+
+                    * The public key of the certificate and the JWK differ
+                    * The JWS' signature is invalid
+
+        :return: HTTP status code *200* if the revocation succeeded.
+        """
         async with self._session() as session:
             certificate, revocation = await self._verify_revocation(request, session)
 
@@ -991,6 +1019,23 @@ class AcmeServerClientBase(AcmeServerBase):
 
 class AcmeBroker(AcmeServerClientBase):
     async def handle_order_finalize(self, kid, order_id):
+        """Method that handles the actual finalization of an order.
+
+        This method is called after the order's status has been set
+        to :class:`acme_broker.models.OrderStatus.PROCESSING` in :meth:`finalize_order`.
+
+        The order is relayed to the remote CA here and the entire
+        certificate acquisition process is handled by the internal client.
+        The obtained certificate's full chain is then stored in the database.
+
+        If the certificate acquisition fails, then the order's status is set
+        to :class:`acme_broker.models.OrderStatus.INVALID`.
+
+        :param kid: The account's id
+        :type kid: :class:`str`
+        :param order_id: The order's id
+        :type order_id: :class:`str`
+        """
         logger.debug("Finalizing order %s", order_id)
 
         async with self._session() as session:
@@ -1069,16 +1114,16 @@ class AcmeProxy(AcmeServerClientBase):
             order_ca = await self._client.order_get(order.proxied_url)
 
             try:
-                # AcmeClient.order_finalize does not return if the order never becomes valid.
-                # Thus, we handle that case here and set the order's status to invalid
-                # if the CA takes too long.
+                """AcmeClient.order_finalize does not return if the order never becomes valid.
+                Thus, we handle that case here and set the order's status to invalid
+                if the CA takes too long."""
                 await asyncio.wait_for(self._client.order_finalize(order_ca, csr), 10.0)
             except asyncio.TimeoutError:
                 # TODO: consider returning notReady instead to let the client try again
                 order.status = models.OrderStatus.INVALID
             else:
-                # The CA's order is valid, we can set our order's status to PROCESSING and
-                # request the certificate from the CA in _handle_order_finalize.
+                """The CA's order is valid, we can set our order's status to PROCESSING and
+                request the certificate from the CA in _handle_order_finalize."""
                 order.status = models.OrderStatus.PROCESSING
 
             order.csr = csr
