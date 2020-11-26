@@ -727,6 +727,7 @@ class AcmeServerBase:
         """Handler that initiates finalization of the given order.
 
         `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
+
         Specifically: https://tools.ietf.org/html/rfc8555#page-47
 
         :raises:
@@ -888,6 +889,21 @@ class AcmeCA(AcmeServerBase):
         return ca
 
     async def handle_order_finalize(self, kid, order_id):
+        """Method that handles the actual finalization of an order.
+
+        This method is called after the order's status has been set
+        to :class:`acme_broker.models.OrderStatus.PROCESSING` in :meth:`finalize_order`.
+
+        It retrieves the order from the database and generates
+        the certificate from the stored CSR, signing it using the CA's private key.
+
+        Afterwards the certificate is stored alongside the order.
+
+        :param kid: The account's id
+        :type kid: :class:`str`
+        :param order_id: The order's id
+        :type order_id: :class:`str`
+        """
         logger.debug("Finalizing order %s", order_id)
 
         async with self._session() as session:
@@ -922,8 +938,15 @@ class AcmeCA(AcmeServerBase):
             )
 
 
-class AcmeServerClientBase(AcmeServerBase):
-    """Base for an ACME server that talks to a CA using an ACME client."""
+class AcmeRelayBase(AcmeServerBase):
+    """Base for an ACME server that relays requests to a remote CA using an internal ACME client.
+
+    The account that is used to sign requests to the remote CA is shared between all users of the relay server.
+
+    At this time, challenges and authorizations are not shared between the relay server and
+    the remote CA. Instead, the relay has to make sure that all authorizations for a given order
+    are valid before applying for certificate issuance.
+    """
 
     def __init__(self, *, client, **kwargs):
         super().__init__(**kwargs)
@@ -1017,7 +1040,15 @@ class AcmeServerClientBase(AcmeServerBase):
             order.status = models.OrderStatus.VALID
 
 
-class AcmeBroker(AcmeServerClientBase):
+class AcmeBroker(AcmeRelayBase):
+    """Server that relays requests to a remote CA employing a "broker" model.
+
+    Orders are only relayed to the remote CA when the finalization is already processing.
+    This means that errors that may occur at the remote CA during order creation or finalization
+    cannot be shown to the end user transparently. If that is a concern, then
+    the :class:`AcmeProxy` class should be used instead.
+    """
+
     async def handle_order_finalize(self, kid, order_id):
         """Method that handles the actual finalization of an order.
 
@@ -1058,9 +1089,25 @@ class AcmeBroker(AcmeServerClientBase):
             await session.commit()
 
 
-class AcmeProxy(AcmeServerClientBase):
+class AcmeProxy(AcmeRelayBase):
+    """Server that relays requests to a remote CA employing a "broker" model.
+
+    Orders are relayed to the remote CA transparently, which allows for
+    the possibility to show errors to the end user as they occur at the remote CA.
+    """
+
     # @routes.post("/new-order", name="new-order")
     async def new_order(self, request):
+        """Handler that creates a new order.
+
+        `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
+
+        The order is also relayed to the remote CA by the internal client.
+        This means that errors that might occur during the creation process
+        are transparently shown to the end user.
+
+        :return: The order object.
+        """
         async with self._session() as session:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
@@ -1109,6 +1156,29 @@ class AcmeProxy(AcmeServerClientBase):
 
     # @routes.post("/order/{id}/finalize", name="finalize-order")
     async def finalize_order(self, request):
+        """Handler that initiates finalization of the given order.
+
+        `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
+
+        Specifically: https://tools.ietf.org/html/rfc8555#page-47
+
+        The order is refetched via the client using the stored *proxied_url*.
+        The client then attempts to finalize the order at the remote CA.
+        If an error is raised here, then it is transparently shown to the end user.
+
+        :raises:
+
+            * :class:`aiohttp.web.HTTPNotFound` If the order does not exist.
+            * :class:`acme.messages.Error` if any of the following are true:
+
+                * The order is not in state :class:`acme_broker.models.OrderStatus.READY`
+                * The CSR's public key size is insufficient
+                * The CSR's signature is invalid
+                * The identifiers that the CSR requests differ from those that the \
+                    order has authorizations for
+
+        :return: The updated order object.
+        """
         async with self._session() as session:
             order, csr = await self._validate_order(request, session)
             order_ca = await self._client.order_get(order.proxied_url)
@@ -1143,6 +1213,19 @@ class AcmeProxy(AcmeServerClientBase):
         )
 
     async def handle_order_finalize(self, kid, order_id):
+        """Method that handles the actual finalization of an order.
+
+        This method is called after the order's status has been set
+        to :class:`acme_broker.models.OrderStatus.PROCESSING` in :meth:`finalize_order`.
+
+        The order is refetched from the remote CA here after which the internal client
+        downloads the certificate and stores its full chain in the database.
+
+        :param kid: The account's id
+        :type kid: :class:`str`
+        :param order_id: The order's id
+        :type order_id: :class:`str`
+        """
         logger.debug("Finalizing order %s", order_id)
 
         async with self._session() as session:

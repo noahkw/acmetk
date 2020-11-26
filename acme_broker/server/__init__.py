@@ -4,11 +4,12 @@ from .challenge_validator import (
     ChallengeValidator,
     CouldNotValidateChallenge,
 )
-from .server import AcmeCA, AcmeBroker, AcmeProxy, AcmeServerBase
+from .server import AcmeCA, AcmeBroker, AcmeProxy, AcmeServerBase, AcmeRelayBase
 
 
 __all__ = [
     "AcmeServerBase",
+    "AcmeRelayBase",
     "AcmeCA",
     "AcmeBroker",
     "AcmeProxy",
