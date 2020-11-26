@@ -4,7 +4,14 @@ API
 ACME Client
 ###########
 
-.. automodule:: acme_broker.client
+.. autoclass:: acme_broker.client.AcmeClient
+    :members:
+    :inherited-members:
+
+Challenge Solvers
+-----------------
+
+.. automodule:: acme_broker.client.challenge_solver
     :members:
     :inherited-members:
 

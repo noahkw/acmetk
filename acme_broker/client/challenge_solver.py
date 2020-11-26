@@ -5,7 +5,9 @@ import enum
 import functools
 import logging
 
+import acme.messages
 import dns.asyncresolver
+import josepy
 from infoblox_client import connector, objects
 
 
@@ -19,21 +21,45 @@ class ChallengeSolverType(enum.Enum):
 
 
 class ChallengeSolver(abc.ABC):
+    """An abstract base class for challenge solver clients.
+
+    All challenge solver implementations must implement the method :func:`complete_challenge`
+    that provisions the resources that are needed to complete the given challenge and delays execution until
+    the server may check for completion.
+    """
+
     @abc.abstractmethod
-    async def complete_challenge(self, key, identifier, challenge):
+    async def complete_challenge(
+        self,
+        key: josepy.jwk.JWKRSA,
+        identifier: acme.messages.Identifier,
+        challenge: acme.messages.ChallengeBody,
+    ):
         """Complete the given challenge.
 
         This method should complete the given challenge and then delay
         returning until the server is allowed to check for completion.
 
-        :param challenge: The challenge to be completed
-        :type challenge: acme.messages.ChallengeBody
+        :param key: The client's account key.
+        :param identifier: The identifier that is associated with the challenge.
+        :param challenge: The challenge to be completed.
         """
         pass
 
 
 class DummySolver(ChallengeSolver):
+    """Dummy challenge solver that does not actually complete any challenges."""
+
     async def complete_challenge(self, key, identifier, challenge):
+        """Does not complete the given challenge.
+
+        Instead, this method only logs the mock completion attempt and pauses
+        execution for one second.
+
+        :param key: The client's account key.
+        :param identifier: The identifier that is associated with the challenge.
+        :param challenge: The challenge to be completed.
+        """
         logger.debug(
             f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ}, identifier {identifier}"
         )
@@ -41,21 +67,39 @@ class DummySolver(ChallengeSolver):
 
 
 class InfobloxClient(ChallengeSolver):
-    POLLING_DELAY = 1.0  # time in seconds between consecutive DNS requests
-    POLLING_TIMEOUT = (
-        60.0  # time in seconds after which placing the TXT record is considered failed
-    )
+    """InfoBlox DNS-01 challenge solver.
+
+    This challenge solver connects to an InfoBlox API to provision
+    DNS TXT records in order to complete the ACME DNS-01 challenge type.
+    """
+
+    POLLING_DELAY = 1.0
+    """Time in seconds between consecutive DNS requests."""
+
+    POLLING_TIMEOUT = 60.0
+    """Time in seconds after which placing the TXT record is considered failed."""
 
     def __init__(self, *, host, username, password):
         self._creds = {"host": host, "username": username, "password": password}
         self._loop = asyncio.get_event_loop()
 
     async def connect(self):
+        """Connect to the InfoBlox API.
+
+        This method must be called before attempting to complete challenges.
+        """
         self._conn = await self._loop.run_in_executor(
             None, connector.Connector, self._creds
         )
 
-    async def set_txt_record(self, name, text, views=None, ttl=60):
+    async def set_txt_record(self, name: str, text: str, views=None, ttl: int = 60):
+        """Sets a DNS TXT record.
+
+        :param name: The name of the TXT record.
+        :param text: The text of the TXT record.
+        :param views: List of views to set the TXT record in. Defaults to *Intern* and *Extern*.
+        :param ttl: Time to live of the TXT record in seconds.
+        """
         if views is None:
             views = ("Intern", "Extern")
 
@@ -80,7 +124,13 @@ class InfobloxClient(ChallengeSolver):
             ]
         )
 
-    async def query_txt_record(self, name):
+    async def query_txt_record(self, name: str):
+        """Queries a DNS TXT record.
+
+        :param name: Name of the TXT record to query.
+        :raises: :class:`dns.asyncresolver.NXDOMAIN` If the TXT record is not set.
+        :return: Text of the TXT record.
+        """
         resp = await dns.asyncresolver.resolve(name, "TXT")
         logger.debug(resp.response.answer)
         txt_record = list(resp.rrset.items.items())[0][0]
@@ -101,6 +151,16 @@ class InfobloxClient(ChallengeSolver):
             await asyncio.sleep(1.0)
 
     async def complete_challenge(self, key, identifier, challenge):
+        """Complete the given DNS-01 challenge.
+
+        This method provisions the TXT record needed to complete the given challenge.
+        Then it polls the DNS for up to 60 seconds to ensure that the record is visible
+        to the remote CA's DNS.
+
+        :param key: The client's account key.
+        :param identifier: The identifier that is associated with the challenge.
+        :param challenge: The challenge to be completed.
+        """
         name = challenge.chall.validation_domain_name(identifier.value)
         text = challenge.chall.validation(key)
 

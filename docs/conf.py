@@ -33,6 +33,8 @@ extensions = ["sphinx.ext.autodoc", "sphinx.ext.intersphinx"]
 intersphinx_mapping = {
     "aiohttp": ("https://docs.aiohttp.org/en/latest/", None),
     "acme": ("https://acme-python.readthedocs.io/en/latest/", None),
+    "cryptography": ("https://cryptography.io/en/latest/", None),
+    "dns": ("https://dnspython.readthedocs.io/en/latest/", None),
 }
 
 autodoc_default_options = {"private-members": True}

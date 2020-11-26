@@ -7,12 +7,12 @@ from pathlib import Path
 import acme.messages
 import josepy
 from acme import jws
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientResponseError
 from cryptography import x509
 
-from acme_broker.models import messages
 from acme_broker.client.challenge_solver import ChallengeSolver
 from acme_broker.client.challenge_solver import ChallengeSolverType
+from acme_broker.models import messages
 
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
@@ -72,6 +72,7 @@ class AcmeClient:
         with open(private_key, "rb") as pem:
             self._private_key = josepy.jwk.JWKRSA.load(pem.read())
 
+        # Filter empty strings
         self._contact = {k: v for k, v in contact.items() if len(v) > 0}
 
         self._directory = dict()
@@ -82,9 +83,22 @@ class AcmeClient:
         self._challenge_solvers = dict()
 
     async def close(self):
+        """Closes the client's session.
+
+        The client may not be used for requests anymore after it has been closed.
+        """
         await self._session.close()
 
     async def start(self):
+        """Starts the client's session.
+
+        This method must be called after initialization and before
+        making requests to an ACME server, as it fetches the ACME directory
+        and registers the private key with the server.
+
+        It is advised to register at least one :class:`ChallengeSolver`
+        using :meth:`register_challenge_solver` before starting the client.
+        """
         async with self._session.get(
             self._directory_url, ssl=self._ssl_context
         ) as resp:
@@ -99,6 +113,22 @@ class AcmeClient:
         await self.account_register(**self._contact)
 
     async def account_register(self, email=None, phone=None) -> None:
+        """Registers an account with the CA.
+
+        Also sends the given contact information and stores the account internally
+        for subsequent requests.
+        If the private key is already registered, then the account is only queried.
+
+        It is usually not necessary to call this method as the account is
+        registered or fetched automatically in :meth:`start`.
+
+        :param email: The contact email
+        :type email: :class:`str`
+        :param phone: The contact phone number
+        :type phone: :class:`str`
+        :raises: :class:`acme.messages.Error` If the server rejects any of the contact information or the private
+            key.
+        """
         reg = acme.messages.Registration.from_data(
             email=email, phone=phone, terms_of_service_agreed=True
         )
@@ -110,6 +140,14 @@ class AcmeClient:
         self._account = messages.Account.from_json(account_obj)
 
     async def account_update(self, **kwargs) -> None:
+        """Updates the account's contact information.
+
+        :param kwargs: Kwargs that are passed to :class:`acme.messages.Registration`'s constructor. May include a
+            :class:`dict` *contact* containing new contact information or *status* set to
+            :class:`acme.messages.STATUS_DEACTIVATED` to deactivate the account.
+        :raises: :class:`acme.messages.Error` If the server rejects any of the contact info or the status
+            update.
+        """
         reg = acme.messages.Registration(**kwargs)
 
         _, account_obj = await self._signed_request(reg, self._account.kid)
@@ -117,6 +155,12 @@ class AcmeClient:
         self._account = messages.Account.from_json(account_obj)
 
     async def account_lookup(self) -> None:
+        """Looks up an account using the stored private key.
+
+        Also stores the account internally for subsequent requests.
+
+        :raises: :class:`acme.messages.Error` If no account associated with the private key exists.
+        """
         reg = acme.messages.Registration.from_data(
             terms_of_service_agreed=True, only_return_existing=True
         )
@@ -131,13 +175,40 @@ class AcmeClient:
     async def order_create(
         self, identifiers: typing.Union[typing.List[dict], typing.List[str]]
     ) -> messages.Order:
+        """Creates a new order with the given identifiers.
+
+        :param identifiers: :class:`list` of identifiers that the order should contain. May either be a list of
+            fully qualified domain names or a list of :class:`dict` containing the *type* and *name* (both
+            :class:`str`) of each identifier.
+        :raises: :class:`acme.messages.Error` If the server is unwilling to create an order with the requested
+            identifiers.
+        :returns: The new order.
+        """
         order = messages.NewOrder.from_data(identifiers=identifiers)
 
         resp, order_obj = await self._signed_request(order, self._directory["newOrder"])
         order_obj["url"] = resp.headers["Location"]
         return messages.Order.from_json(order_obj)
 
-    async def order_finalize(self, order, csr) -> messages.Order:
+    async def order_finalize(
+        self, order: messages.Order, csr: x509.CertificateSigningRequest
+    ) -> messages.Order:
+        """Finalizes the order using the given CSR.
+
+        The caller needs to ensure that this method is called with
+        :py:func:`asyncio.wait_for` and a time-out value.
+        Otherwise it may result in an infinite loop if the CA
+        never reports the order's status as *ready*.
+
+        :param order: Order that is to be finalized.
+        :param csr: The CSR that is submitted to apply for certificate issuance.
+        :raises:
+
+            * :class:`acme.messages.Error` If the server is unwilling to finalize the order.
+            * :class:`aiohttp.ClientResponseError` If the order does not exist.
+
+        :returns: The finalized order.
+        """
         cert_req = messages.CertificateRequest(csr=csr)
 
         while True:
@@ -161,23 +232,50 @@ class AcmeClient:
         )
         return finalized
 
-    async def order_get(self, order_url) -> messages.Order:
+    async def order_get(self, order_url: str) -> messages.Order:
+        """Fetches an order given its URL.
+
+        :param order_url: The order's URL.
+        :raises: :class:`aiohttp.ClientResponseError` If the order does not exist.
+        :return: The fetched order.
+        """
         resp, order = await self._signed_request(None, order_url)
         order["url"] = order_url
         return messages.Order.from_json(order)
 
     async def orders_get(self) -> typing.List[str]:
+        """Fetches the account's orders list.
+
+        :return: List containing the URLs of the account's orders.
+        """
         if not self._account.orders:
             return []
 
+        # TODO: implement chunking
         _, orders = await self._signed_request(None, self._account["orders"])
         return orders
 
-    async def authorization_get(self, authorization_url) -> acme.messages.Authorization:
+    async def authorization_get(
+        self, authorization_url: str
+    ) -> acme.messages.Authorization:
+        """Fetches an authorization given its URL.
+
+        :param authorization_url: The authorization's URL.
+        :raises: :class:`aiohttp.ClientResponseError` If the authorization does not exist.
+        :return: The fetched authorization.
+        """
         resp, authorization = await self._signed_request(None, authorization_url)
         return acme.messages.Authorization.from_json(authorization)
 
     async def authorizations_complete(self, order: acme.messages.Order) -> None:
+        """Completes all authorizations associated with the given order.
+
+        Uses one of the registered :class:`ChallengeSolver` to complete one challenge
+        per authorization.
+
+        :param order: Order whose authorizations should be completed.
+        :raises: :class:`CouldNotCompleteChallenge` If completion of one of the authorizations' challenges failed.
+        """
         authorizations = [
             await self.authorization_get(authorization_url)
             for authorization_url in order.authorizations
@@ -261,20 +359,57 @@ class AcmeClient:
             ]
         )
 
-    async def challenge_get(self, challenge_url) -> acme.messages.ChallengeBody:
+    async def challenge_get(self, challenge_url: str) -> acme.messages.ChallengeBody:
+        """Fetches a challenge given its URL.
+
+        :param challenge_url: The challenge's URL.
+        :raises: :class:`aiohttp.ClientResponseError` If the challenge does not exist.
+        :return: The fetched challenge.
+        """
         _, challenge_obj = await self._signed_request(None, challenge_url)
         return acme.messages.ChallengeBody.from_json(challenge_obj)
 
-    async def challenge_validate(self, challenge_url):
+    async def challenge_validate(self, challenge_url: str) -> None:
+        """Initiates the given challenge's validation.
+
+        :param challenge_url: The challenge's URL.
+        :raises: :class:`aiohttp.ClientResponseError` If the challenge does not exist.
+        """
         await self._signed_request(None, challenge_url, post_as_get=False)
 
-    async def certificate_get(self, order) -> str:
-        _, cert = await self._signed_request(None, order.certificate)
-        return cert
+    async def certificate_get(self, order: acme.messages.Order) -> str:
+        """Downloads the given order's certificate.
+
+        :param order: The order whose certificate to download.
+        :raises:
+
+            * :class:`aiohttp.ClientResponseError` If the certificate does not exist.
+            * :class:`ValueError` If the order has not been finalized yet, i.e. the certificate \
+                property is *None*.
+
+        :return: The order's certificate encoded as PEM.
+        """
+        if not order.certificate:
+            raise ValueError("This order has not been finalized")
+
+        _, pem = await self._signed_request(None, order.certificate)
+
+        return pem
 
     async def certificate_revoke(
         self, certificate: x509.Certificate, reason: messages.RevocationReason = None
     ) -> bool:
+        """Revokes the given certificate.
+
+        :param certificate: The certificate to revoke.
+        :param reason: Optional reason for revocation.
+        :raises:
+
+            * :class:`aiohttp.ClientResponseError` If the certificate does not exist.
+            * :class:`acme.messages.Error` If the revocation did not succeed.
+
+        :return: *True* if the revocation succeeded.
+        """
         cert_rev = messages.Revocation(certificate=certificate, reason=reason)
         resp, _ = await self._signed_request(cert_rev, self._directory["revokeCert"])
 
@@ -285,6 +420,14 @@ class AcmeClient:
         types: typing.Iterable[ChallengeSolverType],
         challenge_solver: ChallengeSolver,
     ):
+        """Registers a challenge solver with the client.
+
+        The challenge solver is used to complete authorizations' challenges whose types it is
+        registered for.
+
+        :param types: The challenge solver's challenge types.
+        :param challenge_solver: The challenge solver to register.
+        """
         for type_ in types:
             if self._challenge_solvers.get(type_, None):
                 raise ValueError(
@@ -386,10 +529,14 @@ class AcmeClient:
             if "Replay-Nonce" in resp.headers:
                 self._nonces.add(resp.headers["Replay-Nonce"])
 
-            if resp.content_type == "application/json":
+            if 200 <= resp.status < 300 and resp.content_type == "application/json":
                 data = await resp.json()
             elif resp.content_type == "application/problem+json":
                 raise acme.messages.Error.from_json(await resp.json())
+            elif resp.status < 200 or resp.status >= 300:
+                raise ClientResponseError(
+                    resp.request_info, resp.history, status=resp.status
+                )
             else:
                 data = await resp.text()
 
