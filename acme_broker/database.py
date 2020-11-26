@@ -1,7 +1,9 @@
 import datetime
 
 import acme
+from aiohttp import web
 from sqlalchemy import select, event
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, defaultload
 
@@ -119,7 +121,11 @@ class Database:
             .join(Account, Order.account_kid == Account.kid)
             .filter((kid == Account.kid) & (Authorization.authorization_id == authz_id))
         )
-        result = (await session.execute(statement)).first()
+        try:
+            result = (await session.execute(statement)).first()
+        except DBAPIError:
+            # authz_id is not a valid UUID
+            raise web.HTTPNotFound
 
         return result[0] if result else None
 
@@ -147,7 +153,11 @@ class Database:
             .join(Account, Order.account_kid == Account.kid)
             .filter((kid == Account.kid) & (Challenge.challenge_id == challenge_id))
         )
-        result = (await session.execute(statement)).first()
+        try:
+            result = (await session.execute(statement)).first()
+        except DBAPIError:
+            # challenge_id is not a valid UUID
+            raise web.HTTPNotFound
 
         return result[0] if result else None
 
@@ -157,7 +167,11 @@ class Database:
             .join(Account, Order.account_kid == Account.kid)
             .filter((kid == Account.kid) & (order_id == Order.order_id))
         )
-        result = (await session.execute(statement)).first()
+        try:
+            result = (await session.execute(statement)).first()
+        except DBAPIError:
+            # order_id is not a valid UUID
+            raise web.HTTPNotFound
 
         return result[0] if result else None
 
@@ -181,5 +195,10 @@ class Database:
                 "Either kid and certificate_id OR certificate should be specified"
             )
 
-        result = (await session.execute(statement)).first()
+        try:
+            result = (await session.execute(statement)).first()
+        except DBAPIError:
+            # certificate_id is not a valid UUID
+            raise web.HTTPNotFound
+
         return result[0] if result else None
