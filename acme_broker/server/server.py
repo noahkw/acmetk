@@ -831,7 +831,7 @@ class AcmeServerBase:
         else:
             return web.Response(
                 status=403,
-                text="This service is only available from within certain networks."
+                text=f"{type(self).__name__}: This service is only available from within certain networks."
                 " Please contact your system administrator.",
             )
 
