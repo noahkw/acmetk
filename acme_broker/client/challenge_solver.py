@@ -128,24 +128,25 @@ class InfobloxClient(ChallengeSolver):
         """Queries a DNS TXT record.
 
         :param name: Name of the TXT record to query.
-        :raises: :class:`dns.asyncresolver.NXDOMAIN` If the TXT record is not set.
-        :return: Text of the TXT record.
+        :return: Strings stored in the TXT record.
         """
-        resp = await dns.asyncresolver.resolve(name, "TXT")
-        logger.debug(resp.response.answer)
-        txt_record = list(resp.rrset.items.items())[0][0]
+        txt_records = []
 
-        return txt_record.strings[0].decode()
+        with contextlib.suppress(
+            dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer
+        ):
+            resp = await dns.asyncresolver.resolve(name, "TXT")
+
+            for records in resp.rrset.items.keys():
+                txt_records.extend([record.decode() for record in records.strings])
+
+        return txt_records
 
     async def _query_until_completed(self, name, text):
         while True:
-            actual_text = None
+            records = await self.query_txt_record(name)
 
-            # Ignore exceptions that indicate that the record has not been propagated yet.
-            with contextlib.suppress(dns.asyncresolver.NXDOMAIN):
-                actual_text = await self.query_txt_record(name)
-
-            if actual_text == text:
+            if text in records:
                 return
 
             await asyncio.sleep(1.0)
