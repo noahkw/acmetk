@@ -2,11 +2,11 @@ import enum
 import json
 
 import OpenSSL
-import acme
+import acme.messages
 import cryptography
 import josepy
-from acme.messages import ResourceBody
 from cryptography import x509
+from josepy import JSONDeSerializable
 
 from acme_broker.models.authorization import AuthorizationStatus
 from acme_broker.models.account import AccountStatus
@@ -16,10 +16,24 @@ ERROR_CODE_STATUS = {
     "orderNotReady": 403,
     "accountDoesNotExist": 404,
 }
+"""ACME error types mapped to HTTP status codes.
+
+`6.7. Errors <https://tools.ietf.org/html/rfc8555#section-6.7>`_
+"""
 
 
-def get_status(error_code):
-    return ERROR_CODE_STATUS.get(error_code, 400)
+def get_status(error_type):
+    """Gets the HTTP status code that corresponds to the given ACME error type.
+
+    Defaults to status code *400* for a generic user error if no mapping was defined by
+    `RFC 8555 <https://tools.ietf.org/html/rfc8555>`_.
+
+    :param error_type: The ACME error type.
+    :type error_type: :class:`str`
+    :return: The corresponding HTTP status code.
+    :rtype: :class:`int`
+    """
+    return ERROR_CODE_STATUS.get(error_type, 400)
 
 
 def decode_cert(b64der):
@@ -33,6 +47,11 @@ def encode_cert(cert):
 
 
 class RevocationReason(enum.Enum):
+    """Certificate revocation reasons.
+
+    Defined in `5.3.1. Reason Code <https://tools.ietf.org/html/rfc5280#section-5.3.1>`_ of RFC 5280.
+    """
+
     unspecified = 0
     keyCompromise = 1
     cACompromise = 2
@@ -47,11 +66,9 @@ class RevocationReason(enum.Enum):
 
 
 class Revocation(josepy.JSONObjectWithFields):
-    """Revocation message.
+    """Message type for certificate revocation requests.
 
-    :ivar .ComparableX509 certificate: `OpenSSL.crypto.X509` wrapped in
-        `.ComparableX509`
-
+    Automatically handles (de-)serialization of the :class:`RevocationReason`.
     """
 
     certificate = josepy.Field("certificate", decoder=decode_cert, encoder=encode_cert)
@@ -64,7 +81,7 @@ class Revocation(josepy.JSONObjectWithFields):
 
 
 def encode_csr(csr):
-    """Encode CSR as JOSE Base-64 DER."""
+    # Encode CSR as JOSE Base-64 DER.
     return josepy.encode_b64jose(
         csr.public_bytes(
             encoding=cryptography.hazmat.primitives.serialization.Encoding.DER
@@ -77,10 +94,23 @@ def decode_csr(b64der):
 
 
 class CertificateRequest(josepy.JSONObjectWithFields):
+    """Message type for certificate requests.
+
+    Received by an :class:`~acme_broker.server.AcmeServerBase` instance at the order finalization step
+    :meth:`~acme_broker.server.AcmeServerBase.finalize_order`.
+    """
+
     csr = josepy.Field("csr", decoder=decode_csr, encoder=encode_csr)
 
 
-class JSONDeSerializableAllowEmpty:
+class JSONDeSerializableAllowEmpty(JSONDeSerializable):
+    """JSONDeSerializable that allows an empty string as the input for :func:`json_loads`.
+
+    This subclass (sub-interface) is needed for :class:`AuthorizationUpdate` as well as
+    :class:`AccountUpdate`, so the request payload can still be parsed into a valid (empty)
+    update object although a POST-as-GET with an empty payload (:code:`b""`) was performed.
+    """
+
     @classmethod
     def json_loads(cls, json_string):
         """Deserialize from JSON document string."""
@@ -95,22 +125,46 @@ class JSONDeSerializableAllowEmpty:
 
 
 class AuthorizationUpdate(JSONDeSerializableAllowEmpty, josepy.JSONObjectWithFields):
+    """Message type that allows (de-)serialization of authorization update request payloads.
+
+    Inherits from :class:`JSONDeSerializableAllowEmpty` so that POST-as-GET requests don't result in a parsing error.
+    """
+
     status = josepy.Field("status", decoder=AuthorizationStatus, omitempty=True)
 
 
 class AccountUpdate(JSONDeSerializableAllowEmpty, acme.messages.Registration):
+    """Patched :class:`acme.messages.Registration` message type that adds a *status* field for status update requests.
+
+    Inherits from :class:`JSONDeSerializableAllowEmpty` so that POST-as-GET requests don't result in a parsing error.
+    """
+
     status = josepy.Field("status", decoder=AccountStatus, omitempty=True)
 
 
-class NewOrder(ResourceBody):
-    """New Order Resource Body."""
+class NewOrder(josepy.JSONObjectWithFields):
+    """Message type for new order requests."""
 
     identifiers = josepy.Field("identifiers", omitempty=True)
-    not_before = josepy.Field("notBefore", omitempty=True)
-    not_after = josepy.Field("notAfter", omitempty=True)
+    not_before = acme.messages.fields.RFC3339Field("notBefore", omitempty=True)
+    not_after = acme.messages.fields.RFC3339Field("notAfter", omitempty=True)
 
     @classmethod
-    def from_data(cls, identifiers=None, not_before=None, not_after=None, **kwargs):
+    def from_data(cls, identifiers=None, not_before=None, not_after=None):
+        """Class factory that takes care of parsing the list of *identifiers*.
+
+        :param identifiers: The requested identifiers.
+        :type identifiers: Either a :class:`list` of :class:`dict` where each dict consists of the keys *type* \
+            and *value*, or a :class:`list` of :class:`str` that represent the DNS names.
+        :param not_before: The requested *notBefore* field in the certificate.
+        :type not_before: timezone-aware :class:`datetime.datetime`.
+        :param not_after: The requested *notAfter* field in the certificate.
+        :type not_after: timezone-aware :class:`datetime.datetime`.
+        :return: The new order object.
+        :rtype: :class:`NewOrder`
+        """
+        kwargs = {}
+
         if type(identifiers[0]) is dict:
             kwargs["identifiers"] = identifiers
         elif type(identifiers[0]) is str:
@@ -129,8 +183,13 @@ class NewOrder(ResourceBody):
         return cls(**kwargs)
 
 
-class Account(ResourceBody):
-    """Account Resource Body."""
+class Account(josepy.JSONObjectWithFields):
+    """Patched :class:`acme.messages.Registration` message type that adds a *kid* field.
+
+    This is the representation of a user account that the :class:`~acme_broker.client.AcmeClient` uses internally.
+    The *kid* field is sent to the remote server with every request and used for request verification.
+    Fields that see no use inside the client have been removed.
+    """
 
     status = josepy.Field("status", omitempty=True)
     contact = josepy.Field("contact", omitempty=True)
@@ -138,27 +197,13 @@ class Account(ResourceBody):
     kid = josepy.Field("kid")
 
 
-class Order(ResourceBody):
-    """Order Resource Body.
+class Order(acme.messages.Order):
+    """Patched :class:`acme.messages.Order` message type that adds a *URL* field.
 
-    Patched version of the acme module's order.
-    Allows storing the order's url."""
+    The *URL* field is populated by copying the *Location* header from responses in the
+    :class:`~acme_broker.client.AcmeClient`.
+    This field is used by the :class:`~acme_broker.server.AcmeProxy` to store the *proxied* URL and to be able
+    to map an internal to that of the remote CA.
+    """
 
     url = josepy.Field("url", omitempty=True)
-    identifiers = josepy.Field("identifiers", omitempty=True)
-    status = josepy.Field(
-        "status", decoder=acme.messages.Status.from_json, omitempty=True
-    )
-    authorizations = josepy.Field("authorizations", omitempty=True)
-    certificate = josepy.Field("certificate", omitempty=True)
-    finalize = josepy.Field("finalize", omitempty=True)
-    expires = acme.messages.fields.RFC3339Field("expires", omitempty=True)
-    error = josepy.Field("error", omitempty=True, decoder=acme.messages.Error.from_json)
-
-    @identifiers.decoder
-    def identifiers(
-        value,
-    ):  # pylint: disable=no-self-argument,missing-function-docstring
-        return tuple(
-            acme.messages.Identifier.from_json(identifier) for identifier in value
-        )

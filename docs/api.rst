@@ -52,3 +52,13 @@ ACME Proxy
 .. autoclass:: acme_broker.server.AcmeProxy
     :members:
     :show-inheritance:
+
+Models
+######
+
+Message types
+-------------
+
+.. automodule:: acme_broker.models.messages
+    :members:
+    :show-inheritance:
