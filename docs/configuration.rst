@@ -41,6 +41,7 @@ An ACME CA configuration file might look as follows:
         - '172.16.0.0/12'
         - '192.168.0.0/16'
         - '130.75.0.0/16'
+      reverse_proxy_host: 'my-ca.com'
 
 * db (required): The database connection string.
     At the moment, only PostgreSQL is supported.
@@ -63,6 +64,10 @@ An ACME CA configuration file might look as follows:
 * subnets (optional): Allowed subnets for all requests. Must be in CIDR notation.
     Hosts with an IP that is not part of any of these get a *503 Forbidden* HTTP error.
     Defaults to allowing any subnet if not specified.
+
+* reverse_proxy_host (optional): The reverse proxy's hostname. Required if deployed behind a reverse proxy.
+    The reverse proxy's hostname is needed so the app can identify *X-Forwarded-For* header spoofing.
+    Needs to be the FQDN of the actual host that clients connect to.
 
 To run a CA that issues self-signed certificates, the private key
 and root certificate may be generated using the following command:
@@ -96,6 +101,7 @@ For a broker, the file might looks as follows:
         - '172.16.0.0/12'
         - '192.168.0.0/16'
         - '130.75.0.0/16'
+      reverse_proxy_host: 'my-broker.com'
       client:
         directory: 'https://acme-v02.api.letsencrypt.org/directory'
         private_key: 'broker_client.key'
