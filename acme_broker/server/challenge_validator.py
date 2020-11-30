@@ -6,27 +6,35 @@ import logging
 import typing
 import dns.asyncresolver
 
-from acme_broker.models import ChallengeType
+from acme_broker.models import ChallengeType, Challenge
 
 logger = logging.getLogger(__name__)
 
 
 class CouldNotValidateChallenge(Exception):
+    """Exception that is raised when any given challenge could not be validated."""
+
     pass
 
 
 class ChallengeValidator(abc.ABC):
+    """An abstract base class for challenge validator clients.
+
+    All challenge validator implementations must implement the method :func:`validate_challenge`
+    that validates the given challenge.
+    """
+
     SUPPORTED_CHALLENGES: typing.Iterable[ChallengeType]
 
     @abc.abstractmethod
-    async def validate_challenge(self, challenge, **kwargs):
+    async def validate_challenge(self, challenge: Challenge, **kwargs):
         """Validate the given challenge.
 
         This method should attempt to validate the given challenge and
-        raise a CouldNotValidateChallenge exception if it did not succeed.
+        raise a :class:`CouldNotValidateChallenge` exception if the validation failed.
 
         :param challenge: The challenge to be validated
-        :type challenge: acme_broker.models.Challenge
+        :raises: :class:`CouldNotValidateChallenge` If the validation failed
         """
         pass
 
@@ -58,14 +66,28 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
 
         return resolved_ips
 
-    async def query_records(self, name):
+    async def query_records(self, name: str) -> typing.Set[str]:
+        """Queries DNS A and AAAA records.
+
+        :param name: Name of the A/AAAA record to query.
+        :return: Set of IPs that the A/AAAA records resolve to.
+        """
         resolved_ips = [
             await self._query_record(name, type_) for type_ in ("A", "AAAA")
         ]
 
         return set(itertools.chain.from_iterable(resolved_ips))
 
-    async def validate_challenge(self, challenge, request=None):
+    async def validate_challenge(self, challenge: Challenge, request=None):
+        """Validate the given challenge.
+
+        This method takes a challenge of :class:`ChallengeType` *DNS_01* or *HTTP_01*
+        and does not actually validate that challenge, but instead checks whether the corresponding
+        authorization's identifier resolves to the IP address that the validation request is being made from.
+
+        :param challenge: The challenge to be validated
+        :raises: :class:`CouldNotValidateChallenge` If the validation failed
+        """
         identifier = challenge.authorization.identifier.value
         logger.debug(
             "Validating challenge %s for identifier %s",
@@ -84,5 +106,15 @@ class DummyValidator(ChallengeValidator):
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
 
-    async def validate_challenge(self, challenge, **kwargs):
-        pass
+    async def validate_challenge(self, challenge: Challenge, **kwargs):
+        """Does not validate the given challenge.
+
+        Instead, this method only logs the mock validation attempt and pauses
+        execution for one second.
+
+        :param challenge: The challenge to be validated
+        """
+        logger.debug(
+            f"(not) validating challenge {challenge.challenge_id}, type {challenge.type}"
+        )
+        # await asyncio.sleep(1)

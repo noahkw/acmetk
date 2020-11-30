@@ -53,6 +53,13 @@ ACME Proxy
     :members:
     :show-inheritance:
 
+Challenge Validators
+--------------------
+
+.. automodule:: acme_broker.server.challenge_validator
+    :members:
+    :inherited-members:
+
 Models
 ######
 

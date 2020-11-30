@@ -8,6 +8,7 @@ import logging
 import acme.messages
 import dns.asyncresolver
 import josepy
+import typing
 from infoblox_client import connector, objects
 
 
@@ -15,9 +16,21 @@ logger = logging.getLogger(__name__)
 
 
 class ChallengeSolverType(enum.Enum):
+    """The types of challenges that a :class:`ChallengeSolver` implementation can support.
+
+    Used to register a challenge solver with an :class:`~acme_broker.client.AcmeClient` instance using
+    :func:`~acme_broker.client.AcmeClient.register_challenge_solver`
+    """
+
     HTTP_01 = "http-01"
+    """The ACME *http-01* challenge type.
+    See `8.3. HTTP Challenge <https://tools.ietf.org/html/rfc8555#section-8.3>`_"""
     DNS_01 = "dns-01"
+    """The ACME *dns-01* challenge type.
+    See `8.4. DNS Challenge <https://tools.ietf.org/html/rfc8555#section-8.4>`_"""
     TLS_ALPN_01 = "tls-alpn-01"
+    """The ACME *tls-alpn-01* challenge type.
+    See `RFC 8737 <https://tools.ietf.org/html/rfc8737>`_"""
 
 
 class ChallengeSolver(abc.ABC):
@@ -43,6 +56,7 @@ class ChallengeSolver(abc.ABC):
         :param key: The client's account key.
         :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to be completed.
+        :raises: :class:`asyncio.TimeoutError` If the challenge completion attempt timed out.
         """
         pass
 
@@ -50,7 +64,12 @@ class ChallengeSolver(abc.ABC):
 class DummySolver(ChallengeSolver):
     """Dummy challenge solver that does not actually complete any challenges."""
 
-    async def complete_challenge(self, key, identifier, challenge):
+    async def complete_challenge(
+        self,
+        key: josepy.jwk.JWKRSA,
+        identifier: acme.messages.Identifier,
+        challenge: acme.messages.ChallengeBody,
+    ):
         """Does not complete the given challenge.
 
         Instead, this method only logs the mock completion attempt and pauses
@@ -124,11 +143,11 @@ class InfobloxClient(ChallengeSolver):
             ]
         )
 
-    async def query_txt_record(self, name: str):
+    async def query_txt_record(self, name: str) -> typing.List[str]:
         """Queries a DNS TXT record.
 
         :param name: Name of the TXT record to query.
-        :return: Strings stored in the TXT record.
+        :return: List of strings stored in the TXT record.
         """
         txt_records = []
 
@@ -151,7 +170,12 @@ class InfobloxClient(ChallengeSolver):
 
             await asyncio.sleep(1.0)
 
-    async def complete_challenge(self, key, identifier, challenge):
+    async def complete_challenge(
+        self,
+        key: josepy.jwk.JWKRSA,
+        identifier: acme.messages.Identifier,
+        challenge: acme.messages.ChallengeBody,
+    ):
         """Complete the given DNS-01 challenge.
 
         This method provisions the TXT record needed to complete the given challenge.
@@ -161,6 +185,7 @@ class InfobloxClient(ChallengeSolver):
         :param key: The client's account key.
         :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to be completed.
+        :raises: :class:`asyncio.TimeoutError` If the challenge completion attempt timed out.
         """
         name = challenge.chall.validation_domain_name(identifier.value)
         text = challenge.chall.validation(key)
