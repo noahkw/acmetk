@@ -122,7 +122,7 @@ class AcmeServerBase:
 
     @classmethod
     async def create_app(cls, config, **kwargs):
-        """A class factory that also creates and initializes the database and session objects,
+        """A factory that also creates and initializes the database and session objects,
         reading the necessary arguments from the passed config dict.
 
         :param config: A dictionary holding the configuration. See :doc:`configuration` for supported options.

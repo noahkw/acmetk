@@ -69,3 +69,36 @@ Message types
 .. automodule:: acme_broker.models.messages
     :members:
     :show-inheritance:
+
+Database models
+---------------
+
+Account
+^^^^^^^
+.. autoclass:: acme_broker.models.account.Account
+    :members:
+
+Authorization
+^^^^^^^^^^^^^
+.. automodule:: acme_broker.models.authorization
+    :members:
+
+Certificate
+^^^^^^^^^^^
+.. autoclass:: acme_broker.models.certificate.Certificate
+    :members:
+
+Challenge
+^^^^^^^^^
+.. automodule:: acme_broker.models.challenge
+    :members:
+
+Identifier
+^^^^^^^^^^
+.. automodule:: acme_broker.models.identifier
+    :members:
+
+Order
+^^^^^
+.. autoclass:: acme_broker.models.order.Order
+    :members:
