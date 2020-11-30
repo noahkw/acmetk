@@ -69,6 +69,21 @@ class TestAcme:
 
         self.client_data = ClientData(client_account_key_path, csr, csr_path)
 
+        self._rmtree = ["client.csr"]
+
+    def tearDown(self):
+        for i in self._rmtree:
+            if Path(i).is_absolute():
+                log.error(f"{i} is not relative")
+                continue
+
+            if (path := self.path / i).is_dir():
+                log.info(f"rmtree {path}")
+                shutil.rmtree(path, ignore_errors=True)
+            elif path.is_file():
+                log.info(f"unlink {path}")
+                path.unlink()
+
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
 
@@ -96,21 +111,6 @@ class TestCA(TestAcme):
         acme_broker.util.generate_root_cert(
             ca_key_path, "DE", "Lower Saxony", "Hanover", "Acme Broker", "AB CA"
         )
-
-        self._rmtree = ["client.csr"]
-
-    def tearDown(self):
-        for i in self._rmtree:
-            if Path(i).is_absolute():
-                log.error(f"{i} is not relative")
-                continue
-
-            if (path := self.path / i).is_dir():
-                log.info(f"rmtree {path}")
-                shutil.rmtree(path, ignore_errors=True)
-            elif path.is_file():
-                log.info(f"unlink {path}")
-                path.unlink()
 
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
@@ -201,16 +201,25 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
 
         arg = " --domain ".join(self.domains)
         await self._run(f"certonly --webroot --webroot-path {self.path} --domain {arg}")
+
+    async def test_subdomain_revocation(self):
+        await self._run(f"register --agree-tos  -m {self.contact}")
+
+        arg = " --domain ".join(self.domains)
+        await self._run(f"certonly --webroot --webroot-path {self.path} --domain {arg}")
+
         arg = " --domain ".join(map(lambda s: f"dns.{s}", self.domains))
         await self._run(
             f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=dns --manual-auth-hook "
             f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
         )
+
         arg = " --domain ".join(map(lambda s: f"http.{s}", self.domains))
         await self._run(
             f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=http --manual-auth-hook "
             f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
         )
+
         for j in ["", "dns.", "http."]:
             try:
                 await self._run(
@@ -385,6 +394,9 @@ class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
 class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
+
+    async def test_subdomain_revocation(self):
+        await super().test_subdomain_revocation()
 
     async def test_skey_revocation(self):
         await super().test_skey_revocation()

@@ -40,6 +40,9 @@ class TestCertBotProxyLocalCA(
     async def test_run(self):
         await super().test_run()
 
+    async def test_subdomain_revocation(self):
+        await super().test_subdomain_revocation()
+
     async def test_skey_revocation(self):
         await super().test_skey_revocation()
 
@@ -86,6 +89,9 @@ class TestAcmetinyProxyLE(TestAcmetiny, TestProxyLE, unittest.IsolatedAsyncioTes
 class TestCertBotProxyLE(TestCertBot, TestProxyLE, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
+
+    async def test_subdomain_revocation(self):
+        await super().test_subdomain_revocation()
 
     async def test_skey_revocation(self):
         await super().test_skey_revocation()
