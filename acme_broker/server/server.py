@@ -667,6 +667,8 @@ class AcmeServerBase:
             if not order:
                 raise web.HTTPNotFound
 
+            await order.validate()
+
             return self._response(request, order.serialize(request))
 
     @routes.post("/orders/{id}", name="orders")
