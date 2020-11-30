@@ -1,5 +1,4 @@
-import functools
-import subprocess
+import asyncio
 import unittest
 from pathlib import Path
 
@@ -56,12 +55,10 @@ class TestDeployment(TestAcme):
 
         ssl._create_default_https_context = ssl._create_unverified_context
 
-        self.loop.run_in_executor(
-            None,
-            functools.partial(
-                subprocess.call, '/usr/sbin/nginx -g "daemon off;"', shell=True
-            ),
+        self.nginx_proc = await asyncio.create_subprocess_shell(
+            '/usr/sbin/nginx -g "daemon off;"', None, None
         )
+
         runner, ca = await AcmeCA.unix_socket(self.config_sec["ca"], "/tmp/app_1.sock")
         ca.register_challenge_validator(RequestIPDNSChallengeValidator())
 
@@ -70,12 +67,14 @@ class TestDeployment(TestAcme):
     async def asyncTearDown(self) -> None:
         await self.runner.shutdown()
         await self.runner.cleanup()
+        self.nginx_proc.kill()
 
 
 class TestAcmetinyCADeployment(
     TestAcmetiny, TestDeployment, unittest.IsolatedAsyncioTestCase
 ):
     async def test_run(self):
+        # TODO: fix, request.host is populated with '127.0.0.1:443' for some reason. Should only be the host IP.
         await super().test_run()
 
 
