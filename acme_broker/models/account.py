@@ -130,14 +130,16 @@ class Account(Entity, Serializer):
         elif upd.status:
             raise ValueError(f"Cannot set an account's status to {upd.status}")
 
-    def serialize(self, request=None):
+    def serialize(self, request=None) -> dict:
         d = super().serialize(request)
         d["orders"] = self.orders_url(request)
         d["contact"] = json.loads(self.contact)
         return d
 
     @classmethod
-    def from_obj(cls, jwk: josepy.jwk.JWK, obj: acme.messages.Registration):
+    def from_obj(
+        cls, jwk: josepy.jwk.JWK, obj: acme.messages.Registration
+    ) -> "Account":
         """A factory that constructs a new :class:`Account` from a message object.
 
         The *kid* is set to the passed JWK's SHA-256 hex digest and the *status* is set to *valid*.

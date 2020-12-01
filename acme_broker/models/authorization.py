@@ -55,11 +55,11 @@ class Authorization(Entity, Serializer):
         lazy="joined",
         foreign_keys=identifier_id,
     )
-    """The identifier associated with the authorization."""
+    """The :class:`~acme_broker.models.identifier.Identifier` associated with the authorization."""
     status = Column("status", Enum(AuthorizationStatus), nullable=False)
     """The authorization's status."""
     expires = Column(DateTime(timezone=True))
-    """The date from which the authorization is considered expired."""
+    """The :class:`datetime.datetime` from which the authorization is considered expired."""
     wildcard = Column(Boolean, nullable=False)
     """Whether the authorization contains a wildcard."""
     challenges = relationship(
@@ -71,7 +71,7 @@ class Authorization(Entity, Serializer):
     )
     """List of challenges (:class:`~acme_broker.models.challenge.Challenge`) associated with the authorization."""
 
-    def url(self, request):
+    def url(self, request) -> str:
         """Returns the authorization's URL.
 
         :param request: The client request needed to build the URL.
@@ -79,7 +79,7 @@ class Authorization(Entity, Serializer):
         """
         return url_for(request, "authz", id=str(self.authorization_id))
 
-    async def validate(self, session):
+    async def validate(self, session) -> AuthorizationStatus:
         """Validates the authorization.
 
         This method is usually not called directly. Rather, :func:`acme_broker.models.challenge.Challenge.validate`
@@ -139,7 +139,7 @@ class Authorization(Entity, Serializer):
         elif upd.status:
             raise ValueError(f"Cannot set an authorizations's status to {upd.status}")
 
-    def serialize(self, request=None):
+    def serialize(self, request=None) -> dict:
         d = super().serialize(self)
 
         # Section on which challenges to include:
@@ -167,7 +167,7 @@ class Authorization(Entity, Serializer):
         return d
 
     @classmethod
-    def for_identifier(cls, identifier):
+    def for_identifier(cls, identifier) -> "Authorization":
         """A factory that constructs a new authorization given an
         :class:`~acme_broker.models.identifier.Identifier`.
 
