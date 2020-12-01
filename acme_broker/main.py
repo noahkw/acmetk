@@ -11,7 +11,7 @@ import sys
 sys.path.append("/app/")  # for supervisord inside docker
 
 from acme_broker import AcmeBroker  # noqa
-from acme_broker.client import AcmeClient, ChallengeSolverType, InfobloxClient  # noqa
+from acme_broker.client import AcmeClient, InfobloxClient  # noqa
 from acme_broker.server import AcmeCA, RequestIPDNSChallengeValidator  # noqa
 from acme_broker.util import generate_root_cert, generate_rsa_key  # noqa
 
@@ -99,10 +99,7 @@ async def run_broker(config, path):
         contact=config["broker"]["client"]["contact"],
     )
 
-    broker_client.register_challenge_solver(
-        (ChallengeSolverType.DNS_01,),
-        infoblox_client,
-    )
+    broker_client.register_challenge_solver(infoblox_client)
 
     await broker_client.start()
     _, broker = await AcmeBroker.unix_socket(

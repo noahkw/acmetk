@@ -10,8 +10,7 @@ from acme import jws
 from aiohttp import ClientSession, ClientResponseError
 
 from acme_broker.client.challenge_solver import ChallengeSolver
-from acme_broker.client.challenge_solver import ChallengeSolverType
-from acme_broker.models import messages
+from acme_broker.models import messages, ChallengeType
 
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
@@ -282,7 +281,7 @@ class AcmeClient:
 
         challenge_types = set(
             [
-                ChallengeSolverType(challenge.chall.typ)
+                ChallengeType(challenge.chall.typ)
                 for authorization in authorizations
                 for challenge in authorization.challenges
             ]
@@ -307,7 +306,7 @@ class AcmeClient:
 
         for authorization in authorizations:
             for challenge in authorization.challenges:
-                if ChallengeSolverType(challenge.chall.typ) == chosen_challenge_type:
+                if ChallengeType(challenge.chall.typ) == chosen_challenge_type:
                     try:
                         await solver.complete_challenge(
                             self._private_key,
@@ -418,27 +417,23 @@ class AcmeClient:
 
     def register_challenge_solver(
         self,
-        types: typing.Iterable[ChallengeSolverType],
         challenge_solver: ChallengeSolver,
     ):
         """Registers a challenge solver with the client.
 
-        The challenge solver is used to complete authorizations' challenges whose types it is
-        registered for.
+        The challenge solver is used to complete authorizations' challenges whose types it supports.
 
-        :param types: The challenge solver's challenge types.
         :param challenge_solver: The challenge solver to register.
+        :raises: :class:`ValueError` If a challenge solver is already registered that supports any of
+            the challenge types that *challenge_solver* supports.
         """
-        for type_ in types:
-            if self._challenge_solvers.get(type_, None):
+        for challenge_type in challenge_solver.SUPPORTED_CHALLENGES:
+            if self._challenge_solvers.get(challenge_type):
                 raise ValueError(
-                    f"A challenge solver of type '{type_}' is already registered."
+                    f"A challenge solver for type {challenge_type} is already registered"
                 )
             else:
-                logger.debug(
-                    f"Registering {type(challenge_solver).__name__} as the Challenge Solver for types {types}"
-                )
-                self._challenge_solvers[type_] = challenge_solver
+                self._challenge_solvers[challenge_type] = challenge_solver
 
     async def _poll_until(
         self,

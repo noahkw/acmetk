@@ -13,7 +13,6 @@ import acme_broker.util
 from acme_broker import AcmeCA
 from acme_broker.client import (
     AcmeClient,
-    ChallengeSolverType,
     DummySolver,
 )
 from acme_broker.main import load_config
@@ -278,10 +277,7 @@ class TestOurClient:
             server_cert=self.config_sec.get("client", {}).get("server_cert", None),
         )
 
-        client.register_challenge_solver(
-            (ChallengeSolverType.DNS_01,),
-            DummySolver(),
-        )
+        client.register_challenge_solver(DummySolver())
 
         return client
 

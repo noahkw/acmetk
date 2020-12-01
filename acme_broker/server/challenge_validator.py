@@ -25,6 +25,7 @@ class ChallengeValidator(abc.ABC):
     """
 
     SUPPORTED_CHALLENGES: typing.Iterable[ChallengeType]
+    """The types of challenges that the challenge validator implementation supports."""
 
     @abc.abstractmethod
     async def validate_challenge(self, challenge: Challenge, **kwargs):
@@ -49,6 +50,7 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
     """
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
+    """The types of challenges that the validator supports."""
 
     async def _query_record(self, name, type_):
         resolved_ips = []
@@ -105,6 +107,7 @@ class DummyValidator(ChallengeValidator):
     """Does not do any validation and reports every challenge as valid."""
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
+    """The types of challenges that the validator supports."""
 
     async def validate_challenge(self, challenge: Challenge, **kwargs):
         """Does not validate the given challenge.

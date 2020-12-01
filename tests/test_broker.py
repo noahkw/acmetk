@@ -9,7 +9,6 @@ from acme_broker import AcmeCA, AcmeBroker
 from acme_broker.client import (
     AcmeClient,
     InfobloxClient,
-    ChallengeSolverType,
     DummySolver,
 )
 from acme_broker.server import DummyValidator
@@ -87,10 +86,7 @@ class TestBrokerLocalCA(TestBroker):
             contact=self.config_sec["broker"]["client"]["contact"],
         )
 
-        broker_client.register_challenge_solver(
-            (ChallengeSolverType.DNS_01,),
-            DummySolver(),
-        )
+        broker_client.register_challenge_solver(DummySolver())
 
         broker = await self._cls.create_app(
             self.config_sec["broker"], client=broker_client
@@ -179,9 +175,7 @@ class TestBrokerLE(TestBroker):
         self.infoblox_client = InfobloxClient(**self._config["infoblox"])
         await self.infoblox_client.connect()
 
-        self.broker_client.register_challenge_solver(
-            (ChallengeSolverType.DNS_01,), self.infoblox_client
-        )
+        self.broker_client.register_challenge_solver(self.infoblox_client)
 
 
 class TestAcmetinyBrokerLE(

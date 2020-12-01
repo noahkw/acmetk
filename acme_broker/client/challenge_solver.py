@@ -1,7 +1,6 @@
 import abc
 import asyncio
 import contextlib
-import enum
 import functools
 import logging
 
@@ -11,26 +10,10 @@ import josepy
 import typing
 from infoblox_client import connector, objects
 
+from acme_broker.models import ChallengeType
+
 
 logger = logging.getLogger(__name__)
-
-
-class ChallengeSolverType(enum.Enum):
-    """The types of challenges that a :class:`ChallengeSolver` implementation can support.
-
-    Used to register a challenge solver with an :class:`~acme_broker.client.AcmeClient` instance using
-    :func:`~acme_broker.client.AcmeClient.register_challenge_solver`
-    """
-
-    HTTP_01 = "http-01"
-    """The ACME *http-01* challenge type.
-    See `8.3. HTTP Challenge <https://tools.ietf.org/html/rfc8555#section-8.3>`_"""
-    DNS_01 = "dns-01"
-    """The ACME *dns-01* challenge type.
-    See `8.4. DNS Challenge <https://tools.ietf.org/html/rfc8555#section-8.4>`_"""
-    TLS_ALPN_01 = "tls-alpn-01"
-    """The ACME *tls-alpn-01* challenge type.
-    See `RFC 8737 <https://tools.ietf.org/html/rfc8737>`_"""
 
 
 class ChallengeSolver(abc.ABC):
@@ -40,6 +23,9 @@ class ChallengeSolver(abc.ABC):
     that provisions the resources that are needed to complete the given challenge and delays execution until
     the server may check for completion.
     """
+
+    SUPPORTED_CHALLENGES: typing.Iterable[ChallengeType]
+    """The types of challenges that the challenge solver implementation supports."""
 
     @abc.abstractmethod
     async def complete_challenge(
@@ -63,6 +49,9 @@ class ChallengeSolver(abc.ABC):
 
 class DummySolver(ChallengeSolver):
     """Dummy challenge solver that does not actually complete any challenges."""
+
+    SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
+    """The types of challenges that the solver supports."""
 
     async def complete_challenge(
         self,
@@ -91,6 +80,9 @@ class InfobloxClient(ChallengeSolver):
     This challenge solver connects to an InfoBlox API to provision
     DNS TXT records in order to complete the ACME DNS-01 challenge type.
     """
+
+    SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01])
+    """The types of challenges that the solver supports."""
 
     POLLING_DELAY = 1.0
     """Time in seconds between consecutive DNS requests."""
