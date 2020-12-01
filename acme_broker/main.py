@@ -6,18 +6,14 @@ from pathlib import Path
 import click
 import yaml
 
-import sys
-
-sys.path.append("/app/")  # for supervisord inside docker
-
-from acme_broker import AcmeBroker  # noqa
-from acme_broker.client import AcmeClient, InfobloxClient  # noqa
-from acme_broker.server import (  # noqa
+from acme_broker import AcmeBroker
+from acme_broker.client import AcmeClient, InfobloxClient
+from acme_broker.server import (
     AcmeServerBase,
     AcmeCA,
     RequestIPDNSChallengeValidator,
 )
-from acme_broker.util import generate_root_cert, generate_rsa_key  # noqa
+from acme_broker.util import generate_root_cert, generate_rsa_key
 
 logger = logging.getLogger(__name__)
 
