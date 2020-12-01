@@ -72,6 +72,13 @@ class AcmeServerBase:
     )
     """The JWS signing algorithms that the server supports."""
 
+    subclasses = []
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if getattr(cls, "config_name", None):
+            cls.subclasses.append(cls)
+
     def __init__(
         self,
         *,
@@ -883,6 +890,8 @@ class AcmeServerBase:
 class AcmeCA(AcmeServerBase):
     """ACME compliant Certificate Authority."""
 
+    config_name = "ca"
+
     def __init__(self, *, cert, private_key, **kwargs):
         super().__init__(**kwargs)
 
@@ -1071,6 +1080,8 @@ class AcmeBroker(AcmeRelayBase):
     the :class:`AcmeProxy` class should be used instead.
     """
 
+    config_name = "broker"
+
     async def handle_order_finalize(self, kid: str, order_id: str):
         """Method that handles the actual finalization of an order.
 
@@ -1115,6 +1126,8 @@ class AcmeProxy(AcmeRelayBase):
     Orders are relayed to the remote CA transparently, which allows for
     the possibility to show errors to the end user as they occur at the remote CA.
     """
+
+    config_name = "proxy"
 
     # @routes.post("/new-order", name="new-order")
     async def new_order(self, request):

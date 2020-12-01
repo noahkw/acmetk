@@ -12,13 +12,17 @@ sys.path.append("/app/")  # for supervisord inside docker
 
 from acme_broker import AcmeBroker  # noqa
 from acme_broker.client import AcmeClient, InfobloxClient  # noqa
-from acme_broker.server import AcmeCA, RequestIPDNSChallengeValidator  # noqa
+from acme_broker.server import (  # noqa
+    AcmeServerBase,
+    AcmeCA,
+    RequestIPDNSChallengeValidator,
+)
 from acme_broker.util import generate_root_cert, generate_rsa_key  # noqa
 
 logger = logging.getLogger(__name__)
 
 
-APP_NAMES = ("broker", "ca")
+server_apps = {app.config_name: app for app in AcmeServerBase.subclasses}
 
 
 def load_config(config_file):
@@ -64,22 +68,28 @@ def run(config_file, path):
     """Starts the app as defined in the config file"""
     config = load_config(config_file)
 
-    if (app := list(config.keys())[0]) not in APP_NAMES:
+    app_config_name = list(config.keys())[0]
+
+    if app_config_name not in server_apps.keys():
         raise click.UsageError(
-            f"Cannot run app '{app}'. Valid options: {', '.join(APP_NAMES)}. "
+            f"Cannot run app '{app_config_name}'. Valid options: "
+            f"{', '.join([app for app in server_apps.keys()])}. "
             f"Please check your config file '{config_file}' and rename the main section accordingly."
         )
 
     loop = asyncio.get_event_loop()
 
-    if app == "broker":
+    app_class = server_apps[app_config_name]
+
+    click.echo(f"Starting {app_class.__name__} at {path}")
+
+    if app_class is AcmeBroker:
         loop.run_until_complete(run_broker(config, path))
-    elif app == "ca":
+    elif app_class is AcmeCA:
         loop.run_until_complete(run_ca(config, path))
 
 
 async def run_ca(config, path):
-    click.echo(f"Starting ACME CA at {path}")
     _, ca = await AcmeCA.unix_socket(config["ca"], path)
     ca.register_challenge_validator(RequestIPDNSChallengeValidator())
 
@@ -88,8 +98,6 @@ async def run_ca(config, path):
 
 
 async def run_broker(config, path):
-    click.echo(f"Starting ACME Broker at {path}")
-
     infoblox_client = InfobloxClient(**config["broker"]["client"]["infoblox"])
     await infoblox_client.connect()
 
