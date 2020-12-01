@@ -22,7 +22,7 @@ class ChallengeStatus(str, enum.Enum):
 class ChallengeType(str, enum.Enum):
     """The types that a :class:`Challenge` can have.
 
-    Subclassing str simplifies json serialization using json.dumps
+    Subclassing :class:`str` simplifies json serialization using :func:`json.dumps`.
     """
 
     HTTP_01 = "http-01"

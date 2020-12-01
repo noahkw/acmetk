@@ -4,7 +4,6 @@ import json
 import typing
 import acme.messages
 import josepy
-from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from sqlalchemy import Column, Enum, String, types, JSON, Integer, ForeignKey
 from sqlalchemy.orm import relationship
@@ -103,7 +102,7 @@ class Account(Entity, Serializer):
             for identifier in identifiers
         )
 
-    def validate_cert(self, cert: x509.Certificate) -> bool:
+    def validate_cert(self, cert: "cryptography.x509.Certificate") -> bool:
         """Validates whether the account holds authorizations for all names present in the certificate.
 
         :param cert: The certificate to validate.
@@ -113,13 +112,12 @@ class Account(Entity, Serializer):
             self.authorized_identifiers(lower=True)
         )
 
-    def update(self, upd):
+    def update(self, upd: "acme_broker.models.messages.AccountUpdate"):
         """Updates the account with new information.
 
         Possible updates are currently to the :attr:`contact` field and to the :attr:`status` field.
 
         :param upd: The requested updates.
-        :type upd: :class:`acme_broker.models.messages.AccountUpdate`
         """
         if contact := upd.contact:
             self.contact = json.dumps(contact)

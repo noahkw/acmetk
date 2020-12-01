@@ -203,7 +203,7 @@ class Order(acme.messages.Order):
     The *URL* field is populated by copying the *Location* header from responses in the
     :class:`~acme_broker.client.AcmeClient`.
     This field is used by the :class:`~acme_broker.server.AcmeProxy` to store the *proxied* URL and to be able
-    to map an internal to that of the remote CA.
+    to map an internal order to that of the remote CA.
     """
 
     url = josepy.Field("url", omitempty=True)

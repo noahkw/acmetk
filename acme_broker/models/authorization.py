@@ -123,11 +123,10 @@ class Authorization(Entity, Serializer):
         """
         return datetime.now(timezone.utc) > self.expires
 
-    def update(self, upd):
+    def update(self, upd: "acme_broker.models.messages.AuthorizationUpdate"):
         """Updates the authoziation's status.
 
         :param upd: The requested status update.
-        :type upd: :class:`acme_broker.models.messages.AuthorizationUpdate`
         """
 
         # the only allowed state transition is VALID -> DEACTIVATED if requested by the client
@@ -167,7 +166,9 @@ class Authorization(Entity, Serializer):
         return d
 
     @classmethod
-    def for_identifier(cls, identifier) -> "Authorization":
+    def for_identifier(
+        cls, identifier: "acme_broker.models.identifier.Identifier"
+    ) -> "Authorization":
         """A factory that constructs a new authorization given an
         :class:`~acme_broker.models.identifier.Identifier`.
 
@@ -177,7 +178,6 @@ class Authorization(Entity, Serializer):
         The resulting authorization is **not** automatically associated with the given identifier.
 
         :param identifier: The identifier that the authorization will be associated with.
-        :type identifier: acme_broker.models.identifier.Identifier
         :return: The constructed authorization.
         """
         return cls(

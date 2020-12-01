@@ -80,7 +80,7 @@ Account
 
 Authorization
 ^^^^^^^^^^^^^
-.. automodule:: acme_broker.models.authorization
+.. autoclass:: acme_broker.models.authorization.Authorization
     :members:
 
 Certificate
@@ -90,7 +90,10 @@ Certificate
 
 Challenge
 ^^^^^^^^^
-.. automodule:: acme_broker.models.challenge
+.. autoclass:: acme_broker.models.challenge.Challenge
+    :members:
+
+.. autoclass:: acme_broker.models.challenge.ChallengeType
     :members:
 
 Identifier

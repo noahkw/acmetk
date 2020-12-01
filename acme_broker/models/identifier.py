@@ -6,13 +6,27 @@ from sqlalchemy.orm import relationship
 
 from .base import Serializer, Entity
 
+import acme.messages
+
 
 class IdentifierType(str, enum.Enum):
-    # subclassing str simplifies json serialization using json.dumps
+    """The types that a :class:`Identifier` can have.
+
+    `9.7.7. Identifier Types <https://tools.ietf.org/html/rfc8555#section-9.7.7>`_
+
+    Subclassing :class:`str` simplifies json serialization using :func:`json.dumps`.
+    """
+
     DNS = "dns"
+    """The ACME *DNS* identifier type."""
 
 
 class Identifier(Entity, Serializer):
+    """Database model for ACME identifier objects.
+
+    `8. Identifier Validation Challenges <https://tools.ietf.org/html/rfc8555#section-8>`_
+    """
+
     __tablename__ = "identifiers"
     __serialize__ = __diff__ = frozenset(["type", "value"])
     __mapper_args__ = {
@@ -21,12 +35,16 @@ class Identifier(Entity, Serializer):
 
     _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
     identifier_id = Column(Integer, primary_key=True)
+    """The identifier's ID."""
     type = Column("type", Enum(IdentifierType))
+    """The identifier's type (:class:`IdentifierType`)."""
     value = Column(String)
+    """The identifier's value. In the case of a *dns* type identifier: the FQDN."""
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.order_id"), nullable=False)
     order = relationship(
         "Order", back_populates="identifiers", lazy="joined", foreign_keys=order_id
     )
+    """The :class:`~acme_broker.models.order.Order` associated with the identifier."""
     authorization = relationship(
         "Authorization",
         cascade="all, delete",
@@ -35,7 +53,13 @@ class Identifier(Entity, Serializer):
         single_parent=True,
         foreign_keys="Authorization.identifier_id",
     )
+    """The :class:`~acme_broker.models.authorization.Authorization` associated with the identifier."""
 
     @classmethod
-    def from_obj(cls, obj):
+    def from_obj(cls, obj: acme.messages.Identifier) -> "Identifier":
+        """A factory that constructs a new :class:`Identifier` from a message object.
+
+        :param obj: The identifier message object.
+        :return: The constructed identifier.
+        """
         return cls(type=IdentifierType(obj.typ.name), value=obj.value)
