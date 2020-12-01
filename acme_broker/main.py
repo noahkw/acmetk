@@ -90,7 +90,7 @@ async def run_ca(config, path):
 async def run_broker(config, path):
     click.echo(f"Starting ACME Broker at {path}")
 
-    infoblox_client = InfobloxClient(**config["broker"]["infoblox"])
+    infoblox_client = InfobloxClient(**config["broker"]["client"]["infoblox"])
     await infoblox_client.connect()
 
     broker_client = AcmeClient(

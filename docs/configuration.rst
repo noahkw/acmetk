@@ -108,6 +108,10 @@ For a broker, the file might looks as follows:
         contact:
           phone: '555-1234'
           email: 'brokerclient@luis.uni-hannover.de'
+        infoblox:
+          host: 'ipam.uni-hannover.de'
+          username: 'infobloxuser'
+          password: 'infobloxpassw'
 
 Refer to section `ACME Certificate Authority`_ for the options *db*, *rsa_min_keysize*,
 *tos_url*, *mail_suffixes*, and *subnets*.
@@ -115,11 +119,35 @@ The *client* section inside the main *broker* section configures the internal
 :class:`~acme_broker.client.AcmeClient` that is used to communicate with the actual CA.
 Refer to section `ACME Client`_ for a description of the possible options.
 
+Challenge Validator Plugins
+###########################
+
+Every type of ACME server app needs an internal challenge validator.
+There are currently two types of challenge validator, both of which do not require configuration:
+:class:`~acme_broker.server.challenge_validator.DummyValidator` and
+:class:`~acme_broker.server.challenge_validator.RequestIPDNSChallengeValidator`.
+
+The :class:`~acme_broker.server.challenge_validator.DummyValidator` does not do any actual validation and should only
+be used in testing, as it is inherently insecure.
+
+The :class:`~acme_broker.server.challenge_validator.RequestIPDNSChallengeValidator` may be used in university or
+corporate environments where the *DNS-01* or *HTTP-01* challenge are difficult to realize.
+It does not validate any actual ACME challenge, but instead checks whether the DNS identifier that is
+to be authorized resolves to the host's IP address that requested challenge validation via an A or AAAA record.
+To achieve this, the *DNS-01* and *HTTP-01* challenge are repurposed, so that no further client-side configuration is
+required.
+
 ACME Client
 ###########
 
 The ACME client is usually configured as a part of an :class:`~acme_broker.server.AcmeBroker`
 or :class:`~acme_broker.server.AcmeProxy` app.
+
+The *infoblox* section inside the main *client* section configures the internal
+:class:`~acme_broker.client.challenge_solver.InfobloxClient`, which provisions TXT records to complete
+ACME *DNS-01* challenges.
+Refer to section `Challenge Solver Plugins`_ for a list of all available challenge solvers and their respective
+configuration options.
 
 The *client* block inside the respective app's surrounding configuration block might look as follows:
 
@@ -131,6 +159,10 @@ The *client* block inside the respective app's surrounding configuration block m
     contact:
       phone: '555-1234'
       email: 'brokerclient@luis.uni-hannover.de'
+    infoblox:
+      host: 'ipam.uni-hannover.de'
+      username: 'infobloxuser'
+      password: 'infobloxpassw'
 
 * directory (required): The directory URL of the ACME CA that the client should communicate with.
     Usually, this will be Let's Encrypt or a similar ACME CA that issues free Domain Validation certificates.
@@ -140,3 +172,31 @@ The *client* block inside the respective app's surrounding configuration block m
 
 * contact (optional): Contact information that is sent to the CA on account creation.
     Should contain a string *phone* with a phone number, a string *email* with an email address, or both.
+
+Challenge Solver Plugins
+########################
+
+Each challenge solver plugin listed here is configured as a block inside the main *client* section.
+
+Dummy Solver
+------------
+
+The :class:`~acme_broker.client.challenge_solver.DummySolver` is a mock solver mainly used in testing and does not
+require any configuration.
+However, it should not be used in production as it does not actually solve any challenges, it only logs
+its "attempts" and pauses execution for a second.
+
+Infoblox Client
+---------------
+
+The :class:`~acme_broker.client.challenge_solver.InfobloxClient` is a *DNS-01* challenge solver that integrates
+with an `Infoblox <https://www.infoblox.com/>`_ instance to provision TXT records.
+
+The *infoblox* block inside the respective client's surrounding configuration block might look as follows:
+
+.. code-block:: yaml
+
+  infoblox:
+    host: 'ipam.uni-hannover.de'
+    username: 'infobloxuser'
+    password: 'infobloxpassw'
