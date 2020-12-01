@@ -8,7 +8,6 @@ import acme.messages
 import josepy
 from acme import jws
 from aiohttp import ClientSession, ClientResponseError
-from cryptography import x509
 
 from acme_broker.client.challenge_solver import ChallengeSolver
 from acme_broker.client.challenge_solver import ChallengeSolverType
@@ -54,7 +53,9 @@ class AcmeClient:
     """ACME compliant client."""
 
     FINALIZE_DELAY = 3.0
+    """The delay in seconds between finalization attemps."""
     INVALID_NONCE_RETRIES = 5
+    """The number of times the client should retry when the server returns the error *badNonce*."""
 
     def __init__(
         self, *, directory_url, private_key, contact=None, server_cert: Path = None
@@ -112,7 +113,7 @@ class AcmeClient:
 
         await self.account_register(**self._contact)
 
-    async def account_register(self, email=None, phone=None) -> None:
+    async def account_register(self, email: str = None, phone: str = None) -> None:
         """Registers an account with the CA.
 
         Also sends the given contact information and stores the account internally
@@ -123,9 +124,7 @@ class AcmeClient:
         registered or fetched automatically in :meth:`start`.
 
         :param email: The contact email
-        :type email: :class:`str`
         :param phone: The contact phone number
-        :type phone: :class:`str`
         :raises: :class:`acme.messages.Error` If the server rejects any of the contact information or the private
             key.
         """
@@ -191,7 +190,7 @@ class AcmeClient:
         return messages.Order.from_json(order_obj)
 
     async def order_finalize(
-        self, order: messages.Order, csr: x509.CertificateSigningRequest
+        self, order: messages.Order, csr: "cryptography.x509.CertificateSigningRequest"
     ) -> messages.Order:
         """Finalizes the order using the given CSR.
 
@@ -397,7 +396,9 @@ class AcmeClient:
         return pem
 
     async def certificate_revoke(
-        self, certificate: x509.Certificate, reason: messages.RevocationReason = None
+        self,
+        certificate: "cryptography.x509.Certificate",
+        reason: messages.RevocationReason = None,
     ) -> bool:
         """Revokes the given certificate.
 
