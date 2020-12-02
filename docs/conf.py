@@ -15,6 +15,11 @@ import sys
 
 sys.path.insert(0, os.path.abspath(".."))
 
+# -- Variables ---------------------------------------------------------------
+
+rst_prolog = """
+.. |GIT_URL| replace:: https://gitlab.uni-hannover.de/ma-woehler/acme-broker.git
+"""
 
 # -- Project information -----------------------------------------------------
 
@@ -28,7 +33,12 @@ author = "Noah Wöhler"
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ["sphinx.ext.autodoc", "sphinx.ext.intersphinx"]
+extensions = [
+    "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
+    "sphinx-prompt",
+    "sphinx_substitution_extensions",
+]
 
 intersphinx_mapping = {
     "aiohttp": ("https://docs.aiohttp.org/en/latest/", None),

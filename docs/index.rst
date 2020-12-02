@@ -7,9 +7,10 @@ Welcome to ACME Broker's documentation!
 =======================================
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 3
    :caption: Contents:
 
+   installation
    configuration
    api
 
