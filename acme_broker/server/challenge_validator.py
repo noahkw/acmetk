@@ -22,10 +22,22 @@ class ChallengeValidator(abc.ABC):
 
     All challenge validator implementations must implement the method :func:`validate_challenge`
     that validates the given challenge.
+    Implementations must also set the :attr:`config_name` attribute, so that the CLI script knows which
+    configuration option corresponds to which challenge validator class.
     """
+
+    config_name: str
+    """The string that maps to the validator implementation inside configuration files."""
 
     SUPPORTED_CHALLENGES: typing.Iterable[ChallengeType]
     """The types of challenges that the challenge validator implementation supports."""
+
+    subclasses = []
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if getattr(cls, "config_name", None):
+            cls.subclasses.append(cls)
 
     @abc.abstractmethod
     async def validate_challenge(self, challenge: Challenge, **kwargs):
@@ -48,6 +60,8 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
     authorization's identifier resolves to the IP that the validation
     request is being made from by checking for a A/AAAA record.
     """
+
+    config_name = "requestipdns"
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
     """The types of challenges that the validator supports."""
@@ -105,6 +119,8 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
 
 class DummyValidator(ChallengeValidator):
     """Does not do any validation and reports every challenge as valid."""
+
+    config_name = "dummy"
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
     """The types of challenges that the validator supports."""

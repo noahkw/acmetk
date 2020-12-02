@@ -30,6 +30,7 @@ An ACME CA configuration file might look as follows:
       db: 'postgresql+asyncpg://user:password@host:5432/db'
       cert: '/app/certs/root.crt'
       private_key: '/app/certs/root.key'
+      challenge_validator: 'requestipdns'
       rsa_min_keysize: 2048
       tos_url: 'https://my-ca.com/tos'
       mail_suffixes:
@@ -51,6 +52,9 @@ An ACME CA configuration file might look as follows:
 
 * private_key (required): Private key that corresponds to the root cert.
     Used to sign client certificates.
+
+* challenge_validator (required): The plugin that validates challenges.
+    Refer to `Challenge Validator Plugins`_ for a list of possible options.
 
 * rsa_min_keysize (optional): The minimum supported keysize for CSR and account RSA keys.
     Defaults to *2048* if not specified.
@@ -90,6 +94,7 @@ For a broker, the file might looks as follows:
 
     broker:
       db: 'postgresql+asyncpg://user:password@host:5432/db'
+      challenge_validator: 'requestipdns'
       rsa_min_keysize: 2048
       tos_url: 'https://my-broker.com/tos'
       mail_suffixes:
@@ -113,8 +118,8 @@ For a broker, the file might looks as follows:
           username: 'infobloxuser'
           password: 'infobloxpassw'
 
-Refer to section `ACME Certificate Authority`_ for the options *db*, *rsa_min_keysize*,
-*tos_url*, *mail_suffixes*, and *subnets*.
+Refer to section `ACME Certificate Authority`_ for the options *db*, *challenge_validator*,
+*rsa_min_keysize*, *tos_url*, *mail_suffixes*, and *subnets*.
 The *client* section inside the main *broker* section configures the internal
 :class:`~acme_broker.client.AcmeClient` that is used to communicate with the actual CA.
 Refer to section `ACME Client`_ for a description of the possible options.
@@ -126,6 +131,8 @@ Every type of ACME server app needs an internal challenge validator.
 There are currently two types of challenge validator, both of which do not require configuration:
 :class:`~acme_broker.server.challenge_validator.DummyValidator` and
 :class:`~acme_broker.server.challenge_validator.RequestIPDNSChallengeValidator`.
+To use the former, set *challenge_validator* to :code:`'dummy'` in the server app's section in the config file.
+For the latter put :code:`'requestipdns'`.
 
 The :class:`~acme_broker.server.challenge_validator.DummyValidator` does not do any actual validation and should only
 be used in testing, as it is inherently insecure.
@@ -143,12 +150,6 @@ ACME Client
 The ACME client is usually configured as a part of an :class:`~acme_broker.server.AcmeBroker`
 or :class:`~acme_broker.server.AcmeProxy` app.
 
-The *infoblox* section inside the main *client* section configures the internal
-:class:`~acme_broker.client.challenge_solver.InfobloxClient`, which provisions TXT records to complete
-ACME *DNS-01* challenges.
-Refer to section `Challenge Solver Plugins`_ for a list of all available challenge solvers and their respective
-configuration options.
-
 The *client* block inside the respective app's surrounding configuration block might look as follows:
 
 .. code-block:: yaml
@@ -156,19 +157,23 @@ The *client* block inside the respective app's surrounding configuration block m
   client:
     directory: 'https://acme-v02.api.letsencrypt.org/directory'
     private_key: 'broker_client.key'
+    challenge_solver:
+      infoblox:
+        host: 'ipam.uni-hannover.de'
+        username: 'infobloxuser'
+        password: 'infobloxpassw'
     contact:
       phone: '555-1234'
       email: 'brokerclient@luis.uni-hannover.de'
-    infoblox:
-      host: 'ipam.uni-hannover.de'
-      username: 'infobloxuser'
-      password: 'infobloxpassw'
 
 * directory (required): The directory URL of the ACME CA that the client should communicate with.
     Usually, this will be Let's Encrypt or a similar ACME CA that issues free Domain Validation certificates.
 
 * private_key (required): The RSA private key in PEM format that is used to sign requests sent to the CA.
     May be generated with :code:`python -m acme_broker generate-keys`.
+
+* challenge_solver (required): Contains the configuration for the plugin that completes challenges.
+    Refer to `Challenge Solver Plugins`_ for a list of possible options.
 
 * contact (optional): Contact information that is sent to the CA on account creation.
     Should contain a string *phone* with a phone number, a string *email* with an email address, or both.
@@ -185,6 +190,15 @@ The :class:`~acme_broker.client.challenge_solver.DummySolver` is a mock solver m
 require any configuration.
 However, it should not be used in production as it does not actually solve any challenges, it only logs
 its "attempts" and pauses execution for a second.
+To configure a client to use it, set up the *challenge_solver* section inside the surrounding client configuration
+block as follows:
+
+.. code-block:: yaml
+
+  challenge_solver:
+    dummy:
+    # There are no configuration options
+
 
 Infoblox Client
 ---------------
@@ -192,11 +206,12 @@ Infoblox Client
 The :class:`~acme_broker.client.challenge_solver.InfobloxClient` is a *DNS-01* challenge solver that integrates
 with an `Infoblox <https://www.infoblox.com/>`_ instance to provision TXT records.
 
-The *infoblox* block inside the respective client's surrounding configuration block might look as follows:
+The *challenge_solver* section inside the respective client's surrounding configuration block might look as follows:
 
 .. code-block:: yaml
 
-  infoblox:
-    host: 'ipam.uni-hannover.de'
-    username: 'infobloxuser'
-    password: 'infobloxpassw'
+  challenge_solver:
+    infoblox:
+      host: 'ipam.uni-hannover.de'
+      username: 'infobloxuser'
+      password: 'infobloxpassw'

@@ -60,7 +60,14 @@ class AcmeResponse(web.Response):
 
 
 class AcmeServerBase:
-    """Base class for an ACME compliant server."""
+    """Base class for an ACME compliant server.
+
+    Implementations must set the :attr:`config_name` attribute, so that the CLI script knows which
+    configuration option corresponds to which server class.
+    """
+
+    config_name: str
+    """The string that maps to the server implementation inside configuration files."""
 
     SUPPORTED_JWS_ALGORITHMS = (
         josepy.RS256,

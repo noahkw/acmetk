@@ -22,10 +22,29 @@ class ChallengeSolver(abc.ABC):
     All challenge solver implementations must implement the method :func:`complete_challenge`
     that provisions the resources that are needed to complete the given challenge and delays execution until
     the server may check for completion.
+    Implementations must also set the :attr:`config_name` attribute, so that the CLI script knows which
+    configuration option corresponds to which challenge solver class.
     """
+
+    config_name: str
+    """The string that maps to the solver implementation inside configuration files."""
 
     SUPPORTED_CHALLENGES: typing.Iterable[ChallengeType]
     """The types of challenges that the challenge solver implementation supports."""
+
+    subclasses = []
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if getattr(cls, "config_name", None):
+            cls.subclasses.append(cls)
+
+    async def connect(self):
+        """Handles connecting the solver implementation to its remote API.
+
+        Must not be overridden if no initial connection is required.
+        """
+        pass
 
     @abc.abstractmethod
     async def complete_challenge(
@@ -49,6 +68,8 @@ class ChallengeSolver(abc.ABC):
 
 class DummySolver(ChallengeSolver):
     """Dummy challenge solver that does not actually complete any challenges."""
+
+    config_name = "dummy"
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
     """The types of challenges that the solver supports."""
@@ -80,6 +101,8 @@ class InfobloxClient(ChallengeSolver):
     This challenge solver connects to an InfoBlox API to provision
     DNS TXT records in order to complete the ACME DNS-01 challenge type.
     """
+
+    config_name = "infoblox"
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01])
     """The types of challenges that the solver supports."""
