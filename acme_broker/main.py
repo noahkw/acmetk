@@ -26,6 +26,10 @@ challenge_validators = {
     validator.config_name: validator for validator in ChallengeValidator.subclasses
 }
 
+PATH_OR_HOST_AND_PORT_MSG = (
+    "Must specify either the path of the unix socket or the hostname + port."
+)
+
 
 def load_config(config_file):
     with open(config_file, "r") as stream:
@@ -120,7 +124,7 @@ def run(config_file, path):
 
     app_class = server_apps[app_config_name]
 
-    click.echo(f"Starting {app_class.__name__} at {path}")
+    click.echo(f"Starting {app_class.__name__}")
 
     if app_class is AcmeBroker:
         loop.run_until_complete(run_broker(config, path))
@@ -135,8 +139,10 @@ async def run_ca(config, path):
 
     if path:
         _, ca = await AcmeCA.unix_socket(config["ca"], path)
-    else:
+    elif config["ca"]["hostname"] and config["ca"]["port"]:
         _, ca = await AcmeCA.runner(config["ca"])
+    else:
+        raise click.UsageError(PATH_OR_HOST_AND_PORT_MSG)
 
     ca.register_challenge_validator(challenge_validator)
 
@@ -166,8 +172,10 @@ async def run_broker(config, path):
         _, broker = await AcmeBroker.unix_socket(
             config["broker"], path, client=broker_client
         )
-    else:
+    elif config["broker"]["hostname"] and config["broker"]["port"]:
         _, broker = await AcmeBroker.runner(config["broker"], client=broker_client)
+    else:
+        raise click.UsageError(PATH_OR_HOST_AND_PORT_MSG)
 
     broker.register_challenge_validator(challenge_validator)
 
