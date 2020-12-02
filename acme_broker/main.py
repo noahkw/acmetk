@@ -133,7 +133,11 @@ async def run_ca(config, path):
         config["ca"]["challenge_validator"]
     )
 
-    _, ca = await AcmeCA.unix_socket(config["ca"], path)
+    if path:
+        _, ca = await AcmeCA.unix_socket(config["ca"], path)
+    else:
+        _, ca = await AcmeCA.runner(config["ca"])
+
     ca.register_challenge_validator(challenge_validator)
 
     while True:
@@ -158,9 +162,13 @@ async def run_broker(config, path):
 
     await broker_client.start()
 
-    _, broker = await AcmeBroker.unix_socket(
-        config["broker"], path, client=broker_client
-    )
+    if path:
+        _, broker = await AcmeBroker.unix_socket(
+            config["broker"], path, client=broker_client
+        )
+    else:
+        _, broker = await AcmeBroker.runner(config["broker"], client=broker_client)
+
     broker.register_challenge_validator(challenge_validator)
 
     while True:
