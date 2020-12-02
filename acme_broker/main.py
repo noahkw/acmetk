@@ -75,11 +75,8 @@ def main(ctx):
 
 @main.command()
 @click.argument("root-key-file", type=click.Path())
-@click.argument("account-key-file", type=click.Path())
-def generate_keys(root_key_file, account_key_file):
-    # TODO: separate account key function
-    """Generates a self-signed root key pair/cert for the CA
-    and an account key pair for the broker client"""
+def generate_keys(root_key_file):
+    """Generates a self-signed root key pair/cert for the CA"""
     click.echo("Generating root key pair/cert")
     # TODO: swap out info
     generate_root_cert(
@@ -91,7 +88,15 @@ def generate_keys(root_key_file, account_key_file):
         "ACMEBroker",
     )
 
-    click.echo("Generating broker client key pair")
+
+@main.command()
+@click.argument("account-key-file", type=click.Path())
+def generate_account_key(account_key_file):
+    """Generates an account key for the ACME client"""
+    click.echo(
+        f"Generating client key at {account_key_file}.\nMake sure to change its permissions,"
+        f" for example with: chmod 600 {account_key_file}"
+    )
     generate_rsa_key(account_key_file)
 
 
