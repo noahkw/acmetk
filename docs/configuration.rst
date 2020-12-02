@@ -10,10 +10,6 @@ The config file is passed to the main script like so:
 
 A config file *always* consists of one block defining the app itself and
 another block that is passed to Python's :mod:`logging` module.
-Further configuration blocks may be required by challenge validator or
-challenge solver plugins as outlined in .
-
-.. TODO: link.
 
 There are three types of apps that each require different options to
 run: :class:`~acme_broker.server.AcmeCA`, :class:`~acme_broker.server.AcmeBroker`,
@@ -27,6 +23,8 @@ An ACME CA configuration file might look as follows:
 .. code-block:: yaml
 
     ca:
+      hostname: '127.0.0.1'
+      port: 8000
       db: 'postgresql+asyncpg://user:password@host:5432/db'
       cert: '/app/certs/root.crt'
       private_key: '/app/certs/root.key'
@@ -43,6 +41,12 @@ An ACME CA configuration file might look as follows:
         - '192.168.0.0/16'
         - '130.75.0.0/16'
       reverse_proxy_host: 'my-ca.com'
+
+* hostname (optional): The hostname that the server should bind to. Required if the *path* option is omitted when starting the server from the CLI.
+    May also be an IP.
+
+* port (optional): The TCP port that the server should bind to. Required if the *path* option is omitted when starting the server from the CLI.
+    May require root permissions to bind to a privileged port below 1024. In that case, deployment behind a reverse proxy is advised.
 
 * db (required): The database connection string.
     At the moment, only PostgreSQL is supported.
@@ -80,6 +84,7 @@ and root certificate may be generated using the following command:
 
     python -m acme_broker generate-keys /app/certs/root.key
 
+.. _config_broker_proxy:
 
 ACME Broker/Proxy
 #################
@@ -93,6 +98,8 @@ For a broker, the file might looks as follows:
 .. code-block:: yaml
 
     broker:
+      hostname: '127.0.0.1'
+      port: 8000
       db: 'postgresql+asyncpg://user:password@host:5432/db'
       challenge_validator: 'requestipdns'
       rsa_min_keysize: 2048
@@ -112,13 +119,14 @@ For a broker, the file might looks as follows:
         private_key: 'broker_client.key'
         contact:
           phone: '555-1234'
-          email: 'brokerclient@luis.uni-hannover.de'
-        infoblox:
-          host: 'ipam.uni-hannover.de'
-          username: 'infobloxuser'
-          password: 'infobloxpassw'
+          email: 'brokerclient@mybroker.com'
+        challenge_solver:
+          infoblox:
+            host: 'ipam.uni-hannover.de'
+            username: 'infobloxuser'
+            password: 'infobloxpassw'
 
-Refer to section `ACME Certificate Authority`_ for the options *db*, *challenge_validator*,
+Refer to section `ACME Certificate Authority`_ for the options *hostname*, *port*, *db*, *challenge_validator*,
 *rsa_min_keysize*, *tos_url*, *mail_suffixes*, and *subnets*.
 The *client* section inside the main *broker* section configures the internal
 :class:`~acme_broker.client.AcmeClient` that is used to communicate with the actual CA.
@@ -159,12 +167,12 @@ The *client* block inside the respective app's surrounding configuration block m
     private_key: 'broker_client.key'
     challenge_solver:
       infoblox:
-        host: 'ipam.uni-hannover.de'
+        host: 'ipam.my-broker.com'
         username: 'infobloxuser'
         password: 'infobloxpassw'
     contact:
       phone: '555-1234'
-      email: 'brokerclient@luis.uni-hannover.de'
+      email: 'broker@my-broker.com'
 
 * directory (required): The directory URL of the ACME CA that the client should communicate with.
     Usually, this will be Let's Encrypt or a similar ACME CA that issues free Domain Validation certificates.
@@ -215,3 +223,69 @@ The *challenge_solver* section inside the respective client's surrounding config
       host: 'ipam.uni-hannover.de'
       username: 'infobloxuser'
       password: 'infobloxpassw'
+
+.. _config_logging:
+
+Logging
+#######
+
+The config section that is passed to :py:func:`logging.config.dictConfig` should be appended to the end of the config file.
+An example logging section that should work for most scenarios looks as follows:
+
+.. code-block:: yaml
+
+    logging:
+      version: 1
+      formatters:
+        simple:
+          format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        simple_root:
+          format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+      handlers:
+        console:
+          class: logging.StreamHandler
+          level: INFO
+          formatter: simple
+          stream: ext://sys.stdout
+        root_console:
+          class: logging.StreamHandler
+          level: INFO
+          formatter: simple_root
+          stream: ext://sys.stdout
+      loggers:
+        asyncio:
+          level: ERROR
+          handlers: [console]
+          propagate: no
+        acme_broker:
+          level: INFO
+          handlers: [console]
+          propagate: no
+        acme.client:
+          level: INFO
+          handlers: [console]
+          propagate: no
+        aiohttp.access:
+          level: INFO
+          handlers: [console]
+          propagate: no
+        aiohttp.client:
+          level: INFO
+          handlers: [console]
+          propagate: no
+        aiohttp.internal:
+          level: INFO
+          handlers: [console]
+          propagate: no
+        aiohttp.server:
+          level: INFO
+          handlers: [console]
+          propagate: no
+        aiohttp.web:
+          level: INFO
+          handlers: [console]
+          propagate: no
+      root:
+        level: INFO
+        handlers: [root_console]
+      disable_existing_loggers: no
