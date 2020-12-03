@@ -116,7 +116,124 @@ The broker's directory should now be available at :code:`http://localhost:8000/d
 Bare-metal behind a reverse proxy
 #################################
 
-Install
+This section builds on the bare-metal installation, so complete that first before continuing.
+
+Install Nginx and Supervisor via apt:
+
+.. code-block:: bash
+
+   sudo apt update
+   sudo apt install nginx supervisor
+
+Create a new Supervisor config file :code:`broker.conf` in :code:`/etc/supervisor/conf.d`:
+
+.. code-block:: ini
+
+   [program:broker]
+   numprocs = 1
+   numprocs_start = 1
+   process_name = broker_%(process_num)s
+
+   directory=/path/to/acme_broker
+   ; Unix socket paths are specified by command line.
+   command=/path/to/venv/bin/python -m acme_broker run --config-file=/path/to/config.yml --path=/tmp/broker_%(process_num)s.sock
+
+   user=www-data
+   autostart=true
+   autorestart=true
+
+   [program:nginx]
+   command=/usr/sbin/nginx -g "daemon off;"
+   autostart = true
+   autorestart = true
+   startsec = 5
+   redirect_stderr = true
+
+The path of the cloned repository, the virtual environment that the package was installed to, and the path of the
+*config.yml* need to be changed.
+
+In order to configure Nginx as a reverse proxy, we first need to disable the default site configuration:
+
+.. code-block:: bash
+
+   sudo rm /etc/nginx/sites-enabled/default
+
+Then create a new file called :code:`broker` in :code:`/etc/nginx/sites-available`:
+
+.. code-block:: ini
+
+   upstream broker {
+     # fail_timeout=0 means we always retry an upstream even if it failed
+     # to return a good HTTP response
+
+     # Unix domain servers
+     server unix:/tmp/broker_1.sock fail_timeout=0;
+     # server unix:/tmp/broker_2.sock fail_timeout=0;
+   }
+
+   server {
+     client_max_body_size 4G;
+
+     listen              80;
+     listen              443 ssl;
+     keepalive_timeout   70;
+
+     ssl_certificate     /path/to/fullchain.pem;
+     ssl_certificate_key /path/to/cert.key;
+     ssl_dhparam         /path/to/dhparam.pem;
+
+     ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+     ssl_prefer_server_ciphers on;
+     ssl_ciphers "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH";
+     ssl_ecdh_curve secp384r1;
+     ssl_session_cache shared:SSL:10m;
+     ssl_session_tickets off;
+     ssl_stapling on;
+     ssl_stapling_verify on;
+     # resolver 8.8.8.8 8.8.4.4 valid=300s;
+     # resolver_timeout 5s;
+     # Disable preloading HSTS for now.  You can use the commented out header line that includes
+     # the "preload" directive if you understand the implications.
+     #add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload";
+     add_header Strict-Transport-Security "max-age=63072000; includeSubdomains";
+     add_header X-Frame-Options DENY;
+     add_header X-Content-Type-Options nosniff;
+
+     location / {
+       proxy_set_header Host $http_host;
+       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+       proxy_set_header X-Forwarded-Proto $scheme;
+       proxy_redirect off;
+       proxy_buffering off;
+       proxy_pass http://broker;
+     }
+   }
+
+Acquiring an SSL certificate for the reverse proxy is out of this guide's scope, but the
+*ssl_certificate*, *ssl_certificate_key*, and *ssl_dhparam* directives need to be changed to point to the
+respective file.
+Symlink the file to :code:`sites-enabled`:
+
+.. code-block:: bash
+
+   sudo ln -s /etc/nginx/sites-available/broker /etc/nginx/sites-enabled/
+
+Now add the hostname of the reverse proxy to the broker's configuration file.
+If the broker and the nginx instace both run on *my-broker.com*, for example, then add the config option
+to the *broker* section:
+
+.. code-block:: ini
+
+   reverse_proxy_host: 'my-broker.com'
+
+Now, to make sure that Supervisor handles starting Nginx, we disable its systemd service,
+then start the broker and the reverse proxy:
+
+.. code-block:: bash
+
+   sudo systemctl stop nginx.service
+   sudo systemctl disable nginx.service
+   sudo supervisord -n -c /etc/supervisor/supervisord.conf
 
 Docker
 ######
