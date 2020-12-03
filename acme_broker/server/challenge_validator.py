@@ -7,6 +7,7 @@ import typing
 import dns.asyncresolver
 
 from acme_broker.models import ChallengeType, Challenge
+from acme_broker.util import ConfigurableMixin
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class CouldNotValidateChallenge(Exception):
     pass
 
 
-class ChallengeValidator(abc.ABC):
+class ChallengeValidator(ConfigurableMixin, abc.ABC):
     """An abstract base class for challenge validator clients.
 
     All challenge validator implementations must implement the method :func:`validate_challenge`
@@ -33,11 +34,6 @@ class ChallengeValidator(abc.ABC):
     """The types of challenges that the challenge validator implementation supports."""
 
     subclasses = []
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if getattr(cls, "config_name", None):
-            cls.subclasses.append(cls)
 
     @abc.abstractmethod
     async def validate_challenge(self, challenge: Challenge, **kwargs):

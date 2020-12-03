@@ -18,13 +18,9 @@ from acme_broker.util import generate_root_cert, generate_rsa_key
 logger = logging.getLogger(__name__)
 
 
-server_apps = {app.config_name: app for app in AcmeServerBase.subclasses}
-challenge_solvers = {
-    solver.config_name: solver for solver in ChallengeSolver.subclasses
-}
-challenge_validators = {
-    validator.config_name: validator for validator in ChallengeValidator.subclasses
-}
+server_apps = AcmeServerBase.config_mapping()
+challenge_solvers = ChallengeSolver.config_mapping()
+challenge_validators = ChallengeValidator.config_mapping()
 
 PATH_OR_HOST_AND_PORT_MSG = (
     "Must specify either the path of the unix socket or the hostname + port."
@@ -75,6 +71,19 @@ async def create_challenge_validator(challenge_validator_name):
 @click.pass_context
 def main(ctx):
     pass
+
+
+@main.command()
+def plugins():
+    """Lists the available plugins and their respective config strings."""
+    for plugins in [
+        ("Server apps", server_apps),
+        ("Challenge solvers", challenge_solvers),
+        ("Challenge validators", challenge_validators),
+    ]:
+        click.echo(
+            f"{plugins[0]}: {', '.join([f'{app.__name__} ({config_name})' for config_name, app in plugins[1].items()])}"
+        )
 
 
 @main.command()

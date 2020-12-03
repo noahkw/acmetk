@@ -11,12 +11,12 @@ import typing
 from infoblox_client import connector, objects
 
 from acme_broker.models import ChallengeType
-
+from acme_broker.util import ConfigurableMixin
 
 logger = logging.getLogger(__name__)
 
 
-class ChallengeSolver(abc.ABC):
+class ChallengeSolver(ConfigurableMixin, abc.ABC):
     """An abstract base class for challenge solver clients.
 
     All challenge solver implementations must implement the method :func:`complete_challenge`
@@ -33,11 +33,6 @@ class ChallengeSolver(abc.ABC):
     """The types of challenges that the challenge solver implementation supports."""
 
     subclasses = []
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if getattr(cls, "config_name", None):
-            cls.subclasses.append(cls)
 
     async def connect(self):
         """Handles connecting the solver implementation to its remote API.
@@ -149,7 +144,7 @@ class InfobloxClient(ChallengeSolver):
 
         logger.debug("Setting TXT record %s = %s, TTL %d", name, text, ttl)
 
-        # TODO: error handling
+        # Infoblox-client exceptions are propagated.
         await asyncio.gather(
             *[
                 self._loop.run_in_executor(

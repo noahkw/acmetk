@@ -32,6 +32,7 @@ from acme_broker.util import (
     names_of,
     forwarded_url,
     pem_split,
+    ConfigurableMixin,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,7 @@ class AcmeResponse(web.Response):
         )
 
 
-class AcmeServerBase:
+class AcmeServerBase(ConfigurableMixin):
     """Base class for an ACME compliant server.
 
     Implementations must set the :attr:`config_name` attribute, so that the CLI script knows which
@@ -81,11 +82,6 @@ class AcmeServerBase:
     """The JWS signing algorithms that the server supports."""
 
     subclasses = []
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if getattr(cls, "config_name", None):
-            cls.subclasses.append(cls)
 
     def __init__(
         self,

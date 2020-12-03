@@ -153,3 +153,18 @@ def pem_split(pem):
         _PEM_TO_CLASS[match.groupdict()["cls"]](match.group(0))
         for match in _PEM_RE.finditer(pem.encode())
     ]
+
+
+class ConfigurableMixin:
+    subclasses: typing.Optional[list]
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        if getattr(cls, "config_name", None):
+            cls.subclasses.append(cls)
+
+    @classmethod
+    def config_mapping(cls):
+        return {
+            configurable.config_name: configurable for configurable in cls.subclasses
+        }
