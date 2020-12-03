@@ -18,8 +18,9 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 
 from acme_broker import models
+
 from acme_broker.models import messages
-from acme_broker.client import CouldNotCompleteChallenge
+from acme_broker.client import CouldNotCompleteChallenge, AcmeClientException
 from acme_broker.database import Database
 from acme_broker.server import (
     ChallengeValidator,
@@ -1123,12 +1124,19 @@ class AcmeBroker(AcmeRelayBase):
                     order_id,
                 )
                 order.status = models.OrderStatus.INVALID
+            except AcmeClientException as e:
+                logger.info(
+                    "Could not complete a challenge associated with order %s due to a general client exception: %s",
+                    order_id,
+                    e,
+                )
+                order.status = models.OrderStatus.INVALID
 
             await session.commit()
 
 
 class AcmeProxy(AcmeRelayBase):
-    """Server that relays requests to a remote CA employing a "broker" model.
+    """Server that relays requests to a remote CA employing a "proxy" model.
 
     Orders are relayed to the remote CA transparently, which allows for
     the possibility to show errors to the end user as they occur at the remote CA.
@@ -1189,6 +1197,12 @@ class AcmeProxy(AcmeRelayBase):
                     "Could not complete challenge %s associated with order %s",
                     e.challenge.uri,
                     order_id,
+                )
+                order.status = models.OrderStatus.INVALID
+            except AcmeClientException as e:
+                logger.info(
+                    "Could not complete a challenge associated with order %s due to a general client exception: %s",
+                    e,
                 )
                 order.status = models.OrderStatus.INVALID
 

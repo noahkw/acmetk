@@ -1,4 +1,4 @@
-from .client import AcmeClient, CouldNotCompleteChallenge
+from .client import AcmeClient, CouldNotCompleteChallenge, AcmeClientException
 from .challenge_solver import InfobloxClient, DummySolver, ChallengeSolver
 
 __all__ = [
@@ -7,4 +7,5 @@ __all__ = [
     "DummySolver",
     "CouldNotCompleteChallenge",
     "ChallengeSolver",
+    "AcmeClientException",
 ]

@@ -34,9 +34,8 @@ class CouldNotCompleteChallenge(AcmeClientException):
 
 
 class PollingException(AcmeClientException):
-    def __init__(self, msg, obj, *args):
+    def __init__(self, obj, *args):
         super().__init__(*args)
-        self.msg = msg
         self.obj = obj
 
 
@@ -456,7 +455,7 @@ class AcmeClient:
 
             if negative_predicate(result):
                 raise PollingException(
-                    f"Polling unsuccessful: {coro.__name__}{args}", result
+                    result, f"Polling unsuccessful: {coro.__name__}{args}"
                 )
 
             await asyncio.sleep(delay)
@@ -464,7 +463,7 @@ class AcmeClient:
             tries -= 1
         else:
             raise PollingException(
-                f"Polling unsuccessful: {coro.__name__}{args}", result
+                result, f"Polling unsuccessful: {coro.__name__}{args}", result
             )
 
         return result
