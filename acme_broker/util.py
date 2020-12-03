@@ -13,6 +13,14 @@ from cryptography.x509 import NameOID
 def generate_csr(
     CN: str, private_key: rsa.RSAPrivateKey, path: Path, names: typing.List[str]
 ):
+    """Generates a certificate signing request.
+
+    :param CN: The requested common name.
+    :param private_key: The private key to sign the CSR with.
+    :param path: The path to write the PEM-serialized CSR to.
+    :param names: The requested names in the CSR.
+    :return: The generated CSR.
+    """
     csr = (
         x509.CertificateSigningRequestBuilder()
         .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, CN)]))
@@ -29,7 +37,12 @@ def generate_csr(
     return csr
 
 
-def generate_rsa_key(path: Path):
+def generate_rsa_key(path: Path) -> rsa.RSAPrivateKey:
+    """Generates an RSA private key and saves it to the given path as PEM.
+
+    :param path: The path to write the PEM-serialized key to.
+    :return: The generated private key.
+    """
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
     pem = private_key.private_bytes(
@@ -44,16 +57,29 @@ def generate_rsa_key(path: Path):
     return private_key
 
 
-def forwarded_url(request):
-    """Looks for the X-Forwarded-Proto header and replaces the request URL's
-    protocol scheme if applicable."""
+def forwarded_url(request) -> "yarl.URL":
+    """Returns the URL with the correct protocol scheme.
+
+    Looks for the X-Forwarded-Proto header and replaces the request URL's
+    protocol scheme if applicable.
+
+    :param request: The request needed to build the URL.
+    :return: The corrected URL.
+    """
     if forwarded_protocol := request.headers.get("X-Forwarded-Proto"):
         return request.url.with_scheme(forwarded_protocol)
     else:
         return request.url
 
 
-def url_for(request, path, **kwargs):
+def url_for(request, path: str, **kwargs) -> str:
+    """Builds a URL for a given path and optional parameters.
+
+    :param request: The request needed to build the URL.
+    :param path: The path for which to build a URL.
+    :param kwargs: Optional parameters for URL construction, such as an account ID.
+    :return: The constructed URL.
+    """
     return str(
         forwarded_url(request).with_path(
             str(request.app.router[path].url_for(**kwargs))
@@ -61,7 +87,19 @@ def url_for(request, path, **kwargs):
     )
 
 
-def generate_cert_from_csr(csr, root_cert, root_key):
+def generate_cert_from_csr(
+    csr: "cryptography.x509.CertificateSigningRequest",
+    root_cert: "cryptography.x509.Certificate",
+    root_key: rsa.RSAPrivateKey,
+) -> "cryptography.x509.Certificate":
+    """Generates a signed certificate from a certificate signing request given the certificate authority's
+    certificate and private key.
+
+    :param csr: The certificate signing request to generate a certificate from.
+    :param root_cert: The signing CA's root certificate.
+    :param root_key: The signing CA's root key.
+    :return: The generated certificate.
+    """
     names = list(names_of(csr))
 
     subject = csr.subject or x509.Name(
@@ -86,7 +124,20 @@ def generate_cert_from_csr(csr, root_cert, root_key):
     return cert
 
 
-def generate_root_cert(path: Path, country, state, locality, org_name, common_name):
+def generate_root_cert(
+    path: Path, country: str, state: str, locality: str, org_name: str, common_name: str
+) -> typing.Tuple["cryptography.x509.Certificate", rsa.RSAPrivateKey]:
+    """Generates a self-signed CA root certificate (RSA).
+
+    :param path: The path of the generated private key. The resulting certificate will be saved to
+        the same directory as :code:`root.crt`.
+    :param country: The requested *country name* in the certificate.
+    :param state: The requested *state or province name* in the certificate.
+    :param locality: The requested *locality name* in the certificate.
+    :param org_name: The requested *organization name* in the certificate.
+    :param common_name: The requested *common name* in the certificate.
+    :return: The resulting root certificate and corresponding private key.
+    """
     root_key = generate_rsa_key(path)
 
     subject = x509.Name(
@@ -119,7 +170,15 @@ def generate_root_cert(path: Path, country, state, locality, org_name, common_na
     return root_cert, root_key
 
 
-def names_of(csr, lower=False):
+def names_of(
+    csr: "cryptography.x509.CertificateSigningRequest", lower: bool = False
+) -> typing.Set[str]:
+    """Returns all names contained in the given CSR.
+
+    :param csr: The CRS whose names to extract.
+    :param lower: True if the names should be returned in lowercase.
+    :return: Set of the contained identifier strings.
+    """
     names = [
         v.value
         for v in csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
@@ -133,7 +192,18 @@ def names_of(csr, lower=False):
     return set([name.lower() if lower else name for name in names])
 
 
-def pem_split(pem):
+def pem_split(
+    pem: str,
+) -> typing.List[
+    typing.Union[
+        "cryptography.x509.CertificateSigningRequest", "cryptography.x509.Certificate"
+    ]
+]:
+    """Parses a PEM encoded string and returns all contained CSRs and certificates.
+
+    :param pem: The concatenated PEM encoded CSRs and certificates.
+    :return: List of all certificate signing requests and certificates found in the PEM string.
+    """
     _PEM_TO_CLASS = {
         b"CERTIFICATE": x509.load_pem_x509_certificate,
         b"CERTIFICATE REQUEST": x509.load_pem_x509_csr,
@@ -156,6 +226,14 @@ def pem_split(pem):
 
 
 class ConfigurableMixin:
+    """Mixin that configurable base classes should inherit from.
+
+    Each configurable base class must have its own :attr:`subclasses`
+    attribute, which is used to track the actual configurable implementations.
+    Each configurable implementation must set the attribute :attr:`config_name`
+    which is used as the key in the :func:`config_mapping`.
+    """
+
     subclasses: typing.Optional[list]
 
     def __init_subclass__(cls, **kwargs):
@@ -164,7 +242,11 @@ class ConfigurableMixin:
             cls.subclasses.append(cls)
 
     @classmethod
-    def config_mapping(cls):
+    def config_mapping(cls) -> typing.Dict[str, "ConfigurableMixin"]:
+        """Class method that maps :attr:`config_name` attributes to the actual class object.
+
+        :return: Mapping from config names to the actual class objects.
+        """
         return {
             configurable.config_name: configurable for configurable in cls.subclasses
         }

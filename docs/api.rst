@@ -105,3 +105,8 @@ Order
 ^^^^^
 .. autoclass:: acme_broker.models.order.Order
     :members:
+
+Utils
+#####
+.. automodule:: acme_broker.util
+    :members:
