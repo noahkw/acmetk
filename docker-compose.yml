@@ -7,7 +7,7 @@ services:
     restart: always
     environment:
       POSTGRES_PASSWORD: ${ACME_BROKER_PG_PW}
-      POSTGRES_USER: acme-broker
+      POSTGRES_USER: acme
   app:
     image: broker_app
     restart: always
@@ -19,4 +19,4 @@ services:
       - .:/app
       - ./certs:/app/certs
     environment:
-      APP_CONFIG_FILE: /app/prod_broker.yml
+      APP_CONFIG_FILE: ${ACME_BROKER_CONFIG_FILE}
