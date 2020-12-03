@@ -223,6 +223,19 @@ The *challenge_solver* section inside the respective client's surrounding config
       host: 'ipam.uni-hannover.de'
       username: 'infobloxuser'
       password: 'infobloxpassw'
+      dns_servers:
+        - '8.8.8.8'
+        - '1.1.1.1'
+      views:
+        - 'Extern'
+
+The options *host*, *username*, and *password* are required and depend on the Infoblox instance's configuration.
+
+* dns_servers (optional): List of IP addresses of the DNS servers that are queried to determine when the remote CA should validate the challenge.
+    Defaults to :attr:`~acme_broker.client.challenge_solver.InfobloxClient.DEFAULT_DNS_SERVERS` if omitted.
+
+* views (optional): List of views to set the record in.
+    Defaults to :attr:`~acme_broker.client.challenge_solver.InfobloxClient.DEFAULT_VIEWS` if omitted.
 
 .. _config_logging:
 

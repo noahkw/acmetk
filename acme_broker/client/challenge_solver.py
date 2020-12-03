@@ -113,9 +113,20 @@ class InfobloxClient(ChallengeSolver):
     POLLING_TIMEOUT = 60.0
     """Time in seconds after which placing the TXT record is considered failed."""
 
-    def __init__(self, *, host, username, password):
+    DEFAULT_DNS_SERVERS = ["1.1.1.1", "8.8.8.8"]
+    """The DNS servers to use if none are specified during initialization."""
+
+    DEFAULT_VIEWS = ["Extern"]
+    """The views to use if none are specified during initialization."""
+
+    def __init__(self, *, host, username, password, dns_servers=None, views=None):
         self._creds = {"host": host, "username": username, "password": password}
         self._loop = asyncio.get_event_loop()
+
+        self._resolver = dns.asyncresolver.Resolver()
+        self._resolver.nameservers = dns_servers or self.DEFAULT_DNS_SERVERS
+
+        self._views = views or self.DEFAULT_VIEWS
 
     async def connect(self):
         """Connect to the InfoBlox API.
@@ -134,8 +145,7 @@ class InfobloxClient(ChallengeSolver):
         :param views: List of views to set the TXT record in. Defaults to *Intern* and *Extern*.
         :param ttl: Time to live of the TXT record in seconds.
         """
-        if views is None:
-            views = ("Intern", "Extern")
+        views = views or self._views
 
         logger.debug("Setting TXT record %s = %s, TTL %d", name, text, ttl)
 
@@ -169,7 +179,7 @@ class InfobloxClient(ChallengeSolver):
         with contextlib.suppress(
             dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer
         ):
-            resp = await dns.asyncresolver.resolve(name, "TXT")
+            resp = await self._resolver.resolve(name, "TXT")
 
             for records in resp.rrset.items.keys():
                 txt_records.extend([record.decode() for record in records.strings])
@@ -183,6 +193,9 @@ class InfobloxClient(ChallengeSolver):
             if text in records:
                 return
 
+            logger.debug(
+                f"{name} does not have TXT {text} yet. Retrying (Records: {records}"
+            )
             await asyncio.sleep(1.0)
 
     async def complete_challenge(

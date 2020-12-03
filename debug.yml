@@ -1,6 +1,13 @@
 infoblox:
   host: 'ipam.uni-hannover.de'
   username: 'woehler-luis'
+  dns_servers:
+    - '130.75.6.3'
+    - '130.75.2.3'
+    - '94.130.101.218'
+  views:
+    - 'Extern'
+
 infoblox_test:
   name: '_acme_test_ibclient.acmenoah.luis.uni-hannover.de'
   domain_name: 'acmenoah.luis.uni-hannover.de'
