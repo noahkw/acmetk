@@ -118,36 +118,38 @@ Bare-metal behind a reverse proxy
 
 This section builds on the bare-metal installation, so complete that first before continuing.
 
-Install Nginx and Supervisor via apt:
+Install Nginx via apt:
 
 .. code-block:: bash
 
    sudo apt update
-   sudo apt install nginx supervisor
+   sudo apt install nginx
 
-Create a new Supervisor config file :code:`broker.conf` in :code:`/etc/supervisor/conf.d`:
+Create a new systemd service file :code:`broker.service` in :code:`/etc/systemd/system/`:
 
 .. code-block:: ini
 
-   [program:broker]
-   numprocs = 1
-   numprocs_start = 1
-   process_name = broker_%(process_num)s
+   [Unit]
+   Description=ACME Broker
 
-   directory=/path/to/acme_broker
-   ; Unix socket paths are specified by command line.
-   command=/path/to/venv/bin/python -m acme_broker run --config-file=/path/to/config.yml --path=/tmp/broker_%(process_num)s.sock
+   [Service]
+   WorkingDirectory=/path/to/acme_broker
+   ExecStart=/path/to/venv/bin/python -m acme_broker run --config-file=/path/to/config.yml --path=/tmp/broker_1.sock
 
-   user=www-data
-   autostart=true
-   autorestart=true
+   # Disable Python's buffering of STDOUT and STDERR, so that output from the
+   # service shows up immediately in systemd's logs
+   Environment=PYTHONUNBUFFERED=1
 
-   [program:nginx]
-   command=/usr/sbin/nginx -g "daemon off;"
-   autostart = true
-   autorestart = true
-   startsec = 5
-   redirect_stderr = true
+   # Automatically restart the service if it crashes
+   Restart=on-failure
+
+   # Use the nginx user to run our service
+   User=www-data
+
+   [Install]
+   # Tell systemd to automatically start this service when the system boots
+   # (assuming the service is enabled)
+   WantedBy=default.target
 
 The path of the cloned repository, the virtual environment that the package was installed to, and the path of the
 *config.yml* need to be changed.
@@ -219,21 +221,20 @@ Symlink the file to :code:`sites-enabled`:
    sudo ln -s /etc/nginx/sites-available/broker /etc/nginx/sites-enabled/
 
 Now add the hostname of the reverse proxy to the broker's configuration file.
-If the broker and the nginx instace both run on *my-broker.com*, for example, then add the config option
+If the broker and the nginx instance both run on *my-broker.com*, for example, then add the config option
 to the *broker* section:
 
 .. code-block:: ini
 
    reverse_proxy_host: 'my-broker.com'
 
-Now, to make sure that Supervisor handles starting Nginx, we disable its systemd service,
-then start the broker and the reverse proxy:
+Enable the broker service, then start it and restart Nginx:
 
 .. code-block:: bash
 
-   sudo systemctl stop nginx.service
-   sudo systemctl disable nginx.service
-   sudo supervisord -n -c /etc/supervisor/supervisord.conf
+   sudo systemctl enable broker.service
+   sudo systemctl start broker.service
+   sudo systemctl restart nginx.service
 
 Docker
 ######
