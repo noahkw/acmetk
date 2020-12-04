@@ -118,8 +118,12 @@ class InfobloxClient(ChallengeSolver):
         self._creds = {"host": host, "username": username, "password": password}
         self._loop = asyncio.get_event_loop()
 
-        self._resolver = dns.asyncresolver.Resolver()
-        self._resolver.nameservers = dns_servers or self.DEFAULT_DNS_SERVERS
+        self._resolvers = []
+
+        for nameserver in dns_servers or self.DEFAULT_DNS_SERVERS:
+            resolver = dns.asyncresolver.Resolver()
+            resolver.nameservers = [nameserver]
+            self._resolvers.append(resolver)
 
         self._views = views or self.DEFAULT_VIEWS
 
@@ -163,33 +167,40 @@ class InfobloxClient(ChallengeSolver):
             ]
         )
 
-    async def query_txt_record(self, name: str) -> typing.List[str]:
+    async def query_txt_record(
+        self, resolver: dns.asyncresolver.Resolver, name: str
+    ) -> typing.Set[str]:
         """Queries a DNS TXT record.
 
         :param name: Name of the TXT record to query.
-        :return: List of strings stored in the TXT record.
+        :return: Set of strings stored in the TXT record.
         """
         txt_records = []
 
         with contextlib.suppress(
             dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer
         ):
-            resp = await self._resolver.resolve(name, "TXT")
+            resp = await resolver.resolve(name, "TXT")
 
             for records in resp.rrset.items.keys():
                 txt_records.extend([record.decode() for record in records.strings])
 
-        return txt_records
+        return set(txt_records)
 
     async def _query_until_completed(self, name, text):
         while True:
-            records = await self.query_txt_record(name)
+            record_sets = await asyncio.gather(
+                *[self.query_txt_record(resolver, name) for resolver in self._resolvers]
+            )
 
-            if text in records:
+            # Determine set of records that has been seen by all name servers
+            seen_by_all = set.intersection(*record_sets)
+
+            if text in seen_by_all:
                 return
 
             logger.debug(
-                f"{name} does not have TXT {text} yet. Retrying (Records: {records}"
+                f"{name} does not have TXT {text} yet. Retrying (Records seen by all name servers: {seen_by_all}"
             )
             await asyncio.sleep(1.0)
 
