@@ -32,7 +32,8 @@ class TestInfobloxClient(unittest.IsolatedAsyncioTestCase):
         # Poll the DNS until the correct record is available
         try:
             await asyncio.wait_for(
-                self.infoblox_client._query_until_completed(test_name, text_value), 60.0
+                self.infoblox_client._query_until_completed(test_name, text_value),
+                60.0 * 5,
             )
         except asyncio.TimeoutError:
             self.fail("Could not verify that the TXT record was set")

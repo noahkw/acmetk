@@ -105,8 +105,8 @@ class InfobloxClient(ChallengeSolver):
     POLLING_DELAY = 1.0
     """Time in seconds between consecutive DNS requests."""
 
-    POLLING_TIMEOUT = 60.0
-    """Time in seconds after which placing the TXT record is considered failed."""
+    POLLING_TIMEOUT = 60.0 * 5
+    """Time in seconds after which placing the TXT record is considered a failure."""
 
     DEFAULT_DNS_SERVERS = ["1.1.1.1", "8.8.8.8"]
     """The DNS servers to use if none are specified during initialization."""

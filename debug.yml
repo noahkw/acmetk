@@ -5,6 +5,7 @@ infoblox:
     - '130.75.6.3'
     - '130.75.2.3'
     - '94.130.101.218'
+#    - '1.1.1.1' # cloudflare (slow)
   views:
     - 'Extern'
 
