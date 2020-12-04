@@ -242,7 +242,7 @@ class ConfigurableMixin:
             cls.subclasses.append(cls)
 
     @classmethod
-    def config_mapping(cls) -> typing.Dict[str, "ConfigurableMixin"]:
+    def config_mapping(cls) -> typing.Dict[str, typing.Type["ConfigurableMixin"]]:
         """Class method that maps :attr:`config_name` attributes to the actual class object.
 
         :return: Mapping from config names to the actual class objects.
