@@ -7,7 +7,7 @@
 <tr>
 
     <td>Status</td>
-    <td>{{ account.status }}</td>
+    <td>{{ account.status.name }}</td>
 </tr>
 <tr>
     <td>Contact</td>
@@ -20,7 +20,7 @@
 
 <tr>
     <td>Key</td>
-    <td><pre>{{ account.key.decode() }}</pre></td>
+    <td><pre>{{ account.key }}</pre></td>
 </tr>
 </table>
 </p>
@@ -57,10 +57,10 @@
 {% for o in orders|reverse %}
 <tr>
     <td>{{ order_url(o) }}</td>
-    <td>{{ o.status }}</td>
+    <td>{{ o.status.name }}</td>
     <td>
-{% for a in o.authorizations|sort(attribute='identifier.value') %}
-    <a href="{{ url_for('mgmt-order', order=o.order) }}#{{ a.authorization }}">{{ a.identifier.value }}</a>
+{% for i in o.identifiers|sort(attribute='value') %}
+    <a href="{{ url_for('mgmt-order', order=o.order_id|string) }}#{{ i.authorization.authorization_id }}">{{ i.value }}</a>
 {% endfor %}
     </td>
     <td>

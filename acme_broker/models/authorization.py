@@ -185,3 +185,11 @@ class Authorization(Entity, Serializer):
             wildcard=identifier.value.startswith("*"),
             expires=datetime.now(timezone.utc) + timedelta(days=7),
         )
+
+    @property
+    def account_of(self):
+        return self.identifier.order.account_of
+
+    @property
+    def order_of(self):
+        return self.identifier.order

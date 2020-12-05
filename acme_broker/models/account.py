@@ -157,3 +157,8 @@ class Account(Entity, Serializer):
             status=AccountStatus.VALID,
             contact=json.dumps(obj.contact),
         )
+
+    @property
+    def account_of(self):
+        return self
+

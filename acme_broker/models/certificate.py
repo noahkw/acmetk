@@ -113,3 +113,11 @@ class Certificate(Entity, Serializer):
         """
         self.status = CertificateStatus.REVOKED
         self.reason = reason or RevocationReason.unspecified
+
+    @property
+    def account_of(self):
+        return self.order.account_of
+
+    @property
+    def order_of(self):
+        return self.order

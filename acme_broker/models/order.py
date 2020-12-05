@@ -233,3 +233,11 @@ class Order(Entity, Serializer):
         )
 
         return order
+
+    @property
+    def account_of(self):
+        return self.account
+
+    @property
+    def order_of(self):
+        return self

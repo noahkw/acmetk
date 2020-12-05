@@ -6,11 +6,11 @@
 <table>
     <tr>
         <td>Account:</td>
-        <td><a href="{{ url_for('mgmt-account', account=order.account.account) }}">{{ order.account.contact }}</a></td>
+        <td><a href="{{ url_for('mgmt-account', account=order.account.account_id|string) }}">{{ order.account.contact }}</a></td>
     </tr>
     <tr>
         <td>Status:</td>
-        <td>{{ order.status }}</td>
+        <td>{{ order.status.name }}</td>
     </tr>
     <tr>
         <td>Expires:</td>
@@ -19,8 +19,8 @@
     <tr>
         <td>Certificate:</td>
         <td>
-{% if order._certificate %}
-            <a href="{{ url_for('mgmt-certificate', certificate=order._certificate)}}">Yes</a>
+{% if order.certificate %}
+            <a href="{{ url_for('mgmt-certificate', certificate=order.certificate_id|string)}}">Yes</a>
 {% else %}
             No
 {% endif %}
@@ -73,7 +73,7 @@
 {% endif %}
 <tr>
 <td>{{ time(c.timestamp, fmt='%H:%M:%S.%f %Z') }}</td>
-<td>{{ c.entity.identity }}/{{ c.entity|attr(c.entity.identity) }}</td>
+<td>{{ c.entity.identity }}/{{ c.entity|attr(c.entity.identity + '_id') }}</td>
 <td>
     <ul class="data">
 {% for i in c.data %}

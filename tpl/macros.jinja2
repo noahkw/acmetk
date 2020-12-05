@@ -1,23 +1,25 @@
-{% macro account_url(obj, l=13) %}
-<a href="{{ url_for('mgmt-account', account=obj.account_of.account) }}">{{ shorten(obj.account_of.account, l) }}</a>
-{% endmacro %}
+{% macro account_url(obj, l=13) -%}
+<a href="{{ url_for('mgmt-account', account=obj.account_of.kid|string) }}">{{ shorten(obj.account_of.kid|string, l) }}</a>
+{%- endmacro %}
 
-{% macro order_url(obj, name=None) -%}
+{% macro order_url(obj, l=13, name=None) -%}
 {%- set order=obj.order_of -%}
 {%- if order -%}
-<a href="{{ url_for('mgmt-order', order=obj.order_of.order) }}">{{ name or obj.order_of.order }}</a>
+<a href="{{ url_for('mgmt-order', order=obj.order_of.order_id|string) }}">{{ shorten(name or obj.order_of.order_id|string, 13) }}</a>
 {%- else -%}
 {{ obj.identity }}
 {%- endif -%}
 {%- endmacro %}
 
 {% macro entity_url(obj) -%}
-{%- if obj.identity in ['account','certificate'] -%}
-<a href="{{ url_for('mgmt-' + obj.identity, **{obj.identity:obj|attr(obj.identity)}) }}">{{ shorten(obj|attr(obj.identity), l=13) }}</a>
+{%- if obj.identity in ['account'] -%}
+{{ account_url(obj, l=13) }}
+{%- elif obj.identity in ['certificate'] %}
+<a href="{{ url_for('mgmt-' + obj.identity, **{obj.identity:obj|attr(obj.identity)|string}) }}">{{ shorten(obj|attr(obj.identity)|string, l=13) }}</a>
 {%- elif obj.identity in ['order','authorization','challenge','identifier'] -%}
-{{ order_url(obj.order_of, shorten(obj|attr(obj.identity), l=13)) }}
+{{ order_url(obj.order_of, shorten(obj|attr(obj.identity + '_id')|string, l=13)) }}
 {%- else -%}
-{{ shorten(obj.entity|attr(obj.entity.identity), l=13) }}
+{{ shorten(obj.entity|attr(obj.entity.identity + '_id')|string, l=13) }}
 {%- endif -%}
 {%- endmacro %}
 

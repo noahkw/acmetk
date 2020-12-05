@@ -20,6 +20,7 @@
 <style>
 body     { font-family: "Lucida Console", Monaco, monospace }
 tr.h { font-size: large; font-weight: bold; text-align: center;}
+tr.even { background-color: #f2f2f2; }
 ul.data { font-size: small; }
 
 /*** The holy grail - The Essential Code ***/
@@ -67,14 +68,14 @@ body {
 body {
     margin: 0;
     padding: 0;
-    background: #FFF;
+    background: #003668;
 }
 
 #header, #footer {
     font-size: large;
     text-align: center;
     padding: 0.3em 0;
-    background: #999;
+    background: #00509b;
 }
 
 #pagination {
@@ -85,7 +86,7 @@ body {
 }
 
 #left {
-    background: #66F;
+    background: #999;
 }
 
 #center {
@@ -93,7 +94,7 @@ body {
 }
 
 #right {
-    background: #F66;
+    background: #999;
 }
 
 #container .column {
@@ -127,7 +128,7 @@ body {
 {% block navigation %}
 <h2>{{ request.match_info.apps[-1]['_service_']._prefix }}</h2>
 <ul>
-    <li><a href="{{ url('root') }}">../</a></li>
+{#     <li><a href="{{ url('root') }}">../</a></li>  #}
 {% for k,v in {'mgmt-changes':'changes','mgmt-accounts':'accounts','mgmt-orders':'orders','mgmt-certificates':'certificates'}.items() %}
     <li><a href="{{ url_for(k) }}">{{ './{}'.format(v) }}</a></li>
 {% endfor %}

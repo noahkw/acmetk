@@ -118,3 +118,11 @@ class Challenge(Entity, Serializer):
 
         await self.authorization.validate(session)
         return self.status
+
+    @property
+    def account_of(self):
+        return self.authorization.account_of
+
+    @property
+    def order_of(self):
+        return self.authorization.order_of
