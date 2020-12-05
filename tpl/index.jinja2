@@ -1,0 +1,13 @@
+{%  extends "template.jinja2" %}
+
+{% block navigation %}
+<h2>Services</h2>
+<ul>
+{% for i in res %}
+<li><a href="{{ i._app.router['mgmt-changes'].url_for() }}">{{ i.canonical }}</a></li>
+{% endfor %}
+</ul>
+{% endblock %}
+
+{%  block body %}
+{% endblock %}
