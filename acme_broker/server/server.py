@@ -803,9 +803,32 @@ class AcmeServerBase(ConfigurableMixin):
         raise NotImplementedError
 
     @routes.get("/mgmt/", name="mgmt-index")
-    @aiohttp_jinja2.template("template.jinja2")
+    @aiohttp_jinja2.template("index.jinja2")
     async def management_index(self, request):
-        return {}
+        import datetime
+        import collections
+        from sqlalchemy.sql import text
+        from acme_broker.models.base import Entity
+
+        async with self._session(request) as session:
+            now = datetime.datetime.now()
+            yesterday = now - datetime.timedelta(days=28)
+            q = select(sqlalchemy.func.date_trunc('day', Change.timestamp).label('dateof'),
+                       sqlalchemy.func.count(Change.change).label('numberof'), Entity.identity.label('actionof'))\
+                .select_from(Change).join(Entity, Entity.entity == Change._entity)\
+                .filter(Change.timestamp.between(yesterday, now))\
+                .group_by(text('dateof'), Entity.identity)
+            r = await session.execute(q)
+
+            s = collections.defaultdict(lambda: dict())
+            for m in r.mappings():
+                s[m['dateof'].date()][m['actionof']] = m['numberof']
+
+            statistics = []
+            for i in sorted(s.keys()):
+                statistics.append((i, s[i], sum(s[i].values())))
+            return {'statistics':statistics}
+
 
     @routes.get("/mgmt/changes", name="mgmt-changes")
     @aiohttp_jinja2.template("changes.jinja2")

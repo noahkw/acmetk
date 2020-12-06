@@ -1,13 +1,23 @@
 {%  extends "template.jinja2" %}
 
-{% block navigation %}
-<h2>Services</h2>
-<ul>
-{% for i in res %}
-<li><a href="{{ i._app.router['mgmt-changes'].url_for() }}">{{ i.canonical }}</a></li>
-{% endfor %}
-</ul>
-{% endblock %}
-
 {%  block body %}
+<h3>Statistics</h3>
+
+<table>
+<tr class="h">
+    <th>Date</th>
+    <th>Changes</th>
+    <th>Orders</th>
+    <th>Certificates</th>
+</tr>
+{% for date,s,all in statistics %}
+<tr class="{{loop.cycle('odd', 'even')}}">
+    <td class="n">{{ date.strftime("%Y-%m-%d") }}</td>
+    <td class="n">{{ all }}</td>
+    <td class="n">{{ s.order }}</td>
+    <td class="n">{{ s.certificate }}</td>
+</tr>
+{% endfor %}
+</table>
+
 {% endblock %}
