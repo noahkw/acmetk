@@ -125,7 +125,7 @@ class AcmeServerBase(ConfigurableMixin):
         self._nonces = set()
 
         self._db: typing.Optional[Database] = None
-        self._session = None
+        self._db_session = None
 
         self._challenge_validators = {}
 
@@ -168,9 +168,12 @@ class AcmeServerBase(ConfigurableMixin):
             **kwargs,
         )
         instance._db = db
-        instance._session = db.session
+        instance._db_session = db.session
 
         return instance
+
+    def _session(self, request):
+        return self._db_session(info={'remote_host':request.get('actual_ip','0.0.0.0')})
 
     @classmethod
     async def runner(
@@ -469,7 +472,7 @@ class AcmeServerBase(ConfigurableMixin):
 
         :return: The account object.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             jws, account = await self._verify_request(request, session, key_auth=True)
             reg = acme.messages.Registration.json_loads(jws.payload)
             jwk = jws.signature.combined.jwk
@@ -530,7 +533,7 @@ class AcmeServerBase(ConfigurableMixin):
 
         :return: The account object.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             upd = messages.AccountUpdate.json_loads(jws.payload)
 
@@ -555,7 +558,7 @@ class AcmeServerBase(ConfigurableMixin):
 
         :return: The order object.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
 
@@ -591,7 +594,7 @@ class AcmeServerBase(ConfigurableMixin):
 
         :return: The authorization object.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             authz_id = request.match_info["id"]
             upd = messages.AuthorizationUpdate.json_loads(jws.payload)
@@ -620,7 +623,7 @@ class AcmeServerBase(ConfigurableMixin):
 
         :return: The challenge object.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             challenge_id = request.match_info["id"]
 
@@ -661,7 +664,7 @@ class AcmeServerBase(ConfigurableMixin):
 
         :return: HTTP status code *200* if the revocation succeeded.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             certificate, revocation = await self._verify_revocation(request, session)
 
             certificate.revoke(revocation.reason)
@@ -679,7 +682,7 @@ class AcmeServerBase(ConfigurableMixin):
         :raises: :class:`aiohttp.web.HTTPNotFound` If the order does not exist.
         :return: The order object.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
             )
@@ -701,7 +704,7 @@ class AcmeServerBase(ConfigurableMixin):
 
         :return: An object with key *orders* that holds the account's orders list.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
             )
@@ -770,7 +773,7 @@ class AcmeServerBase(ConfigurableMixin):
 
         :return: The updated order object.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             order, csr = await self._validate_order(request, session)
 
             order.csr = csr
@@ -781,7 +784,7 @@ class AcmeServerBase(ConfigurableMixin):
             kid = order.account_kid
             await session.commit()
 
-        asyncio.ensure_future(self.handle_order_finalize(kid, order_id))
+        asyncio.ensure_future(self.handle_order_finalize(request, kid, order_id))
         return self._response(
             request,
             serialized,
@@ -807,7 +810,7 @@ class AcmeServerBase(ConfigurableMixin):
     @routes.get("/mgmt/changes", name="mgmt-changes")
     @aiohttp_jinja2.template("changes.jinja2")
     async def management_changes(self, request):
-        async with self._session() as session:
+        async with self._session(request) as session:
             q = select(sqlalchemy.func.max(Change.change))
             total = (await session.execute(q)).scalars().first()
 
@@ -839,7 +842,7 @@ class AcmeServerBase(ConfigurableMixin):
     @routes.get("/mgmt/accounts", name="mgmt-accounts")
     @aiohttp_jinja2.template("accounts.jinja2")
     async def management_accounts(self, request):
-        async with self._session() as session:
+        async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Account.kid))
             total = (await session.execute(q)).scalars().first()
 
@@ -855,7 +858,7 @@ class AcmeServerBase(ConfigurableMixin):
     @aiohttp_jinja2.template("account.jinja2")
     async def management_account(self, request):
         account = request.match_info["account"]
-        async with self._session() as session:
+        async with self._session(request) as session:
             q = select(Account).options(
                 selectinload(Account.orders),
                 selectinload(Account.changes).selectinload(Change.entity)
@@ -867,7 +870,7 @@ class AcmeServerBase(ConfigurableMixin):
     @routes.get("/mgmt/orders", name="mgmt-orders")
     @aiohttp_jinja2.template("orders.jinja2")
     async def management_orders(self, request):
-        async with self._session() as session:
+        async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Order.order_id))
             total = (await session.execute(q)).scalars().first()
 
@@ -886,7 +889,7 @@ class AcmeServerBase(ConfigurableMixin):
     @aiohttp_jinja2.template("order.jinja2")
     async def management_order(self, request):
         order = request.match_info["order"]
-        async with self._session() as session:
+        async with self._session(request) as session:
             q = select(Order) \
             .options(
                 selectinload(Order.account),
@@ -930,7 +933,7 @@ class AcmeServerBase(ConfigurableMixin):
     @routes.get("/mgmt/certificates", name="mgmt-certificates")
     @aiohttp_jinja2.template("certificates.jinja2")
     async def management_certificates(self, request):
-        async with self._session() as session:
+        async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Certificate.certificate_id))
             total = (await session.execute(q)).scalars().first()
 
@@ -947,7 +950,7 @@ class AcmeServerBase(ConfigurableMixin):
     @routes.get("/mgmt/certificates/{certificate}", name="mgmt-certificate")
     async def management_certificate(self, request):
         certificate = request.match_info["certificate"]
-        async with self._session() as session:
+        async with self._session(request) as session:
             q = select(Certificate) \
             .options(
                 selectinload(Certificate.changes),
@@ -968,7 +971,7 @@ class AcmeServerBase(ConfigurableMixin):
     async def _handle_challenge_validate(self, request, kid, challenge_id):
         logger.debug("Validating challenge %s", challenge_id)
 
-        async with self._session() as session:
+        async with self._session(request) as session:
             challenge = await self._db.get_challenge(session, kid, challenge_id)
 
             validator = self._challenge_validators[challenge.type]
@@ -981,7 +984,7 @@ class AcmeServerBase(ConfigurableMixin):
 
             await session.commit()
 
-    async def handle_order_finalize(self, kid: str, order_id: str):
+    async def handle_order_finalize(self, request, kid: str, order_id: str):
         """Method that handles the actual finalization of an order.
 
         This method should be called after the order's status has been set
@@ -1119,11 +1122,11 @@ class AcmeCA(AcmeServerBase):
             **kwargs,
         )
         ca._db = db
-        ca._session = db.session
+        ca._db_session = db.session
 
         return ca
 
-    async def handle_order_finalize(self, kid: str, order_id: str):
+    async def handle_order_finalize(self, request, kid: str, order_id: str):
         """Method that handles the actual finalization of an order.
 
         This method is called after the order's status has been set
@@ -1139,7 +1142,7 @@ class AcmeCA(AcmeServerBase):
         """
         logger.debug("Finalizing order %s", order_id)
 
-        async with self._session() as session:
+        async with self._session(request) as session:
             order = await self._db.get_order(session, kid, order_id)
 
             cert = generate_cert_from_csr(order.csr, self._cert, self._private_key)
@@ -1152,7 +1155,7 @@ class AcmeCA(AcmeServerBase):
 
     # @routes.post("/certificate/{id}", name="certificate")
     async def certificate(self, request):
-        async with self._session() as session:
+        async with self._session(request) as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
             )
@@ -1196,7 +1199,7 @@ class AcmeRelayBase(AcmeServerBase):
         :raises: :class:`aiohttp.web.HTTPNotFound` If the certificate does not exist.
         :return: The certificate's full chain in PEM format.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
             )
@@ -1236,7 +1239,7 @@ class AcmeRelayBase(AcmeServerBase):
 
         :return: HTTP status code *200* if the revocation succeeded.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             certificate, revocation = await self._verify_revocation(request, session)
 
             revocation_succeeded = await self._client.certificate_revoke(
@@ -1284,7 +1287,7 @@ class AcmeBroker(AcmeRelayBase):
 
     config_name = "broker"
 
-    async def handle_order_finalize(self, kid: str, order_id: str):
+    async def handle_order_finalize(self, request, kid: str, order_id: str):
         """Method that handles the actual finalization of an order.
 
         This method is called after the order's status has been set
@@ -1302,7 +1305,7 @@ class AcmeBroker(AcmeRelayBase):
         """
         logger.debug("Finalizing order %s", order_id)
 
-        async with self._session() as session:
+        async with self._session(request) as session:
             order = await self._db.get_order(session, kid, order_id)
 
             order_ca = await self._client.order_create(list(names_of(order.csr)))
@@ -1350,7 +1353,7 @@ class AcmeProxy(AcmeRelayBase):
 
         :return: The order object.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
 
@@ -1370,7 +1373,7 @@ class AcmeProxy(AcmeRelayBase):
             order_id = order.order_id
             await session.commit()
 
-        asyncio.ensure_future(self._complete_challenges(kid, order_id))
+        asyncio.ensure_future(self._complete_challenges(request, kid, order_id))
         return self._response(
             request,
             serialized,
@@ -1378,9 +1381,9 @@ class AcmeProxy(AcmeRelayBase):
             headers={"Location": url_for(request, "order", id=str(order_id))},
         )
 
-    async def _complete_challenges(self, kid, order_id):
+    async def _complete_challenges(self, request, kid, order_id):
         logger.debug("Completing challenges for order %s", order_id)
-        async with self._session() as session:
+        async with self._session(request) as session:
             order = await self._db.get_order(session, kid, order_id)
 
             order_ca = await self._client.order_get(order.proxied_url)
@@ -1427,7 +1430,7 @@ class AcmeProxy(AcmeRelayBase):
 
         :return: The updated order object.
         """
-        async with self._session() as session:
+        async with self._session(request) as session:
             order, csr = await self._validate_order(request, session)
             order_ca = await self._client.order_get(order.proxied_url)
 
@@ -1452,7 +1455,7 @@ class AcmeProxy(AcmeRelayBase):
             await session.commit()
 
         if order_processing:
-            asyncio.ensure_future(self.handle_order_finalize(kid, order_id))
+            asyncio.ensure_future(self.handle_order_finalize(request, kid, order_id))
 
         return self._response(
             request,
@@ -1460,7 +1463,7 @@ class AcmeProxy(AcmeRelayBase):
             headers={"Location": url_for(request, "order", id=order_id)},
         )
 
-    async def handle_order_finalize(self, kid: str, order_id: str):
+    async def handle_order_finalize(self, request, kid: str, order_id: str):
         """Method that handles the actual finalization of an order.
 
         This method is called after the order's status has been set
@@ -1474,7 +1477,7 @@ class AcmeProxy(AcmeRelayBase):
         """
         logger.debug("Finalizing order %s", order_id)
 
-        async with self._session() as session:
+        async with self._session(request) as session:
             order = await self._db.get_order(session, kid, order_id)
 
             order_ca = await self._client.order_get(order.proxied_url)
