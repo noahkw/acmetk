@@ -52,15 +52,17 @@ async def paginate(session, request, query, by='limit', total=-1):
 
     begin = (page - 1) * page_size
     end = page * page_size
-    if by == 'limit':
-        q = query.limit(page_size).offset(begin)
-    else:
+    if by != 'limit':
+        # BETWEEN on indexed values is way faster …
         q = query.filter(by.between(begin, end))
-    print(q.compile(compile_kwargs={"literal_binds": True}))
+    else:
+        q = query.limit(page_size).offset(begin)
+
     try:
         r = await session.execute(q)
         items = r.scalars().all()
     except Exception as e:
         print(e)
+        raise e
 
     return Page(items, page, page_size, total)

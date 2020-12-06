@@ -20,7 +20,9 @@
 
 <tr>
     <td>Key</td>
-    <td><pre>{{ account.key }}</pre></td>
+    <td><pre>{{ account.key.key._wrapped.public_bytes(
+    encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM,
+    format=cryptography.hazmat.primitives.serialization.PublicFormat.SubjectPublicKeyInfo).decode() }}</pre></td>
 </tr>
 </table>
 </p>

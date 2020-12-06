@@ -6,6 +6,9 @@ from pathlib import Path
 import click
 import yaml
 
+import aiohttp_jinja2
+import jinja2
+
 from acme_broker import AcmeBroker
 from acme_broker.client import AcmeClient, ChallengeSolver
 from acme_broker.server import (
@@ -159,6 +162,15 @@ async def run_ca(config, path):
         await asyncio.sleep(3600)
 
 
+@jinja2.contextfunction
+def _url_for(context, __route_name, **parts):
+    try:
+        return context["request"].match_info.apps[-1].router[__route_name].url_for(**parts)
+    except Exception as e:
+        print(e)
+        return "ERROR GENERATING URL"
+
+
 async def run_broker(config, path):
     challenge_solver = await create_challenge_solver(
         config["broker"]["client"]["challenge_solver"]
@@ -185,6 +197,9 @@ async def run_broker(config, path):
         _, broker = await AcmeBroker.runner(config["broker"], client=broker_client)
     else:
         raise click.UsageError(PATH_OR_HOST_AND_PORT_MSG)
+
+    aiohttp_jinja2.setup(broker.app, loader=jinja2.FileSystemLoader("./tpl/"))
+    aiohttp_jinja2.get_env(broker.app).globals.update({"url_for": _url_for})
 
     broker.register_challenge_validator(challenge_validator)
 

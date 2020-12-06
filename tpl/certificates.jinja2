@@ -19,7 +19,7 @@
 <tr>
 <td>{{ time(c.changes[0].timestamp) }}</td>
 <td>{{ account_url(c) }}</td>
-<td><a href="{{ url_for('mgmt-certificate', certificate=c.certificate_id|string) }}">{{ c.certificate_id }}</a></td>
+<td><a href="{{ url_for('mgmt-certificate', certificate=c.certificate_id|string) }}">{{ shorten(c.certificate_id|string, l=13) }}</a></td>
 <td>{{ c.order.identifiers|map(attribute='value')|join(' ') }}</td>
 </tr>
 {% endfor %}

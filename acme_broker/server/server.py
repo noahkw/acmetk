@@ -5,6 +5,9 @@ import logging
 import re
 import typing
 import uuid
+import functools
+import types
+
 from email.utils import parseaddr
 
 import acme.jws
@@ -14,10 +17,20 @@ import yarl
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
+import aiohttp_jinja2
+
+import cryptography
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 
 from acme_broker import models
+
+from .pagination import paginate
+import sqlalchemy
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload, selectin_polymorphic
+from acme_broker.models import Change, Account, Order, Identifier, Certificate, Challenge, Authorization
+
 
 from acme_broker.models import messages
 from acme_broker.client import CouldNotCompleteChallenge, AcmeClientException
@@ -102,8 +115,10 @@ class AcmeServerBase(ConfigurableMixin):
         self._reverse_proxy_host = reverse_proxy_host
 
         self.app = web.Application(
-            middlewares=[self.host_ip_middleware, self.error_middleware]
+            middlewares=[self.host_ip_middleware, self.aiohttp_jinja2_middleware, self.error_middleware]
         )
+        # request.app['_service_'] available in jinja2 templates
+        self.app['_service_'] = self
 
         self._add_routes()
 
@@ -784,6 +799,172 @@ class AcmeServerBase(ConfigurableMixin):
         """
         raise NotImplementedError
 
+    @routes.get("/mgmt/", name="mgmt-index")
+    @aiohttp_jinja2.template("template.jinja2")
+    async def management_index(self, request):
+        return {}
+
+    @routes.get("/mgmt/changes", name="mgmt-changes")
+    @aiohttp_jinja2.template("changes.jinja2")
+    async def management_changes(self, request):
+        async with self._session() as session:
+            q = select(sqlalchemy.func.max(Change.change))
+            total = (await session.execute(q)).scalars().first()
+
+            q = select(Change)\
+            .options(
+                selectin_polymorphic(Change.entity, [Account]),
+                selectinload(Change.entity.of_type(Authorization))
+                    .selectinload(Authorization.identifier)
+                    .selectinload(Identifier.order)
+                    .selectinload(Order.account),
+                selectinload(Change.entity.of_type(Challenge))
+                    .selectinload(Challenge.authorization)
+                    .selectinload(Authorization.identifier)
+                    .selectinload(Identifier.order)
+                    .selectinload(Order.account),
+                selectinload(Change.entity.of_type(Certificate))
+                    .selectinload(Certificate.order)
+                    .selectinload(Order.account),
+                selectinload(Change.entity.of_type(Identifier))
+                    .selectinload(Identifier.order)
+                    .selectinload(Order.account),
+                selectinload(Change.entity.of_type(Order))
+                    .selectinload(Order.account),
+            ).order_by(Change.change.desc())
+
+            page = await paginate(session, request, q, Change.change, total)
+            return {"changes": page.items, "page": page}
+
+    @routes.get("/mgmt/accounts", name="mgmt-accounts")
+    @aiohttp_jinja2.template("accounts.jinja2")
+    async def management_accounts(self, request):
+        async with self._session() as session:
+            q = select(sqlalchemy.func.count(Account.kid))
+            total = (await session.execute(q)).scalars().first()
+
+            q = select(Account)\
+                .options(selectinload(Account.orders))\
+                .order_by(Account._entity.desc())
+
+            page = await paginate(session, request, q, 'limit', total)
+
+            return {"accounts": page.items, "page": page}
+
+    @routes.get("/mgmt/accounts/{account}", name="mgmt-account")
+    @aiohttp_jinja2.template("account.jinja2")
+    async def management_account(self, request):
+        account = request.match_info["account"]
+        async with self._session() as session:
+            q = select(Account).options(
+                selectinload(Account.orders),
+                selectinload(Account.changes).selectinload(Change.entity)
+            ).filter(Account.kid == account)
+            a = await session.execute(q)
+            a = a.scalars().first()
+            return {"account": a, "orders": a.orders, "cryptography":cryptography}
+
+    @routes.get("/mgmt/orders", name="mgmt-orders")
+    @aiohttp_jinja2.template("orders.jinja2")
+    async def management_orders(self, request):
+        async with self._session() as session:
+            q = select(sqlalchemy.func.count(Order.order_id))
+            total = (await session.execute(q)).scalars().first()
+
+            q = select(Order) \
+            .options(
+                selectinload(Order.account),
+                selectinload(Order.identifiers),
+                selectinload(Order.changes)
+            ).order_by(Order._entity.desc())
+
+            page = await paginate(session, request, q, 'limit', total)
+            return {"orders": page.items, "page": page}
+
+
+    @routes.get("/mgmt/orders/{order}", name="mgmt-order")
+    @aiohttp_jinja2.template("order.jinja2")
+    async def management_order(self, request):
+        order = request.match_info["order"]
+        async with self._session() as session:
+            q = select(Order) \
+            .options(
+                selectinload(Order.account),
+                selectinload(Order.identifiers).options(
+                    selectinload(Identifier.authorization).options(
+                        selectinload(Authorization.challenges)
+                            .selectinload(Challenge.changes)
+                            .selectinload(Change.entity),
+                        selectinload(Authorization.changes)
+                            .selectinload(Change.entity)
+                    ),
+                    selectinload(Identifier.changes)
+                        .selectinload(Change.entity)
+                ),
+                selectinload(Order.changes)
+                    .selectinload(Change.entity),
+                selectinload(Order.certificate)
+                    .selectinload(Certificate.changes)
+                    .selectinload(Change.entity)
+            ).filter(Order.order_id == order)
+
+            r = await session.execute(q)
+            o = r.scalars().first()
+
+            changes = []
+            changes.extend(o.changes)
+
+        for i in o.identifiers:
+            changes.extend(i.changes)
+            changes.extend(i.authorization.changes)
+            for c in i.authorization.challenges:
+                changes.extend(c.changes)
+
+        if o.certificate:
+            changes.extend(o.certificate.changes)
+
+        changes = sorted(changes, key=lambda x: x.timestamp, reverse=True)
+
+        return {"order": o, "changes": changes}
+
+    @routes.get("/mgmt/certificates", name="mgmt-certificates")
+    @aiohttp_jinja2.template("certificates.jinja2")
+    async def management_certificates(self, request):
+        async with self._session() as session:
+            q = select(sqlalchemy.func.count(Certificate.certificate_id))
+            total = (await session.execute(q)).scalars().first()
+
+            q = select(Certificate) \
+            .options(
+                selectinload(Certificate.changes),
+                selectinload(Certificate.order)
+                    .selectinload(Order.account),
+            ).order_by(Certificate._entity.desc())
+
+            page = await paginate(session, request, q, 'limit', total)
+            return {"certificates": page.items, "page": page}
+
+    @routes.get("/mgmt/certificates/{certificate}", name="mgmt-certificate")
+    async def management_certificate(self, request):
+        certificate = request.match_info["certificate"]
+        async with self._session() as session:
+            q = select(Certificate) \
+            .options(
+                selectinload(Certificate.changes),
+                selectinload(Certificate.order).selectinload(Order.account),
+            ).filter(Certificate.certificate_id == certificate)
+
+            r = await session.execute(q)
+            a = r.scalars().first()
+            context = {"certificate": a.cert, "cryptography": cryptography}
+            response = aiohttp_jinja2.render_template(
+                "certificate.jinja2", request, context
+            )
+            response.content_type = "text"
+            response.charset = "utf-8"
+            return response
+
+
     async def _handle_challenge_validate(self, request, kid, challenge_id):
         logger.debug("Validating challenge %s", challenge_id)
 
@@ -868,6 +1049,23 @@ class AcmeServerBase(ConfigurableMixin):
                 text=f"{type(self).__name__}: This service is only available from within certain networks."
                 " Please contact your system administrator.",
             )
+
+    @middleware
+    async def aiohttp_jinja2_middleware(self, request, handler):
+        if isinstance(handler, functools.partial) and (handler := handler.keywords["handler"]):
+            # using subapps -> functools.partial
+            # aiohttp_jinja2 context
+            request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {"request": request}
+        elif isinstance(handler, types.MethodType):
+            if handler.__self__.__class__ == web.AbstractRoute:
+                pass
+            else:
+                request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {"request": request}
+        elif isinstance(handler, types.FunctionType):  # index_of
+            pass
+        else:
+            raise TypeError(handler)
+        return await handler(request)
 
     @middleware
     async def error_middleware(self, request, handler):
