@@ -29,7 +29,15 @@ from .pagination import paginate
 import sqlalchemy
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, selectin_polymorphic
-from acme_broker.models import Change, Account, Order, Identifier, Certificate, Challenge, Authorization
+from acme_broker.models import (
+    Change,
+    Account,
+    Order,
+    Identifier,
+    Certificate,
+    Challenge,
+    Authorization,
+)
 
 
 from acme_broker.models import messages
@@ -115,10 +123,14 @@ class AcmeServerBase(ConfigurableMixin):
         self._reverse_proxy_host = reverse_proxy_host
 
         self.app = web.Application(
-            middlewares=[self.host_ip_middleware, self.aiohttp_jinja2_middleware, self.error_middleware]
+            middlewares=[
+                self.host_ip_middleware,
+                self.aiohttp_jinja2_middleware,
+                self.error_middleware,
+            ]
         )
         # request.app['_service_'] available in jinja2 templates
-        self.app['_service_'] = self
+        self.app["_service_"] = self
 
         self._add_routes()
 
@@ -173,7 +185,9 @@ class AcmeServerBase(ConfigurableMixin):
         return instance
 
     def _session(self, request):
-        return self._db_session(info={'remote_host':request.get('actual_ip','0.0.0.0')})
+        return self._db_session(
+            info={"remote_host": request.get("actual_ip", "0.0.0.0")}
+        )
 
     @classmethod
     async def runner(
@@ -812,23 +826,28 @@ class AcmeServerBase(ConfigurableMixin):
 
         async with self._session(request) as session:
             now = datetime.datetime.now()
-            yesterday = now - datetime.timedelta(days=28)
-            q = select(sqlalchemy.func.date_trunc('day', Change.timestamp).label('dateof'),
-                       sqlalchemy.func.count(Change.change).label('numberof'), Entity.identity.label('actionof'))\
-                .select_from(Change).join(Entity, Entity.entity == Change._entity)\
-                .filter(Change.timestamp.between(yesterday, now))\
-                .group_by(text('dateof'), Entity.identity)
+            start_date = now - datetime.timedelta(days=28)
+            q = (
+                select(
+                    sqlalchemy.func.date_trunc("day", Change.timestamp).label("dateof"),
+                    sqlalchemy.func.count(Change.change).label("numberof"),
+                    Entity.identity.label("actionof"),
+                )
+                .select_from(Change)
+                .join(Entity, Entity.entity == Change._entity)
+                .filter(Change.timestamp.between(start_date, now))
+                .group_by(text("dateof"), Entity.identity)
+            )
             r = await session.execute(q)
 
             s = collections.defaultdict(lambda: dict())
             for m in r.mappings():
-                s[m['dateof'].date()][m['actionof']] = m['numberof']
+                s[m["dateof"].date()][m["actionof"]] = m["numberof"]
 
             statistics = []
             for i in sorted(s.keys()):
                 statistics.append((i, s[i], sum(s[i].values())))
-            return {'statistics':statistics}
-
+            return {"statistics": statistics}
 
     @routes.get("/mgmt/changes", name="mgmt-changes")
     @aiohttp_jinja2.template("changes.jinja2")
@@ -837,27 +856,31 @@ class AcmeServerBase(ConfigurableMixin):
             q = select(sqlalchemy.func.max(Change.change))
             total = (await session.execute(q)).scalars().first()
 
-            q = select(Change)\
-            .options(
-                selectin_polymorphic(Change.entity, [Account]),
-                selectinload(Change.entity.of_type(Authorization))
+            q = (
+                select(Change)
+                .options(
+                    selectin_polymorphic(Change.entity, [Account]),
+                    selectinload(Change.entity.of_type(Authorization))
                     .selectinload(Authorization.identifier)
                     .selectinload(Identifier.order)
                     .selectinload(Order.account),
-                selectinload(Change.entity.of_type(Challenge))
+                    selectinload(Change.entity.of_type(Challenge))
                     .selectinload(Challenge.authorization)
                     .selectinload(Authorization.identifier)
                     .selectinload(Identifier.order)
                     .selectinload(Order.account),
-                selectinload(Change.entity.of_type(Certificate))
+                    selectinload(Change.entity.of_type(Certificate))
                     .selectinload(Certificate.order)
                     .selectinload(Order.account),
-                selectinload(Change.entity.of_type(Identifier))
+                    selectinload(Change.entity.of_type(Identifier))
                     .selectinload(Identifier.order)
                     .selectinload(Order.account),
-                selectinload(Change.entity.of_type(Order))
-                    .selectinload(Order.account),
-            ).order_by(Change.change.desc())
+                    selectinload(Change.entity.of_type(Order)).selectinload(
+                        Order.account
+                    ),
+                )
+                .order_by(Change.change.desc())
+            )
 
             page = await paginate(session, request, q, Change.change, total)
             return {"changes": page.items, "page": page}
@@ -869,11 +892,13 @@ class AcmeServerBase(ConfigurableMixin):
             q = select(sqlalchemy.func.count(Account.kid))
             total = (await session.execute(q)).scalars().first()
 
-            q = select(Account)\
-                .options(selectinload(Account.orders))\
+            q = (
+                select(Account)
+                .options(selectinload(Account.orders))
                 .order_by(Account._entity.desc())
+            )
 
-            page = await paginate(session, request, q, 'limit', total)
+            page = await paginate(session, request, q, "limit", total)
 
             return {"accounts": page.items, "page": page}
 
@@ -882,13 +907,17 @@ class AcmeServerBase(ConfigurableMixin):
     async def management_account(self, request):
         account = request.match_info["account"]
         async with self._session(request) as session:
-            q = select(Account).options(
-                selectinload(Account.orders),
-                selectinload(Account.changes).selectinload(Change.entity)
-            ).filter(Account.kid == account)
+            q = (
+                select(Account)
+                .options(
+                    selectinload(Account.orders),
+                    selectinload(Account.changes).selectinload(Change.entity),
+                )
+                .filter(Account.kid == account)
+            )
             a = await session.execute(q)
             a = a.scalars().first()
-            return {"account": a, "orders": a.orders, "cryptography":cryptography}
+            return {"account": a, "orders": a.orders, "cryptography": cryptography}
 
     @routes.get("/mgmt/orders", name="mgmt-orders")
     @aiohttp_jinja2.template("orders.jinja2")
@@ -897,42 +926,46 @@ class AcmeServerBase(ConfigurableMixin):
             q = select(sqlalchemy.func.count(Order.order_id))
             total = (await session.execute(q)).scalars().first()
 
-            q = select(Order) \
-            .options(
-                selectinload(Order.account),
-                selectinload(Order.identifiers),
-                selectinload(Order.changes)
-            ).order_by(Order._entity.desc())
+            q = (
+                select(Order)
+                .options(
+                    selectinload(Order.account),
+                    selectinload(Order.identifiers),
+                    selectinload(Order.changes),
+                )
+                .order_by(Order._entity.desc())
+            )
 
-            page = await paginate(session, request, q, 'limit', total)
+            page = await paginate(session, request, q, "limit", total)
             return {"orders": page.items, "page": page}
-
 
     @routes.get("/mgmt/orders/{order}", name="mgmt-order")
     @aiohttp_jinja2.template("order.jinja2")
     async def management_order(self, request):
         order = request.match_info["order"]
         async with self._session(request) as session:
-            q = select(Order) \
-            .options(
-                selectinload(Order.account),
-                selectinload(Order.identifiers).options(
-                    selectinload(Identifier.authorization).options(
-                        selectinload(Authorization.challenges)
+            q = (
+                select(Order)
+                .options(
+                    selectinload(Order.account),
+                    selectinload(Order.identifiers).options(
+                        selectinload(Identifier.authorization).options(
+                            selectinload(Authorization.challenges)
                             .selectinload(Challenge.changes)
                             .selectinload(Change.entity),
-                        selectinload(Authorization.changes)
-                            .selectinload(Change.entity)
+                            selectinload(Authorization.changes).selectinload(
+                                Change.entity
+                            ),
+                        ),
+                        selectinload(Identifier.changes).selectinload(Change.entity),
                     ),
-                    selectinload(Identifier.changes)
-                        .selectinload(Change.entity)
-                ),
-                selectinload(Order.changes)
-                    .selectinload(Change.entity),
-                selectinload(Order.certificate)
+                    selectinload(Order.changes).selectinload(Change.entity),
+                    selectinload(Order.certificate)
                     .selectinload(Certificate.changes)
-                    .selectinload(Change.entity)
-            ).filter(Order.order_id == order)
+                    .selectinload(Change.entity),
+                )
+                .filter(Order.order_id == order)
+            )
 
             r = await session.execute(q)
             o = r.scalars().first()
@@ -960,25 +993,30 @@ class AcmeServerBase(ConfigurableMixin):
             q = select(sqlalchemy.func.count(Certificate.certificate_id))
             total = (await session.execute(q)).scalars().first()
 
-            q = select(Certificate) \
-            .options(
-                selectinload(Certificate.changes),
-                selectinload(Certificate.order)
-                    .selectinload(Order.account),
-            ).order_by(Certificate._entity.desc())
+            q = (
+                select(Certificate)
+                .options(
+                    selectinload(Certificate.changes),
+                    selectinload(Certificate.order).selectinload(Order.account),
+                )
+                .order_by(Certificate._entity.desc())
+            )
 
-            page = await paginate(session, request, q, 'limit', total)
+            page = await paginate(session, request, q, "limit", total)
             return {"certificates": page.items, "page": page}
 
     @routes.get("/mgmt/certificates/{certificate}", name="mgmt-certificate")
     async def management_certificate(self, request):
         certificate = request.match_info["certificate"]
         async with self._session(request) as session:
-            q = select(Certificate) \
-            .options(
-                selectinload(Certificate.changes),
-                selectinload(Certificate.order).selectinload(Order.account),
-            ).filter(Certificate.certificate_id == certificate)
+            q = (
+                select(Certificate)
+                .options(
+                    selectinload(Certificate.changes),
+                    selectinload(Certificate.order).selectinload(Order.account),
+                )
+                .filter(Certificate.certificate_id == certificate)
+            )
 
             r = await session.execute(q)
             a = r.scalars().first()
@@ -989,7 +1027,6 @@ class AcmeServerBase(ConfigurableMixin):
             response.content_type = "text"
             response.charset = "utf-8"
             return response
-
 
     async def _handle_challenge_validate(self, request, kid, challenge_id):
         logger.debug("Validating challenge %s", challenge_id)
@@ -1078,7 +1115,9 @@ class AcmeServerBase(ConfigurableMixin):
 
     @middleware
     async def aiohttp_jinja2_middleware(self, request, handler):
-        if isinstance(handler, functools.partial) and (handler := handler.keywords["handler"]):
+        if isinstance(handler, functools.partial) and (
+            handler := handler.keywords["handler"]
+        ):
             # using subapps -> functools.partial
             # aiohttp_jinja2 context
             request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {"request": request}
