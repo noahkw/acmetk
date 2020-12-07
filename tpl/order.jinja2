@@ -43,20 +43,20 @@
     <td>validated</td>
 </tr>
 <tr><td colspan="4"></td></tr>
-{% for a in order.authorizations|sort(attribute='identifier.value') %}
+{% for a in order.identifiers|map(attribute='authorization')|sort(attribute='identifier.value') %}
 <tr class="h">
     <td colspan="2">{{ a.identifier.value }}</td>
     <td>{{ a.authorization }}</td>
     <td>{{ time(a.expires) }}</td>
-    <td>{{ a.status }}</td>
+    <td>{{ a.status.name }}</td>
 </tr>
 {% for c in a.challenges|sort(attribute='type') %}
 <tr>
     <td></td>
-    <td>{{ c.type }}</td>
-    <td>{{ c.challenge }}</td>
+    <td>{{ c.type.name }}</td>
+    <td>{{ c.challenge_id }}</td>
     <td>{{ time(c.validated) }}</td>
-    <td>{{ c.status }}</td>
+    <td>{{ c.status.name }}</td>
 </tr>
 {%  endfor %}
 <tr><td colspan="5"></td></tr>

@@ -161,4 +161,3 @@ class Account(Entity, Serializer):
     @property
     def account_of(self):
         return self
-
