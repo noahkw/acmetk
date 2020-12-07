@@ -41,18 +41,19 @@ class Page:
         self.total = total
         self.pages = int(math.ceil(total / float(page_size)))
 
-async def paginate(session, request, query, by='limit', total=-1):
+
+async def paginate(session, request, query, by="limit", total=-1):
     page_size = int(request.query.get("pagesize", 25))
     page = int(request.query.get("page", 1))
-    if not ( 0 < page_size < 100) :
+    if not (0 < page_size < 100):
         raise AttributeError("0 < page_size < 100")
     page_count = math.ceil(total / page_size)
-    if not ( 0 < page <= page_count):
+    if not (0 < page <= page_count):
         raise AttributeError(f"0 < page < {page_count}")
 
     begin = (page - 1) * page_size
     end = page * page_size
-    if by != 'limit':
+    if by != "limit":
         # BETWEEN on indexed values is way faster …
         q = query.filter(by.between(begin, end))
     else:

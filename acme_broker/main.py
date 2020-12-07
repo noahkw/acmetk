@@ -153,6 +153,7 @@ def run(config_file, path):
     except KeyboardInterrupt:
         loop.run_until_complete(runner.cleanup())
 
+
 async def run_ca(config, path):
     challenge_validator = await create_challenge_validator(
         config["ca"]["challenge_validator"]
@@ -173,7 +174,9 @@ async def run_ca(config, path):
 @jinja2.contextfunction
 def _url_for(context, __route_name, **parts):
     try:
-        return context["request"].match_info.apps[-1].router[__route_name].url_for(**parts)
+        return (
+            context["request"].match_info.apps[-1].router[__route_name].url_for(**parts)
+        )
     except Exception as e:
         print(e)
         return "ERROR GENERATING URL"
@@ -209,6 +212,7 @@ async def run_broker(config, path):
     broker.register_challenge_validator(challenge_validator)
 
     return runner, broker
+
 
 if __name__ == "__main__":
     main()
