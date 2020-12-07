@@ -1,0 +1,81 @@
+broker:
+  hostname: '127.0.0.1'
+  port: 8000
+  db: 'postgresql+asyncpg://acme:YOUR_PASSWORD@localhost:5432/acme'
+  challenge_validator: 'requestipdns'
+  rsa_min_keysize: 2048
+  tos_url: 'https://my-broker.com/tos'
+  mail_suffixes:
+    - 'uni-hannover.de'
+    - 'tib.eu'
+  subnets:
+    - '127.0.0.1/32'
+    - '10.0.0.0/8'
+    - '172.16.0.0/12'
+    - '192.168.0.0/16'
+    - '130.75.0.0/16'
+  client:
+    directory: 'https://acme-v02.api.letsencrypt.org/directory'
+    private_key: '/etc/acme_broker/broker_client_account.key'
+    contact:
+      email: 'broker@my-broker.com'
+    challenge_solver:
+      infoblox:
+        host: 'ipam.my-broker.com'
+        username: 'infobloxuser'
+        password: 'infobloxpassw'
+logging:
+  version: 1
+  formatters:
+    simple:
+      format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    simple_root:
+      format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  handlers:
+    console:
+      class: logging.StreamHandler
+      level: INFO
+      formatter: simple
+      stream: ext://sys.stdout
+    root_console:
+      class: logging.StreamHandler
+      level: INFO
+      formatter: simple_root
+      stream: ext://sys.stdout
+  loggers:
+    asyncio:
+      level: ERROR
+      handlers: [console]
+      propagate: no
+    acme_broker:
+      level: INFO
+      handlers: [console]
+      propagate: no
+    acme.client:
+      level: INFO
+      handlers: [console]
+      propagate: no
+    aiohttp.access:
+      level: INFO
+      handlers: [console]
+      propagate: no
+    aiohttp.client:
+      level: INFO
+      handlers: [console]
+      propagate: no
+    aiohttp.internal:
+      level: INFO
+      handlers: [console]
+      propagate: no
+    aiohttp.server:
+      level: INFO
+      handlers: [console]
+      propagate: no
+    aiohttp.web:
+      level: INFO
+      handlers: [console]
+      propagate: no
+  root:
+    level: INFO
+    handlers: [root_console]
+  disable_existing_loggers: no

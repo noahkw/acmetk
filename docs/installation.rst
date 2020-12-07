@@ -12,14 +12,6 @@ The section after that explains how to run this same setup behind an
 The docker section deploys a :class:`~acme_broker.server.AcmeProxy`, also with a PostgreSQL database, behind an Nginx
 reverse proxy.
 
-In either case, the first step is to clone the repository:
-
-.. code-block:: bash
-   :substitutions:
-
-   git clone |GIT_URL|
-   cd acme-broker
-
 Bare-metal
 ##########
 
@@ -34,6 +26,22 @@ The package requires at least Python version 3.8, which may or may not be availa
 To install it from source, follow the following guide (should work on Debian 9 or 10):
 `How to install Python 3.8 on Debian 10 <https://linuxize.com/post/how-to-install-python-3-8-on-debian-10/>`_.
 
+First, create the user that will run the broker app and clone the repository:
+
+.. code-block:: bash
+   :substitutions:
+
+   # create the user
+   sudo useradd acme_broker -m -d /srv/acme_broker -s /bin/bash
+   # create the configuration directory and grant permissions
+   sudo mkdir /etc/acme_broker && sudo chown acme_broker: /etc/acme_broker
+   # change user to the newly created one
+   sudo su acme_broker
+   # clone the repository to the user's home directory
+   cd /srv/acme_broker
+   git clone |GIT_URL|
+
+
 To create the database user and the database needed for the :class:`~acme_broker.server.AcmeBroker`,
 issue the following commands:
 
@@ -44,7 +52,7 @@ issue the following commands:
    # create the database
    sudo -u postgres createdb acme
    # give the user a password
-   sudo -u postgresql psql
+   sudo -u postgres psql
    # issue the following commands inside the psql prompt
    postgres=$ ALTER USER acme WITH ENCRYPTED PASSWORD 'PASSWORD'; # choose a strong password
    # grant the user privileges to access the database acme
@@ -59,55 +67,37 @@ points to the right binary.
 
 .. code-block:: bash
 
-   pwd # Should return the directory that the repo was cloned to
+   # log into user acme_broker and change dir to its home directory
+   sudo su acme_broker
+   cd
+   # create the virtual environment and activate it
    python -m venv venv
    source venv/bin/activate
-   pip install -r requirements.txt
-   pip install .
+   # install the package into the virtual environment
+   pip install -r acme-broker/requirements.txt
+   pip install acme-broker/.
    # Generate an account key for the internal ACME client
-   python -m acme_broker generate-account-key broker_client_account.key
+   python -m acme_broker generate-account-key /etc/acme_broker/broker_client_account.key
    # Change the key's file permissions
-   chmod 600 broker_client_account.key
+   chmod 600 /etc/acme_broker/broker_client_account.key
 
-Create a file *config.yml*, copy the following template to it and edit it according to your use case.
+Copy the template config file :code:`conf/broker.config.sample.yml` and the systemd unit file
+:code:`conf/broker.service` and edit them according to your use case.
 For an explanation of the configuration options, see :ref:`config_broker_proxy`.
-
-.. code-block:: yaml
-
-    broker:
-      db: 'postgresql+asyncpg://acme:YOUR_PASSWORD@localhost:5432/acme'
-      challenge_validator: 'requestipdns'
-      rsa_min_keysize: 2048
-      tos_url: 'https://my-broker.com/tos'
-      mail_suffixes:
-        - 'uni-hannover.de'
-        - 'tib.eu'
-      subnets:
-        - '127.0.0.1/32'
-        - '10.0.0.0/8'
-        - '172.16.0.0/12'
-        - '192.168.0.0/16'
-        - '130.75.0.0/16'
-      client:
-        directory: 'https://acme-v02.api.letsencrypt.org/directory'
-        private_key: 'broker_client_account.key'
-        contact:
-          phone: '555-1234'
-          email: 'broker@my-broker.com'
-        challenge_solver:
-          infoblox:
-            host: 'ipam.my-broker.com'
-            username: 'infobloxuser'
-            password: 'infobloxpassw'
-
-The config file also needs a section that sets up logging.
-For a configuration that should work for most use cases, see :ref:`config_logging`.
-
-The final step is to start the broker server:
 
 .. code-block:: bash
 
-   python -m acme_broker run --config-file=config.yml
+   cp acme_broker/conf/broker.config.sample.yml /etc/acme_broker/config.yml
+   chmod 600 /etc/acme_broker/config.yml
+   exit
+   sudo cp acme_broker/conf/broker.service /etc/systemd/system
+
+The final step is to enable/start the broker app:
+
+.. code-block:: bash
+
+   sudo systemctl enable broker.service
+   sudo systemctl start broker.service
 
 The broker's directory should now be available at :code:`http://localhost:8000/directory`.
 
