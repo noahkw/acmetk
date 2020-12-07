@@ -2,6 +2,7 @@ import datetime
 
 import asyncpg
 from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, JSON
+from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import relationship
@@ -38,6 +39,7 @@ class Change(Base):
     change = Column(Integer, primary_key=True, index=True)
     _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
     timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
+    remote_host = Column(INET, index=True)
     data = Column(JSON, nullable=False)
 
 

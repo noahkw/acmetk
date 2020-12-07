@@ -88,6 +88,7 @@ def versioned_session(session):
                 obj.changes.append(
                     models.Change(
                         timestamp=datetime.datetime.now(datetime.timezone.utc),
+                        remote_host=session.info.get('remote_host'),
                         data=diff,
                     )
                 )
