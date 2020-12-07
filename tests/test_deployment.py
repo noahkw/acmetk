@@ -17,7 +17,7 @@ class TestDeployment(TestAcme):
     This is probably easiest to set up using PyCharm's built-in
     'docker-compose' remote interpreter."""
 
-    DIRECTORY = "https://127.0.0.1:443/directory"
+    DIRECTORY = "https://127.0.0.1/directory"
 
     @property
     def config_sec(self):
@@ -74,7 +74,6 @@ class TestAcmetinyCADeployment(
     TestAcmetiny, TestDeployment, unittest.IsolatedAsyncioTestCase
 ):
     async def test_run(self):
-        # TODO: fix, request.host is populated with '127.0.0.1:443' for some reason. Should only be the host IP.
         await super().test_run()
 
 
