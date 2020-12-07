@@ -48,7 +48,7 @@ tests:
       mail_suffixes:
         - 'uni-hannover.de'
         - 'tib.eu'
-      reverse_proxy_host: '127.0.0.1'
+      use_forwarded_header: false
     client:
       directory: 'https://127.0.0.1/directory'
       contact:

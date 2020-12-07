@@ -218,13 +218,11 @@ Symlink the file to :code:`sites-enabled`:
 
    sudo ln -s /etc/nginx/sites-available/broker /etc/nginx/sites-enabled/
 
-Now add the hostname of the reverse proxy to the broker's configuration file.
-If the broker and the nginx instance both run on *my-broker.com*, for example, then add the config option
-to the *broker* section:
+Now set the *use_forwarded_header* option to *true* in the broker's configuration file.
 
 .. code-block:: ini
 
-   reverse_proxy_host: 'my-broker.com'
+   use_forwarded_header: 'my-broker.com'
 
 Enable the broker service, then start it and restart Nginx:
 
@@ -261,7 +259,7 @@ For an explanation of the configuration options, see :ref:`config_broker_proxy`.
       challenge_validator: 'requestipdns'
       rsa_min_keysize: 2048
       tos_url: 'https://my-proxy.com/tos'
-      reverse_proxy_host: 'my-proxy.com'
+      use_forwarded_header: true
       mail_suffixes:
         - 'uni-hannover.de'
         - 'tib.eu'

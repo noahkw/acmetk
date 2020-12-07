@@ -111,7 +111,7 @@ class AcmeServerBase(ConfigurableMixin):
         tos_url=None,
         mail_suffixes=None,
         subnets=None,
-        reverse_proxy_host=None,
+        use_forwarded_header=False,
         **kwargs,
     ):
         self._rsa_min_keysize = rsa_min_keysize
@@ -120,7 +120,7 @@ class AcmeServerBase(ConfigurableMixin):
         self._subnets = (
             [ipaddress.ip_network(subnet) for subnet in subnets] if subnets else None
         )
-        self._reverse_proxy_host = reverse_proxy_host
+        self._use_forwarded_header = use_forwarded_header
 
         self.app = web.Application(
             middlewares=[
@@ -176,7 +176,7 @@ class AcmeServerBase(ConfigurableMixin):
             tos_url=config.get("tos_url"),
             mail_suffixes=config.get("mail_suffixes"),
             subnets=config.get("subnets"),
-            reverse_proxy_host=config.get("reverse_proxy_host"),
+            use_forwarded_header=config.get("use_forwarded_header"),
             **kwargs,
         )
         instance._db = db
@@ -1073,45 +1073,33 @@ class AcmeServerBase(ConfigurableMixin):
 
             * HTTP status code *403* if the host's IP is not part of any of the whitelisted subnets.
             * HTTP status code *400* if there is a *X-Forwarded-For* header spoofing attack going on.
-            * HTTP status code *500* if the reverse proxy is misconfigured, i.e. the *X-Forwarded-For* header is set, \
-                but no reverse proxy IP was configured.
 
         """
         forwarded_for = request.headers.get("X-Forwarded-For")
 
-        """If the X-Forwarded-For header is set, then we need to check whether the host IP is the
-        configured reverse proxy's. Otherwise, there may be a spoofing attack going on.
-        Similarly, if the X-Forwarded-For header is set, but the reverse proxy IP was not configured by the
-        administrator, then the app shows an error."""
-        if (
-            forwarded_for
-            and self._reverse_proxy_host
-            and request.host != self._reverse_proxy_host
-        ):
+        """If the X-Forwarded-For header is set, then we need to check whether the app is configured
+        to be behind a reverse proxy. Otherwise, there may be a spoofing attack going on."""
+        if forwarded_for and not self._use_forwarded_header:
             return web.Response(
                 status=400,
                 text=f"{type(self).__name__}: The X-Forwarded-For header is being spoofed.",
-            )
-        elif forwarded_for and not self._reverse_proxy_host:
-            return web.Response(
-                status=500,
-                text=f"{type(self).__name__}: The reverse proxy is misconfigured. "
-                f"Please contact the server administrator.",
             )
 
         """Read the X-Forwarded-For header if the server is behind a reverse proxy.
         Otherwise, use the host address directly."""
         host_ip = ipaddress.ip_address(forwarded_for or request.remote)
+
+        """Attach the actual host IP to the request for re-use in the handler."""
         request["actual_ip"] = host_ip
 
-        if not self._subnets or any([host_ip in subnet for subnet in self._subnets]):
-            return await handler(request)
-        else:
+        if self._subnets and not any([host_ip in subnet for subnet in self._subnets]):
             return web.Response(
                 status=403,
                 text=f"{type(self).__name__}: This service is only available from within certain networks."
                 " Please contact your system administrator.",
             )
+
+        return await handler(request)
 
     @middleware
     async def aiohttp_jinja2_middleware(self, request, handler):
@@ -1178,7 +1166,7 @@ class AcmeCA(AcmeServerBase):
             tos_url=config.get("tos_url"),
             mail_suffixes=config.get("mail_suffixes"),
             subnets=config.get("subnets"),
-            reverse_proxy_host=config.get("reverse_proxy_host"),
+            use_forwarded_header=config.get("use_forwarded_header"),
             cert=config["cert"],
             private_key=config["private_key"],
             **kwargs,
