@@ -104,123 +104,50 @@ The broker's directory should now be available at :code:`http://localhost:8000/d
 Bare-metal behind a reverse proxy
 #################################
 
-This section builds on the bare-metal installation, so complete that first before continuing.
+This section builds on the `Bare-metal`_ installation, so complete that first before continuing.
 
-Install Nginx via apt:
+Install OpenResty from the openresty repository via apt: `Section Debian <http://openresty.org/en/linux-packages.html>`_
 
-.. code-block:: bash
-
-   sudo apt update
-   sudo apt install nginx
-
-Create a new systemd service file :code:`broker.service` in :code:`/etc/systemd/system/`:
-
-.. code-block:: ini
-
-   [Unit]
-   Description=ACME Broker
-
-   [Service]
-   WorkingDirectory=/path/to/acme_broker
-   ExecStart=/path/to/venv/bin/python -m acme_broker run --config-file=/path/to/config.yml --path=/tmp/broker_1.sock
-
-   # Disable Python's buffering of STDOUT and STDERR, so that output from the
-   # service shows up immediately in systemd's logs
-   Environment=PYTHONUNBUFFERED=1
-
-   # Automatically restart the service if it crashes
-   Restart=on-failure
-
-   # Use the nginx user to run our service
-   User=www-data
-
-   [Install]
-   # Tell systemd to automatically start this service when the system boots
-   # (assuming the service is enabled)
-   WantedBy=default.target
-
-The path of the cloned repository, the virtual environment that the package was installed to, and the path of the
-*config.yml* need to be changed.
-
-In order to configure Nginx as a reverse proxy, we first need to disable the default site configuration:
+Copy the modified :code:`nginx.conf` as well as the broker site config file:
 
 .. code-block:: bash
 
-   sudo rm /etc/nginx/sites-enabled/default
-
-Then create a new file called :code:`broker` in :code:`/etc/nginx/sites-available`:
-
-.. code-block:: ini
-
-   upstream broker {
-     # fail_timeout=0 means we always retry an upstream even if it failed
-     # to return a good HTTP response
-
-     # Unix domain servers
-     server unix:/tmp/broker_1.sock fail_timeout=0;
-     # server unix:/tmp/broker_2.sock fail_timeout=0;
-   }
-
-   server {
-     client_max_body_size 4G;
-
-     listen              80;
-     listen              443 ssl;
-     keepalive_timeout   70;
-
-     ssl_certificate     /path/to/fullchain.pem;
-     ssl_certificate_key /path/to/cert.key;
-     ssl_dhparam         /path/to/dhparam.pem;
-
-     ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
-     ssl_prefer_server_ciphers on;
-     ssl_ciphers "EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH";
-     ssl_ecdh_curve secp384r1;
-     ssl_session_cache shared:SSL:10m;
-     ssl_session_tickets off;
-     ssl_stapling on;
-     ssl_stapling_verify on;
-     # resolver 8.8.8.8 8.8.4.4 valid=300s;
-     # resolver_timeout 5s;
-     # Disable preloading HSTS for now.  You can use the commented out header line that includes
-     # the "preload" directive if you understand the implications.
-     #add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload";
-     add_header Strict-Transport-Security "max-age=63072000; includeSubdomains";
-     add_header X-Frame-Options DENY;
-     add_header X-Content-Type-Options nosniff;
-
-     location / {
-       proxy_set_header Host $http_host;
-       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-       proxy_set_header X-Forwarded-Proto $scheme;
-       proxy_redirect off;
-       proxy_buffering off;
-       proxy_pass http://broker;
-     }
-   }
-
-Acquiring an SSL certificate for the reverse proxy is out of this guide's scope, but the
-*ssl_certificate*, *ssl_certificate_key*, and *ssl_dhparam* directives need to be changed to point to the
-respective file.
-Symlink the file to :code:`sites-enabled`:
-
-.. code-block:: bash
-
-   sudo ln -s /etc/nginx/sites-available/broker /etc/nginx/sites-enabled/
+   cd /srv/acme_broker
+   sudo cp acme-broker/conf/nginx.conf /etc/openresty/nginx.conf
+   sudo mkdir /etc/openresty/conf.d
+   sudo cp acme-broker/conf/broker_site.conf /etc/openresty/conf.d/
 
 Now set the *use_forwarded_header* option to *true* in the broker's configuration file.
 
 .. code-block:: ini
 
-   use_forwarded_header: 'my-broker.com'
+   use_forwarded_header: true
 
-Enable the broker service, then start it and restart Nginx:
+Install LuaRocks via apt and lua-resty-open-ssl via LuaRocks:
 
 .. code-block:: bash
 
-   sudo systemctl enable broker.service
-   sudo systemctl start broker.service
-   sudo systemctl restart nginx.service
+   sudo apt install luarocks
+   sudo luarocks install lua-resty-auto-ssl
+   # create the config directory, grant permissions
+   sudo mkdir /etc/resty-auto-ssl
+   sudo chown www-data: /etc/resty-auto-ssl
+
+Generate the self-signed fallback certificate:
+
+.. code-block:: bash
+
+   sudo openssl req -new -newkey rsa:2048 -days 3650 -nodes -x509 \
+      -subj '/CN=sni-support-required-for-valid-ssl' \
+      -keyout /etc/ssl/resty-auto-ssl-fallback.key \
+      -out /etc/ssl/resty-auto-ssl-fallback.crt
+
+Restart both services:
+
+.. code-block:: bash
+
+   sudo systemctl restart broker.service
+   sudo systemctl restart openresty.service
 
 The broker's directory should now be available at :code:`https://my-broker.com/directory`.
 
