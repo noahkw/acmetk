@@ -1,0 +1,40 @@
+{%  extends "template.jinja2" %}
+
+{%  block body %}
+<h1>Changes</h1>
+{{ paginate(page) }}
+<table>
+<tr class="h">
+    <th>Time</th>
+    <th align="left">Account<br>Identifier/Order</th>
+    <th>Change</th>
+</tr>
+{% for c in changes %}
+{% set zebra=loop.cycle('odd', 'even') %}
+{% if loop.changed(time(c.timestamp, fmt='%Y-%m-%d')) %}
+<tr class="h">
+<td colspan="3" >{{ time(c.timestamp, fmt='%Y-%m-%d')  }}</td>
+</tr>
+{% endif %}
+
+<tr class="{{ zebra }}">
+    <td>{{ time(c.timestamp, fmt='%H:%M:%S.%f %Z') }}</td>
+    <td>
+        <div>{{ account_url(c.entity, l=13) }}</div>
+        <div>{{ c.entity.identity }}/{{ entity_url(c.entity) }}</div>
+    </td>
+    <td>
+    <ul class="data">
+{% for i in c.data %}
+{{  change(i) }}
+{% endfor %}
+    </ul>
+    </td>
+</tr>
+<tr class="{{ zebra }}">
+
+</tr>
+{% endfor %}
+</table>
+{{ paginate(page) }}
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "template.jinja2" %}
+
+{%  block body %}
+<h1>Certificates</h1>
+{{ paginate(page) }}
+<table>
+<tr class="h">
+    <th>Time</th>
+    <th>Account</th>
+    <th>Certificate</th>
+    <th>Identifiers</th>
+</tr>
+{% for c in certificates %}
+{% if loop.changed(time(c.changes[0].timestamp, fmt='%Y-%m-%d')) %}
+<tr class="h">
+<td colspan="4" >{{ time(c.changes[0].timestamp, fmt='%Y-%m-%d')  }}</td>
+</tr>
+{% endif %}
+<tr>
+<td>{{ time(c.changes[0].timestamp) }}</td>
+<td>{{ account_url(c) }}</td>
+<td><a href="{{ url_for('mgmt-certificate', certificate=c.certificate_id|string) }}">{{ shorten(c.certificate_id|string, l=13) }}</a></td>
+<td>{{ c.order.identifiers|map(attribute='value')|join(' ') }}</td>
+</tr>
+{% endfor %}
+</table>
+{{ paginate(page) }}
+{% endblock %}

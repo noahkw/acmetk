@@ -1,0 +1,89 @@
+{%- macro listsep(l) -%}
+{%- if not l.changed(True) %}, {% endif %}
+{%- endmacro %}
+
+{%- macro Name(n) %}
+{%- for attr in n.rdns -%}
+{{ listsep(loop) }}{{ attr.rfc4514_string() }}
+{%- endfor %}
+{%- endmacro %}
+
+{%- macro Blob(b, batchsize=18, off=9) -%}
+{%- for i in b.hex(':')|batch(batchsize*3) -%}
+{{ (''.join(i))|string|indent(off, True, False) }}{{ '\n' if not loop.last }}
+{%- endfor -%}
+{%- endmacro -%}
+
+{%- macro IntBlob(i, batchsize, off) -%}
+{{ Blob(i.to_bytes(((i.bit_length()/8)+1)|int, byteorder='big'), batchsize, off) }}
+{%- endmacro -%}
+
+{%- set c=certificate -%}
+{%- set key=c.public_key() -%}
+
+Certificate:
+    Data:
+        Version: {{ c.version.name }} ({{ c.version.value}})
+        Serial Number:
+{{ IntBlob(c.serial_number, 64, 12) }}
+        Signature Algorithm: {{ c.signature_algorithm_oid._name }}
+        Issuer: {{ Name(c.issuer) }}
+        Validity
+            Not Before: {{ c.not_valid_before }}
+            Not After : {{ c.not_valid_after }}
+        Subject: {{ Name(c.subject) }}
+        Subject Public Key Info:
+{%- if key.__class__.__name__ == '_RSAPublicKey' %}
+            Public Key Algorithm: RSA Public Key
+                RSA Public-Key: ({{ key.key_size }} bit)
+                Modulus:
+{{ IntBlob(key.public_numbers().n, 15, 20) }}
+                Exponent: {{ key.public_numbers().e }} ({{ '0x{:x}'.format(key.public_numbers().e) }})
+{% elif key.__class__.__name__ == '_EllipticCurvePublicKey' %}
+            Public Key Algorithm: id-ecPublicKey
+                Public-Key: ({{ key.key_size }} bit)
+                pub:
+{{ Blob(key.public_bytes(encoding=cryptography.hazmat.primitives.serialization.Encoding.X962,
+format=cryptography.hazmat.primitives.serialization.PublicFormat.UncompressedPoint),15,20) }}
+                ASN1 OID: {{ key.curve.name }}
+                NIST CURVE: {{ 'P-{}'.format(key.curve.name[4:7]) if key.curve.name.startswith('secp') else 'u'}}
+{%- else %}
+            Public Key Algorithm: {{key.__class__.__name__}}
+{%- endif %}
+        X509v3 extensions:
+{%- for e in c.extensions %}
+{%- set v=e.value %}
+            X509v3 {{ e.oid._name }}: {{ 'critical' if e.critical }}
+{%- if v.__class__.__name__ == 'BasicConstraints'%}
+                CA={{ v.ca }} pathlen={{ v.pathlen }}
+{%- elif v.__class__.__name__ == 'SubjectAlternativeName'%}
+{%- for n in v %}
+                {{ n.__class__.__name__ }}: {{ n.value }}
+{%- endfor %}
+{%- elif v.__class__.__name__ == 'KeyUsage'%}
+                {% for k,va in {
+                    'digital_signature':'Digital Signature',
+                    'content_commitment':'_Content Commitment',
+                    'key_encipherment':'Key Encipherment',
+                    'data_encipherment':'Data Encipherment',
+                    'key_agreement':'_Key Agreement',
+                    'key_cert_sign':'_Key Cert Sign',
+                    'crl_sign':'_CRL Sign',
+                    }.items() %}
+{%- if v|attr(k) %}{{listsep(loop)}}{{ va }} {%- endif %}
+{%- endfor %}
+{%- elif v.__class__.__name__ == 'ExtendedKeyUsage'%}
+                {% for e in v -%}
+{{listsep(loop)}}{{ e._name }}
+{%- endfor %}
+{%- elif v.__class__.__name__ == 'AuthorityKeyIdentifier'%}
+                keyid:{{ v.key_identifier.hex(':') }}
+{%- elif v.__class__.__name__ == 'SubjectKeyIdentifier'%}
+                keyid:{{ v.digest.hex(':') }}
+{%- else %}
+                Can't decode
+{%- endif %}
+{%- endfor %}
+    Signature Algorithm: {{c.signature_algorithm_oid._name}}
+{{ Blob(c.signature, 18, 9) }}
+{{  c.public_bytes(encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM).decode() }}

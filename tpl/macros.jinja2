@@ -1,0 +1,52 @@
+{% macro account_url(obj, l=13) -%}
+<a href="{{ url_for('mgmt-account', account=obj.account_of.kid|string) }}">{{ shorten(obj.account_of.kid|string, l) }}</a>
+{%- endmacro %}
+
+{% macro order_url(obj, l=13, name=None) -%}
+{%- set order=obj.order_of -%}
+{%- if order -%}
+<a href="{{ url_for('mgmt-order', order=obj.order_of.order_id|string) }}">{{ shorten(name or obj.order_of.order_id|string, 13) }}</a>
+{%- else -%}
+{{ obj.identity }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro entity_url(obj) -%}
+{%- if obj.identity in ['account'] -%}
+{{ account_url(obj, l=13) }}
+{%- elif obj.identity in ['certificate'] %}
+<a href="{{ url_for('mgmt-' + obj.identity, **{obj.identity:obj|attr(obj.identity)|string}) }}">{{ shorten(obj|attr(obj.identity)|string, l=13) }}</a>
+{%- elif obj.identity in ['order','authorization','challenge','identifier'] -%}
+{{ order_url(obj.order_of, shorten(obj|attr(obj.identity + '_id')|string, l=13)) }}
+{%- else -%}
+{{ shorten(obj.entity|attr(obj.entity.identity + '_id')|string, l=13) }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro time(t, or_='-', fmt='%Y-%m-%d %H:%M %Z') -%}
+{{ t.strftime(fmt) if t else or_ }}
+{%- endmacro %}
+
+{% macro shorten(s, l=7) -%}
+{%- if s|length > l -%}
+    {{ s[:((l-1)/2)|int] }}…{{ s[(-(l-1)/2)|int:] }}
+{%- else -%}
+    {{ s }}
+{%- endif -%}
+{%- endmacro %}
+
+{% macro paginate(p) %}
+<div id="pagination">
+{% if p.has_previous %}
+    <a href="{{ url_for(request.match_info.route.name).with_query({'page':p.previous_page}) }}">&larr;</a>
+{% else %}
+    &larr;
+{% endif %}
+{{ request.query.get('page', 1) }}/{{ page.pages }}
+{% if p.has_next %}
+    <a href="{{ url_for(request.match_info.route.name).with_query({'page':p.next_page}) }}">&rarr;</a>
+{% else %}
+    &rarr;
+{% endif %}
+</div>
+{% endmacro %}

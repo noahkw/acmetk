@@ -1,0 +1,75 @@
+{%  extends "template.jinja2" %}
+
+{%  block body %}
+<h1>Account</h1>
+<p>
+<table>
+<tr>
+
+    <td>Status</td>
+    <td>{{ account.status.name }}</td>
+</tr>
+<tr>
+    <td>Contact</td>
+    <td>{{ account.contact }}</td>
+</tr>
+<tr>
+    <td>Fingerprint</td>
+    <td>{{ account_url(account, l=32) }}</td>
+</tr>
+
+<tr>
+    <td>Key</td>
+    <td><pre>{{ account.key.key._wrapped.public_bytes(
+    encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM,
+    format=cryptography.hazmat.primitives.serialization.PublicFormat.SubjectPublicKeyInfo).decode() }}</pre></td>
+</tr>
+</table>
+</p>
+<h2>History</h2>
+<table>
+{% for c in account.changes %}
+{% if loop.changed(time(c.timestamp, fmt='%Y-%m-%d')) %}
+<tr class="h">
+<td colspan="3" >{{ time(c.timestamp, fmt='%Y-%m-%d')  }}</td>
+</tr>
+{% endif %}
+<tr>
+<td>{{ time(c.timestamp, fmt='%H:%M:%S.%f %Z') }}</td>
+<td>{{ c.entity.identity }}/{{ shorten(c.entity|attr(c.entity.identity), 13) }}</td>
+<td>
+    <ul class="data">
+{% for i in c.data %}
+    {{change(i)}}
+{% endfor %}
+    </ul>
+</td>
+</tr>
+{% endfor %}
+</table>
+
+<h2>Orders</h2>
+<table>
+<tr class="h">
+    <th>order</th>
+    <th>status</th>
+    <th>authorizations</th>
+    <th>expires</th>
+</tr>
+{% for o in orders|reverse %}
+<tr>
+    <td>{{ order_url(o) }}</td>
+    <td>{{ o.status.name }}</td>
+    <td>
+{% for i in o.identifiers|sort(attribute='value') %}
+    <a href="{{ url_for('mgmt-order', order=o.order_id|string) }}#{{ i.authorization.authorization_id }}">{{ i.value }}</a>
+{% endfor %}
+    </td>
+    <td>
+        {{ time(o.expires) }}
+    </td>
+</tr>
+{% endfor %}
+</table>
+
+{% endblock %}

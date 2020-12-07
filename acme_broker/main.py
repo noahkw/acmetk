@@ -6,6 +6,9 @@ from pathlib import Path
 import click
 import yaml
 
+import aiohttp_jinja2
+import jinja2
+
 from acme_broker import AcmeBroker
 from acme_broker.client import AcmeClient, ChallengeSolver
 from acme_broker.server import (
@@ -136,10 +139,19 @@ def run(config_file, path):
     click.echo(f"Starting {app_class.__name__}")
 
     if app_class is AcmeBroker:
-        loop.run_until_complete(run_broker(config, path))
+        runner, site = loop.run_until_complete(run_broker(config, path))
     elif app_class is AcmeCA:
-        loop.run_until_complete(run_ca(config, path))
+        runner, site = loop.run_until_complete(run_ca(config, path))
+    else:
+        raise ValueError(app_class)
 
+    aiohttp_jinja2.setup(site.app, loader=jinja2.FileSystemLoader("./tpl/"))
+    aiohttp_jinja2.get_env(site.app).globals.update({"url_for": _url_for})
+
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        loop.run_until_complete(runner.cleanup())
 
 async def run_ca(config, path):
     challenge_validator = await create_challenge_validator(
@@ -147,16 +159,24 @@ async def run_ca(config, path):
     )
 
     if path:
-        _, ca = await AcmeCA.unix_socket(config["ca"], path)
+        runner, ca = await AcmeCA.unix_socket(config["ca"], path)
     elif config["ca"]["hostname"] and config["ca"]["port"]:
-        _, ca = await AcmeCA.runner(config["ca"])
+        runner, ca = await AcmeCA.runner(config["ca"])
     else:
         raise click.UsageError(PATH_OR_HOST_AND_PORT_MSG)
 
     ca.register_challenge_validator(challenge_validator)
 
-    while True:
-        await asyncio.sleep(3600)
+    return runner, ca
+
+
+@jinja2.contextfunction
+def _url_for(context, __route_name, **parts):
+    try:
+        return context["request"].match_info.apps[-1].router[__route_name].url_for(**parts)
+    except Exception as e:
+        print(e)
+        return "ERROR GENERATING URL"
 
 
 async def run_broker(config, path):
@@ -178,19 +198,17 @@ async def run_broker(config, path):
     await broker_client.start()
 
     if path:
-        _, broker = await AcmeBroker.unix_socket(
+        runner, broker = await AcmeBroker.unix_socket(
             config["broker"], path, client=broker_client
         )
     elif config["broker"]["hostname"] and config["broker"]["port"]:
-        _, broker = await AcmeBroker.runner(config["broker"], client=broker_client)
+        runner, broker = await AcmeBroker.runner(config["broker"], client=broker_client)
     else:
         raise click.UsageError(PATH_OR_HOST_AND_PORT_MSG)
 
     broker.register_challenge_validator(challenge_validator)
 
-    while True:
-        await asyncio.sleep(3600)
-
+    return runner, broker
 
 if __name__ == "__main__":
     main()

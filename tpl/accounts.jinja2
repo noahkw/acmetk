@@ -1,0 +1,14 @@
+{% extends "template.jinja2" %}
+
+{%  block body %}
+<h1>Accounts</h1>
+<table>
+{% for account in accounts %}
+<tr>
+    <td>{{ account_url(account) }}</td>
+    <td>{{ account.contact }}</td>
+    <td>{{ account.status.name }}</td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}

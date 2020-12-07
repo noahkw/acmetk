@@ -1,0 +1,87 @@
+{%  extends "template.jinja2" %}
+
+{%  block body %}
+<h1>Order {{ order.order }}</h1>
+<p>
+<table>
+    <tr>
+        <td>Account:</td>
+        <td><a href="{{ url_for('mgmt-account', account=order.account.account_id|string) }}">{{ order.account.contact }}</a></td>
+    </tr>
+    <tr>
+        <td>Status:</td>
+        <td>{{ order.status.name }}</td>
+    </tr>
+    <tr>
+        <td>Expires:</td>
+        <td>{{ time(order.expires, 'No') }}</td>
+    </tr>
+    <tr>
+        <td>Certificate:</td>
+        <td>
+{% if order.certificate %}
+            <a href="{{ url_for('mgmt-certificate', certificate=order.certificate_id|string)}}">Yes</a>
+{% else %}
+            No
+{% endif %}
+        </td>
+    </tr>
+</table>
+</p>
+<h2>Authorizations & Challenges</h2>
+<table>
+<tr class="h">
+    <td colspan="2" >domain</td>
+    <td>authz</td>
+    <td>expires</td>
+    <td rowspan="2">status</td>
+</tr>
+<tr>
+    <td></td>
+    <td>type</td>
+    <td>challenge</td>
+    <td>validated</td>
+</tr>
+<tr><td colspan="4"></td></tr>
+{% for a in order.authorizations|sort(attribute='identifier.value') %}
+<tr class="h">
+    <td colspan="2">{{ a.identifier.value }}</td>
+    <td>{{ a.authorization }}</td>
+    <td>{{ time(a.expires) }}</td>
+    <td>{{ a.status }}</td>
+</tr>
+{% for c in a.challenges|sort(attribute='type') %}
+<tr>
+    <td></td>
+    <td>{{ c.type }}</td>
+    <td>{{ c.challenge }}</td>
+    <td>{{ time(c.validated) }}</td>
+    <td>{{ c.status }}</td>
+</tr>
+{%  endfor %}
+<tr><td colspan="5"></td></tr>
+{%  endfor %}
+</table>
+
+<h2>History</h2>
+<table>
+{% for c in changes %}
+{% if loop.changed(time(c.timestamp, fmt='%Y-%m-%d')) %}
+<tr class="h">
+<td colspan="3" >{{ time(c.timestamp, fmt='%Y-%m-%d')  }}</td>
+</tr>
+{% endif %}
+<tr>
+<td>{{ time(c.timestamp, fmt='%H:%M:%S.%f %Z') }}</td>
+<td>{{ c.entity.identity }}/{{ c.entity|attr(c.entity.identity + '_id') }}</td>
+<td>
+    <ul class="data">
+{% for i in c.data %}
+    {{change(i)}}
+{% endfor %}
+    </ul>
+</td>
+</tr>
+{% endfor %}
+</table>
+{% endblock %}
