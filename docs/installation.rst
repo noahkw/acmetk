@@ -177,6 +177,7 @@ Build the broker image locally:
 
 .. code-block:: bash
 
+   cd acme-broker/
    pwd # Should return the directory that the repo was cloned to
    sudo docker build -t broker_app .
 

@@ -9,11 +9,11 @@ import yaml
 import aiohttp_jinja2
 import jinja2
 
-from acme_broker import AcmeBroker
 from acme_broker.client import AcmeClient, ChallengeSolver
 from acme_broker.database import Database
 from acme_broker.server import (
     AcmeServerBase,
+    AcmeRelayBase,
     AcmeCA,
     ChallengeValidator,
 )
@@ -141,8 +141,10 @@ def run(config_file, path):
 
     click.echo(f"Starting {app_class.__name__}")
 
-    if app_class is AcmeBroker:
-        runner, site = loop.run_until_complete(run_broker(config, path))
+    if issubclass(app_class, AcmeRelayBase):
+        runner, site = loop.run_until_complete(
+            run_relay(config, path, app_class, app_config_name)
+        )
     elif app_class is AcmeCA:
         runner, site = loop.run_until_complete(run_ca(config, path))
     else:
@@ -185,36 +187,38 @@ def _url_for(context, __route_name, **parts):
         return "ERROR GENERATING URL"
 
 
-async def run_broker(config, path):
+async def run_relay(config, path, class_, config_name):
+    config_section = config[config_name]
+
     challenge_solver = await create_challenge_solver(
-        config["broker"]["client"]["challenge_solver"]
+        config_section["client"]["challenge_solver"]
     )
     challenge_validator = await create_challenge_validator(
-        config["broker"]["challenge_validator"]
+        config_section["challenge_validator"]
     )
 
-    broker_client = AcmeClient(
-        directory_url=config["broker"]["client"]["directory"],
-        private_key=config["broker"]["client"]["private_key"],
-        contact=config["broker"]["client"]["contact"],
+    relay_client = AcmeClient(
+        directory_url=config_section["client"]["directory"],
+        private_key=config_section["client"]["private_key"],
+        contact=config_section["client"]["contact"],
     )
 
-    broker_client.register_challenge_solver(challenge_solver)
+    relay_client.register_challenge_solver(challenge_solver)
 
-    await broker_client.start()
+    await relay_client.start()
 
     if path:
-        runner, broker = await AcmeBroker.unix_socket(
-            config["broker"], path, client=broker_client
+        runner, relay = await class_.unix_socket(
+            config_section, path, client=relay_client
         )
-    elif config["broker"]["hostname"] and config["broker"]["port"]:
-        runner, broker = await AcmeBroker.runner(config["broker"], client=broker_client)
+    elif config_section["hostname"] and config_section["port"]:
+        runner, relay = await class_.runner(config_section, client=relay_client)
     else:
         raise click.UsageError(PATH_OR_HOST_AND_PORT_MSG)
 
-    broker.register_challenge_validator(challenge_validator)
+    relay.register_challenge_validator(challenge_validator)
 
-    return runner, broker
+    return runner, relay
 
 
 @main.group()
