@@ -146,19 +146,20 @@ class TestAcmetiny:
             f"--acme-dir {self.path}/challenge"
         )
 
+
 class TestDehydrated:
     def setUp(self) -> None:
         super().setUp()
 
-        datadirs = ["domains_d","accounts","alpn-certs","certs","wellknown"]
+        datadirs = ["domains_d", "accounts", "alpn-certs", "certs", "wellknown"]
         self._rmtree.extend(datadirs)
         for n in datadirs:
             if not (r := (self.path / n)).exists():
                 r.mkdir()
 
-        with open(str(self.path / 'config'), 'wt') as f:
+        with open(str(self.path / "config"), "wt") as f:
             f.write(
-f"""
+                f"""
 CA={self.DIRECTORY}
 CONTACT_EMAIL={self.contact}
 IP_VERSION=4
@@ -170,7 +171,8 @@ CHALLENGETYPE="http-01"
 #ALPNCERTDIR="${{BASEDIR}}/alpn-certs"
 #ACCOUNTDIR="${{BASEDIR}}/accounts"
 WELLKNOWN="{str(self.path / 'wellknown')}"
-""")
+"""
+            )
 
     async def _run_dehydrated(self, _cmd):
         cmd = f"/tmp/dehydrated/dehydrated --config {self.path}/config {_cmd}"
@@ -178,7 +180,6 @@ WELLKNOWN="{str(self.path / 'wellknown')}"
         p = await asyncio.create_subprocess_exec(
             *shlex.split(cmd), stdout=asyncio.subprocess.PIPE
         )
-
 
         def llog(_line, logger):
             if not _line:
@@ -190,8 +191,9 @@ WELLKNOWN="{str(self.path / 'wellknown')}"
             llog(r, log.info)
 
     async def test_run(self):
-        await self._run_dehydrated('--register --accept-terms')
-        await self._run_dehydrated('--cron --force --domain test.de')
+        await self._run_dehydrated("--register --accept-terms")
+        await self._run_dehydrated("--cron --force --domain test.de")
+
 
 class TestCertBot:
     def setUp(self) -> None:
@@ -432,10 +434,10 @@ class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
+
 class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
-
 
 
 class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):

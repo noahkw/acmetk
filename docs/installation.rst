@@ -99,7 +99,7 @@ The final step is to enable/start the broker app:
    sudo systemctl enable broker.service
    sudo systemctl start broker.service
 
-The broker's directory should now be available at :code:`http://localhost:8000/directory`.
+The broker's directory should now be available at :code:`http://localhost:8180/directory`.
 
 Bare-metal behind a reverse proxy
 #################################
