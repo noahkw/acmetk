@@ -672,7 +672,7 @@ class AcmeServerBase(ConfigurableMixin):
         asyncio.ensure_future(
             self._handle_challenge_validate(request, kid, challenge_id)
         )
-        return self._response(request, serialized, links=[f'<{authz_url}>;rel="up"'])
+        return self._response(request, serialized, links=[f'<{authz_url}>; rel="up"'])
 
     @routes.post("/revoke-cert", name="revoke-cert")
     async def revoke_cert(self, request):
@@ -1243,7 +1243,7 @@ class AcmeCA(AcmeServerBase):
                 raise web.HTTPNotFound
 
             l = yarl.URL(url_for(request, 'ca-chain')).with_query(n=0)
-            links = [f'<{str(l)}>;rel="up"']
+            links = [f'<{str(l)}>; rel="up"']
 
             return self._response(
                 request,
