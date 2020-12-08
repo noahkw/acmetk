@@ -11,6 +11,7 @@ import jinja2
 
 from acme_broker import AcmeBroker
 from acme_broker.client import AcmeClient, ChallengeSolver
+from acme_broker.database import Database
 from acme_broker.server import (
     AcmeServerBase,
     AcmeCA,
@@ -34,7 +35,9 @@ def load_config(config_file):
     with open(config_file, "r") as stream:
         config = yaml.safe_load(stream)
 
-    logging.config.dictConfig(config["logging"])
+    if logging_section := config.get("logging"):
+        logging.config.dictConfig(logging_section)
+
     return config
 
 
@@ -212,6 +215,34 @@ async def run_broker(config, path):
     broker.register_challenge_validator(challenge_validator)
 
     return runner, broker
+
+
+@main.group()
+def db():
+    """Commands to interact with the database"""
+    pass
+
+
+@db.command()
+def migrate():
+    """Migrates the database"""
+    raise click.UsageError("Migrations have not been implemented yet.")
+
+
+@db.command()
+@click.option("--config-file", envvar="APP_CONFIG_FILE", type=click.Path())
+def init(config_file):
+    """Initializes the database's tables"""
+    loop = asyncio.get_event_loop()
+
+    config = load_config(config_file)
+    app_config_name = list(config.keys())[0]
+    db_connection_string = config[app_config_name]["db"]
+
+    db = Database(db_connection_string)
+
+    click.echo("Initializing tables...")
+    loop.run_until_complete(db.begin())
 
 
 if __name__ == "__main__":
