@@ -146,6 +146,52 @@ class TestAcmetiny:
             f"--acme-dir {self.path}/challenge"
         )
 
+class TestDehydrated:
+    def setUp(self) -> None:
+        super().setUp()
+
+        datadirs = ["domains_d","accounts","alpn-certs","certs","wellknown"]
+        self._rmtree.extend(datadirs)
+        for n in datadirs:
+            if not (r := (self.path / n)).exists():
+                r.mkdir()
+
+        with open(str(self.path / 'config'), 'wt') as f:
+            f.write(
+f"""
+CONTACT_EMAIL={self.contact}
+IP_VERSION=4
+CA="letsencrypt"
+CHALLENGETYPE="http-01"
+#DOMAINS_D={str(self.path / 'domains_d')}
+#BASEDIR=$SCRIPTDIR
+#DOMAINS_TXT="${{BASEDIR}}/domains.txt"
+#CERTDIR="${{BASEDIR}}/certs"
+#ALPNCERTDIR="${{BASEDIR}}/alpn-certs"
+#ACCOUNTDIR="${{BASEDIR}}/accounts"
+WELLKNOWN="{str(self.path / 'wellknown')}"
+""")
+
+    async def _run_dehydrated(self, _cmd):
+        cmd = f"/tmp/dehydrated/dehydrated --ca {self.DIRECTORY} --config {self.path}/config {_cmd}"
+        log.info(cmd)
+        p = await asyncio.create_subprocess_exec(
+            *shlex.split(cmd), stdout=asyncio.subprocess.PIPE
+        )
+
+
+        def llog(_line, logger):
+            if not _line:
+                return
+            args = _line.decode().strip()
+            logger(args)
+
+        while r := await p.stdout.readline():
+            llog(r, log.info)
+
+    async def test_run(self):
+        await self._run_dehydrated('--register --accept-terms')
+        await self._run_dehydrated('--cron --force --domain test.de')
 
 class TestCertBot:
     def setUp(self) -> None:
@@ -385,6 +431,11 @@ class TestOurClient:
 class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
+
+class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
+
 
 
 class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
