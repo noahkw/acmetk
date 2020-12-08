@@ -17,7 +17,7 @@ class TestDeployment(TestAcme):
     This is probably easiest to set up using PyCharm's built-in
     'docker-compose' remote interpreter."""
 
-    DIRECTORY = "https://127.0.0.1/directory"
+    DIRECTORY = "https://localhost/directory"
 
     @property
     def config_sec(self):
@@ -29,7 +29,7 @@ class TestDeployment(TestAcme):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
 
-        # Create and place the self-signed certificate for nginx to use.
+        # Create and place the self-signed certificate for openresty to use.
         fake_ca = trustme.CA()
         server_cert = fake_ca.issue_cert("127.0.0.1", "localhost")
 
@@ -42,7 +42,7 @@ class TestDeployment(TestAcme):
 
         fake_ca.cert_pem.write_to_path(cert_path, append=True)
 
-        key_path = cert_path.parent / "client_cert.key"
+        key_path = cert_path.parent / "resty-auto-ssl-fallback.key"
         server_cert.private_key_pem.write_to_path(key_path)
 
         # The environment variable is set to the server cert so that the requests module uses it (certbot).
@@ -55,11 +55,17 @@ class TestDeployment(TestAcme):
 
         ssl._create_default_https_context = ssl._create_unverified_context
 
+        # Disable resty-auto-ssl
+        with open("/usr/local/bin/resty-auto-ssl/dehydrated", "w") as f:
+            f.write("echo 1;")
+
         self.nginx_proc = await asyncio.create_subprocess_shell(
-            '/usr/sbin/nginx -g "daemon off;"', None, None
+            '/usr/local/openresty/nginx/sbin/nginx -g "daemon off; master_process on;"',
+            None,
+            None,
         )
 
-        runner, ca = await AcmeCA.unix_socket(self.config_sec["ca"], "/tmp/app_1.sock")
+        runner, ca = await AcmeCA.runner(self.config_sec["ca"])
         ca.register_challenge_validator(RequestIPDNSChallengeValidator())
 
         self.runner = runner

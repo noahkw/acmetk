@@ -17,6 +17,7 @@ services:
       - db
     volumes:
       - .:/app
-      - ./certs:/app/certs
+      - ./etc:/etc/acme_broker
+      - ./log:/var/log/supervisor
     environment:
       APP_CONFIG_FILE: ${ACME_BROKER_CONFIG_FILE}

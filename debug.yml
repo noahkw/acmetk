@@ -41,19 +41,21 @@ tests:
     names:
       - 'localhost'
     ca:
-      &db_prod db: 'postgresql+asyncpg://acme-broker:acme-broker-prod-pw@db:55432/acme-broker' # TODO: consider using a different db
+      hostname: *host
+      port: 8180
+      db: 'postgresql+asyncpg://acme-broker:acme-broker-prod-pw@db:5432/acme-broker' # TODO: consider using a different db
       rsa_min_keysize: *rsa_min
       tos_url: *tos
       cert: '/app/certs/root.crt'
       private_key: '/app/certs/root.key'
       mail_suffixes: *mail_suffixes
-      use_forwarded_header: false
+      use_forwarded_header: true
     client:
       directory: 'https://127.0.0.1/directory'
       contact:
         # phone: ''
         email: 'woehler+testclientcadeployment@luis.uni-hannover.de'
-      server_cert: '/app/certs/fullchain.pem'
+      server_cert: '/etc/ssl/resty-auto-ssl-fallback.crt'
   BrokerLocalCA:
     names:
       - 'brokerlocalca.test.de'
