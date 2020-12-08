@@ -166,6 +166,13 @@ Install Docker and Docker Compose:
 * `Install Docker Engine on Debian <https://docs.docker.com/engine/install/debian/>`_
 * `Install Docker Compose <https://docs.docker.com/compose/install/>`_
 
+Clone the git repository:
+
+.. code-block:: bash
+   :substitutions:
+
+   git clone |GIT_URL|
+
 Build the broker image locally:
 
 .. code-block:: bash
@@ -173,60 +180,33 @@ Build the broker image locally:
    pwd # Should return the directory that the repo was cloned to
    sudo docker build -t broker_app .
 
-Create a file :code:`config.yml`, copy the following template to it and edit it according to your use case.
+Create the directory :code:`./etc`, copy the template config file :code:`conf/proxy.config.sample.yml` to it
+and edit it according to your use case.
 For an explanation of the configuration options, see :ref:`config_broker_proxy`.
 
 .. code-block:: yaml
 
-    proxy:
-      db: 'postgresql+asyncpg://acme:YOUR_PASSWORD@db:5432/acme'
-      challenge_validator: 'requestipdns'
-      rsa_min_keysize: 2048
-      tos_url: 'https://my-proxy.com/tos'
-      use_forwarded_header: true
-      mail_suffixes:
-        - 'uni-hannover.de'
-        - 'tib.eu'
-      subnets:
-        - '127.0.0.1/32'
-        - '10.0.0.0/8'
-        - '172.16.0.0/12'
-        - '192.168.0.0/16'
-        - '130.75.0.0/16'
-      client:
-        directory: 'https://acme-v02.api.letsencrypt.org/directory'
-        private_key: 'proxy_client_account.key'
-        contact:
-          phone: '555-1234'
-          email: 'broker@my-proxy.com'
-        challenge_solver:
-          infoblox:
-            host: 'ipam.my-proxy.com'
-            username: 'infobloxuser'
-            password: 'infobloxpassw'
-
-The config file also needs a section that sets up logging.
-For a configuration that should work for most use cases, see :ref:`config_logging`.
+   mkdir etc
+   cp conf/proxy.config.sample.yml etc/config.yml
+   chmod 600 etc/config.yml
 
 Create a :code:`.env` file that holds the database user's password defined in your :code:`config.yml` and the path of
-said config file inside the container:
+said config file inside the container.
+The :code:`./etc` directory is mounted to :code:`/etc/acme_broker` inside the container:
 
 .. code-block:: ini
 
    ACME_BROKER_PG_PW=YOUR_PASSWORD
-   ACME_BROKER_CONFIG_FILE=/app/config.yml
+   ACME_BROKER_CONFIG_FILE=/etc/acme_broker/config.yml
 
 Generate an account key for the internal ACME client:
 
 .. code-block:: bash
 
-   sudo docker-compose run --entrypoint="" app python -m acme_broker generate-account-key /app/proxy_client_account.key
+   sudo docker-compose run --entrypoint="" app python -m acme_broker \
+      generate-account-key /etc/acme_broker/proxy_client_account.key
    # Change the key's file permissions
-   sudo chmod 600 proxy_client_account.key
-
-Acquiring an SSL certificate for the reverse proxy is out of this guide's scope, but the
-full chain, private key, and dh param file should be located at :code:`./certs/fullchain.pem`,
-:code:`./certs/client_cert.key`, and :code:`./certs/dhparam.pem` respectively.
+   sudo chmod 600 etc/proxy_client_account.key
 
 Start the proxy as a daemon:
 
@@ -235,3 +215,5 @@ Start the proxy as a daemon:
    sudo docker-compose up -d
 
 The proxy's directory should now be available at :code:`https://my-proxy.com/directory`.
+It may take up to a minute after the first request until the proxy does not use the self-signed cert anymore.
+Supervisor's log files are mounted to :code:`./logs` by default.
