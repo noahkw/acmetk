@@ -27,6 +27,9 @@ COPY docker_conf/openresty/conf.d /etc/openresty/conf.d
 COPY docker_conf/openresty/nginx.conf /etc/openresty/nginx.conf
 COPY docker_conf/supervisor/conf.d /etc/supervisor/conf.d
 
+VOLUME /etc/resty-auto-ssl
+VOLUME /var/log/supervisor
+
 EXPOSE 80
 EXPOSE 443
 

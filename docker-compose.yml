@@ -19,5 +19,6 @@ services:
       - .:/app
       - ./etc:/etc/acme_broker
       - ./log:/var/log/supervisor
+      - ./auto-ssl:/etc/resty-auto-ssl
     environment:
       APP_CONFIG_FILE: ${ACME_BROKER_CONFIG_FILE}
