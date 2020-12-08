@@ -133,6 +133,13 @@ Install LuaRocks via apt and lua-resty-open-ssl via LuaRocks:
    sudo mkdir /etc/resty-auto-ssl
    sudo chown www-data: /etc/resty-auto-ssl
 
+Update the dehydrated client script to the latest version:
+
+.. code-block::
+
+   sudo curl https://raw.githubusercontent.com/dehydrated-io/dehydrated/master/dehydrated -o \
+   /usr/local/bin/resty-auto-ssl/dehydrated
+
 Generate the self-signed fallback certificate:
 
 .. code-block:: bash
