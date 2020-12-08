@@ -357,7 +357,13 @@ class AcmeServerBase(ConfigurableMixin):
             kid = yarl.URL(sig.kid).name
 
             if url_for(request, "accounts", kid=kid) != sig.kid:
-                raise acme.messages.Error.with_code("malformed")
+                # BUG dehydrated, accepted by lets encrypt
+                au = yarl.URL(url_for(request, "new-account"))
+                au = au.with_path(au.path + '/' + kid)
+                if str(au) == sig.kid:
+                    logger.debug("buggy client kid account mismatch")
+                else:
+                    raise acme.messages.Error.with_code("malformed")
             elif "kid" in request.match_info and request.match_info["kid"] != kid:
                 raise acme.messages.Error.with_code("malformed")
 
