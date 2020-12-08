@@ -47,6 +47,7 @@ class versioned_sessionmaker(sessionmaker):
 def versioned_session(session):
     @event.listens_for(session.sync_session, "before_flush")
     def before_flush(session, flush_context, instances):
+        now = datetime.datetime.now(datetime.timezone.utc)
         for obj in session.dirty.union(session.new).union(session.deleted):
             if not hasattr(obj, "__diff__"):
                 return
@@ -87,7 +88,7 @@ def versioned_session(session):
             if len(diff) > 0:
                 obj.changes.append(
                     models.Change(
-                        timestamp=datetime.datetime.now(datetime.timezone.utc),
+                        timestamp=now,
                         remote_host=session.info.get("remote_host"),
                         data=diff,
                     )
