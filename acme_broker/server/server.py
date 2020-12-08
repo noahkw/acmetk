@@ -357,11 +357,15 @@ class AcmeServerBase(ConfigurableMixin):
             kid = yarl.URL(sig.kid).name
 
             if url_for(request, "accounts", kid=kid) != sig.kid:
-                # BUG dehydrated, accepted by lets encrypt
-                au = yarl.URL(url_for(request, "new-account"))
-                au = au.with_path(au.path + '/' + kid)
-                if str(au) == sig.kid:
-                    logger.debug("buggy client kid account mismatch")
+                """Bug in the dehydrated client, accepted by boulder, so we accept it too.
+                Dehydrated puts .../new-account/{kid} into the request signature, instead of
+                .../accounts/{kid}."""
+                kid_new_account_route = yarl.URL(url_for(request, "new-account"))
+                kid_new_account_route = kid_new_account_route.with_path(
+                    kid_new_account_route.path + "/" + kid
+                )
+                if str(kid_new_account_route) == sig.kid:
+                    logger.debug("Buggy client kid account mismatch")
                 else:
                     raise acme.messages.Error.with_code("malformed")
             elif "kid" in request.match_info and request.match_info["kid"] != kid:
