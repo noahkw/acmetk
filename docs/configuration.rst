@@ -124,9 +124,12 @@ For a broker, the file might looks as follows:
             host: 'ipam.uni-hannover.de'
             username: 'infobloxuser'
             password: 'infobloxpassw'
+            dns_servers:
+              - '8.8.8.8' # Google DNS
+              - '1.1.1.1' # Cloudflare DNS
 
 Refer to section `ACME Certificate Authority`_ for the options *hostname*, *port*, *db*, *challenge_validator*,
-*rsa_min_keysize*, *tos_url*, *mail_suffixes*, and *subnets*.
+*rsa_min_keysize*, *tos_url*, *mail_suffixes*, *subnets*, and *use_forwarded_header*.
 The *client* section inside the main *broker* section configures the internal
 :class:`~acme_broker.client.AcmeClient` that is used to communicate with the actual CA.
 Refer to section `ACME Client`_ for a description of the possible options.
@@ -169,6 +172,9 @@ The *client* block inside the respective app's surrounding configuration block m
         host: 'ipam.my-broker.com'
         username: 'infobloxuser'
         password: 'infobloxpassw'
+        dns_servers:
+          - '8.8.8.8' # Google DNS
+          - '1.1.1.1' # Cloudflare DNS
     contact:
       phone: '555-1234'
       email: 'broker@my-broker.com'
@@ -223,8 +229,8 @@ The *challenge_solver* section inside the respective client's surrounding config
       username: 'infobloxuser'
       password: 'infobloxpassw'
       dns_servers:
-        - '8.8.8.8'
-        - '1.1.1.1'
+        - '8.8.8.8' # Google DNS
+        - '1.1.1.1' # Cloudflare DNS
       views:
         - 'Extern'
 
