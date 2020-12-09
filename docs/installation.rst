@@ -6,11 +6,10 @@ There are two supported installation methods: *bare-metal* and *docker*.
 The bare-metal section focuses on deploying an :class:`~acme_broker.server.AcmeBroker` with a PostgreSQL
 instance on a virtual machine running Debian Stretch (9).
 The section after that explains how to run this same setup behind an
-`Nginx reverse proxy <https://www.nginx.com/>`_ in conjunction with
-`Supervisor <http://supervisord.org/>`_.
+`OpenResty reverse proxy <https://openresty.org/>`_.
 
-The docker section deploys a :class:`~acme_broker.server.AcmeProxy`, also with a PostgreSQL database, behind an Nginx
-reverse proxy.
+The docker section deploys a :class:`~acme_broker.server.AcmeProxy`, also with a PostgreSQL database, behind
+an OpenResty reverse proxy.
 
 Bare-metal
 ##########
@@ -67,13 +66,13 @@ points to the right binary.
 
 .. code-block:: bash
 
-   # log into user acme_broker and change dir to its home directory
+   # Log into user acme_broker and change dir to its home directory
    sudo su acme_broker
    cd
-   # create the virtual environment and activate it
+   # Create the virtual environment and activate it
    python -m venv venv
    source venv/bin/activate
-   # install the package into the virtual environment
+   # Install the package into the virtual environment
    pip install -r acme-broker/requirements.txt
    pip install acme-broker/.
    # Generate an account key for the internal ACME client
@@ -132,7 +131,7 @@ Install LuaRocks via apt and lua-resty-open-ssl via LuaRocks:
 
    sudo apt install luarocks
    sudo luarocks install lua-resty-auto-ssl
-   # create the config directory, grant permissions
+   # Create the config directory, grant permissions
    sudo mkdir /etc/resty-auto-ssl
    sudo chown www-data: /etc/resty-auto-ssl
 
