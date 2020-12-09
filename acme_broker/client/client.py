@@ -301,7 +301,9 @@ class AcmeClient:
             type(solver).__name__,
         )
 
-        processing_challenges = []
+        processing_challenges: typing.List[
+            typing.Tuple[acme.messages.Identifier, acme.messages.ChallengeBody]
+        ] = []
 
         for authorization in authorizations:
             for challenge in authorization.challenges:
@@ -312,7 +314,9 @@ class AcmeClient:
                             authorization.identifier,
                             challenge,
                         )
-                        processing_challenges.append(challenge)
+                        processing_challenges.append(
+                            (authorization.identifier, challenge)
+                        )
 
                         break
                     except asyncio.TimeoutError:
@@ -321,7 +325,7 @@ class AcmeClient:
         await asyncio.gather(
             *[
                 self.challenge_validate(challenge.uri)
-                for challenge in processing_challenges
+                for _, challenge in processing_challenges
             ]
         )
 
@@ -336,7 +340,7 @@ class AcmeClient:
                         delay=5.0,
                         max_tries=50,
                     )
-                    for challenge in processing_challenges
+                    for _, challenge in processing_challenges
                 ]
             )
         except PollingException as e:
@@ -353,6 +357,14 @@ class AcmeClient:
                     negative_predicate=is_invalid,
                 )
                 for authorization_url in order.authorizations
+            ]
+        )
+
+        # Clean up all completed challenges
+        await asyncio.gather(
+            *[
+                solver.cleanup_challenge(self._private_key, identifier, challenge)
+                for identifier, challenge in processing_challenges
             ]
         )
 
@@ -464,7 +476,7 @@ class AcmeClient:
             tries -= 1
         else:
             raise PollingException(
-                result, f"Polling unsuccessful: {coro.__name__}{args}", result
+                result, f"Polling unsuccessful: {coro.__name__}{args}"
             )
 
         return result

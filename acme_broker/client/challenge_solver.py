@@ -60,6 +60,26 @@ class ChallengeSolver(ConfigurableMixin, abc.ABC):
         """
         pass
 
+    @abc.abstractmethod
+    async def cleanup_challenge(
+        self,
+        key: josepy.jwk.JWKRSA,
+        identifier: acme.messages.Identifier,
+        challenge: acme.messages.ChallengeBody,
+    ):
+        """Performs cleanup for the given challenge.
+
+        This method should de-provision the resource that was provisioned for the given challenge.
+        It is called once the challenge is complete, i.e. its status has transitioned to
+        :class:`~acme_broker.models.challenge.ChallengeStatus.VALID` or
+        :class:`~acme_broker.models.challenge.ChallengeStatus.INVALID`.
+
+        :param key: The client's account key.
+        :param identifier: The identifier that is associated with the challenge.
+        :param challenge: The challenge to clean up after.
+        """
+        pass
+
 
 class DummySolver(ChallengeSolver):
     """Dummy challenge solver that does not actually complete any challenges."""
@@ -88,6 +108,25 @@ class DummySolver(ChallengeSolver):
             f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ}, identifier {identifier}"
         )
         # await asyncio.sleep(1)
+
+    async def cleanup_challenge(
+        self,
+        key: josepy.jwk.JWKRSA,
+        identifier: acme.messages.Identifier,
+        challenge: acme.messages.ChallengeBody,
+    ):
+        """Performs cleanup for the given challenge.
+
+        Does not actually do any cleanup, instead it just logs the mock attempt and pauses execution
+        for one second.
+
+        :param key: The client's account key.
+        :param identifier: The identifier that is associated with the challenge.
+        :param challenge: The challenge to clean up after.
+        """
+        logger.debug(
+            f"(not) cleaning up after challenge {challenge.uri}, type {challenge.chall.typ}"
+        )
 
 
 class InfobloxClient(ChallengeSolver):
@@ -128,7 +167,7 @@ class InfobloxClient(ChallengeSolver):
         self._views = views or self.DEFAULT_VIEWS
 
     async def connect(self):
-        """Connect to the InfoBlox API.
+        """Connects to the InfoBlox API.
 
         This method must be called before attempting to complete challenges.
         """
@@ -165,6 +204,27 @@ class InfobloxClient(ChallengeSolver):
                 )
                 for view in views
             ]
+        )
+
+    async def delete_txt_record(self, name: str, text: str):
+        """Deletes a DNS TXT record.
+
+        :param name: The name of the TXT record to delete.
+        :param text: The text of the TXT record to delete.
+        """
+        logger.debug("Deleting TXT record %s = %s", name, text)
+
+        # Fetch all TXT records of the given name that contain the given text.
+        records = await self._loop.run_in_executor(
+            None,
+            functools.partial(
+                objects.TXTRecord.search_all, self._conn, name=name, text=text
+            ),
+        )
+
+        # De-provision those TXT records
+        await asyncio.gather(
+            *[self._loop.run_in_executor(None, record.delete) for record in records]
         )
 
     async def query_txt_record(
@@ -210,7 +270,7 @@ class InfobloxClient(ChallengeSolver):
         identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
-        """Complete the given DNS-01 challenge.
+        """Completes the given DNS-01 challenge.
 
         This method provisions the TXT record needed to complete the given challenge.
         Then it polls the DNS for up to 60 seconds to ensure that the record is visible
@@ -228,3 +288,22 @@ class InfobloxClient(ChallengeSolver):
 
         # Poll the DNS until the correct record is available
         await asyncio.wait_for(self._query_until_completed(name, text), 60.0)
+
+    async def cleanup_challenge(
+        self,
+        key: josepy.jwk.JWKRSA,
+        identifier: acme.messages.Identifier,
+        challenge: acme.messages.ChallengeBody,
+    ):
+        """Performs cleanup for the given challenge.
+
+        This method de-provisions the TXT record that was created to complete the given challenge.
+
+        :param key: The client's account key.
+        :param identifier: The identifier that is associated with the challenge.
+        :param challenge: The challenge to clean up after.
+        """
+        name = challenge.chall.validation_domain_name(identifier.value)
+        text = challenge.chall.validation(key)
+
+        await self.delete_txt_record(name, text)

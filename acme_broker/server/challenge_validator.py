@@ -37,7 +37,7 @@ class ChallengeValidator(ConfigurableMixin, abc.ABC):
 
     @abc.abstractmethod
     async def validate_challenge(self, challenge: Challenge, **kwargs):
-        """Validate the given challenge.
+        """Validates the given challenge.
 
         This method should attempt to validate the given challenge and
         raise a :class:`CouldNotValidateChallenge` exception if the validation failed.
@@ -91,7 +91,7 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
         return set(itertools.chain.from_iterable(resolved_ips))
 
     async def validate_challenge(self, challenge: Challenge, request=None):
-        """Validate the given challenge.
+        """Validates the given challenge.
 
         This method takes a challenge of :class:`ChallengeType` *DNS_01* or *HTTP_01*
         and does not actually validate that challenge, but instead checks whether the corresponding
