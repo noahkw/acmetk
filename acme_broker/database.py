@@ -103,18 +103,30 @@ class Database:
         self.session = versioned_sessionmaker(bind=self.engine, class_=AsyncSession)
 
     async def begin(self):
+        """Creates the database's tables according to the models defined in :mod:`acme_broker.models`."""
         async with self.engine.begin() as conn:
-            # TODO: don't drop_all in prod
+            await conn.run_sync(Base.metadata.create_all)
+
+    async def drop(self):
+        """Drops all of the database's tables."""
+        async with self.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+
+    async def _recreate(self):
+        """Drops, then recreates all of the database's tables."""
+        async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
             await conn.run_sync(Base.metadata.create_all)
 
-    async def get_account(self, session, key=None, kid=None):
+    @staticmethod
+    async def get_account(session, key=None, kid=None):
         statement = select(Account).filter((Account.key == key) | (Account.kid == kid))
         result = (await session.execute(statement)).first()
 
         return result[0] if result else None
 
-    async def get_authz(self, session, kid, authz_id):
+    @staticmethod
+    async def get_authz(session, kid, authz_id):
         statement = (
             select(Authorization)
             .join(Identifier, Authorization.identifier_id == Identifier.identifier_id)
@@ -130,7 +142,8 @@ class Database:
 
         return result[0] if result else None
 
-    async def get_challenge(self, session, kid, challenge_id):
+    @staticmethod
+    async def get_challenge(session, kid, challenge_id):
         statement = (
             select(Challenge)
             .options(
@@ -162,7 +175,8 @@ class Database:
 
         return result[0] if result else None
 
-    async def get_order(self, session, kid, order_id):
+    @staticmethod
+    async def get_order(session, kid, order_id):
         statement = (
             select(Order)
             .join(Account, Order.account_kid == Account.kid)
@@ -176,9 +190,8 @@ class Database:
 
         return result[0] if result else None
 
-    async def get_certificate(
-        self, session, kid=None, certificate_id=None, certificate=None
-    ):
+    @staticmethod
+    async def get_certificate(session, kid=None, certificate_id=None, certificate=None):
         if kid and certificate_id:
             statement = (
                 select(Certificate)

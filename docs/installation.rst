@@ -92,10 +92,13 @@ For an explanation of the configuration options, see :ref:`config_broker_proxy`.
    exit
    sudo cp acme_broker/conf/broker.service /etc/systemd/system
 
-The final step is to enable/start the broker app:
+The final step is to initialize the db's tables and then enable/start the broker app:
 
 .. code-block:: bash
 
+   # Initialize the database's tables
+   python -m acme_broker db init --config-file=/etc/acme_broker/config.yml
+   # Enable/start the broker app's service
    sudo systemctl enable broker.service
    sudo systemctl start broker.service
 
@@ -157,6 +160,7 @@ Restart both services:
    sudo systemctl restart openresty.service
 
 The broker's directory should now be available at :code:`https://my-broker.com/directory`.
+It may take up to a minute after the first request until the proxy does not use the self-signed cert anymore.
 
 Docker
 ######
@@ -209,10 +213,14 @@ Generate an account key for the internal ACME client:
    # Change the key's file permissions
    sudo chmod 600 etc/proxy_client_account.key
 
-Start the proxy as a daemon:
+Initialize the db's tables and start the proxy as a daemon:
 
 .. code-block:: bash
 
+   # Initialize the database's tables
+   sudo docker-compose run --entrypoint="" app python -m acme_broker \
+      db init --config-file=/etc/acme_broker/config.yml
+   # Start the proxy as a daemon via docker-compose
    sudo docker-compose up -d
 
 The proxy's directory should now be available at :code:`https://my-proxy.com/directory`.

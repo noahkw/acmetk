@@ -249,5 +249,24 @@ def init(config_file):
     loop.run_until_complete(db.begin())
 
 
+@db.command()
+@click.option("--config-file", envvar="APP_CONFIG_FILE", type=click.Path())
+def drop(config_file):
+    """Drops the database's tables
+
+    Make sure to backup the database before running this command.
+    """
+    loop = asyncio.get_event_loop()
+
+    config = load_config(config_file)
+    app_config_name = list(config.keys())[0]
+    db_connection_string = config[app_config_name]["db"]
+
+    db = Database(db_connection_string)
+
+    click.echo("Dropping tables...")
+    loop.run_until_complete(db.drop())
+
+
 if __name__ == "__main__":
     main()

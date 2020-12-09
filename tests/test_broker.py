@@ -47,6 +47,8 @@ class TestBroker(TestCA):
         )
         broker.register_challenge_validator(DummyValidator())
 
+        await broker._db._recreate()
+
         main_app = web.Application()
         main_app.add_subapp("/broker", broker.app)
 
@@ -80,6 +82,8 @@ class TestBrokerLocalCA(TestBroker):
         ca = await AcmeCA.create_app(self.config_sec["ca"])
         ca.register_challenge_validator(DummyValidator())
 
+        await ca._db._recreate()
+
         broker_client = AcmeClient(
             directory_url=self.config_sec["broker"]["client"]["directory"],
             private_key=self.brokerclient_account_key_path,
@@ -92,6 +96,8 @@ class TestBrokerLocalCA(TestBroker):
             self.config_sec["broker"], client=broker_client
         )
         broker.register_challenge_validator(DummyValidator())
+
+        await broker._db._recreate()
 
         main_app = web.Application()
         main_app.add_subapp("/ca", ca.app)

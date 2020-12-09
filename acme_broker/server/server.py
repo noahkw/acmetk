@@ -169,7 +169,6 @@ class AcmeServerBase(ConfigurableMixin):
         :return: The server instance
         """
         db = Database(config["db"])
-        await db.begin()
 
         instance = cls(
             rsa_min_keysize=config.get("rsa_min_keysize"),
@@ -1169,7 +1168,6 @@ class AcmeCA(AcmeServerBase):
     @classmethod
     async def create_app(cls, config, **kwargs):
         db = Database(config["db"])
-        await db.begin()
 
         ca = cls(
             rsa_min_keysize=config.get("rsa_min_keysize"),
