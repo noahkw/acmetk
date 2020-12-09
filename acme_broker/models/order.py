@@ -14,6 +14,7 @@ from sqlalchemy import (
     LargeBinary,
     TypeDecorator,
     Integer,
+    JSON,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -40,6 +41,20 @@ class CSRType(TypeDecorator):
     def process_result_value(self, value, dialect):
         if value:
             return x509.load_pem_x509_csr(value)
+        return value
+
+
+class AcmeErrorType(TypeDecorator):
+    impl = JSON
+
+    def process_bind_param(self, value, dialect):
+        if value:
+            return value.json_dumps()
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value:
+            return acme.messages.Error.json_loads(value)
         return value
 
 
@@ -72,6 +87,8 @@ class Order(Entity, Serializer):
     """The order's ID."""
     proxied_url = Column(String, nullable=True, unique=True)
     """The order's URL at the remote CA."""
+    proxied_error = Column(AcmeErrorType, nullable=True)
+    """The error that occured at the remote CA while processing the order."""
     status = Column("status", Enum(OrderStatus), nullable=False)
     """The order's status."""
     expires = Column(DateTime(timezone=True), nullable=False)
@@ -191,6 +208,9 @@ class Order(Entity, Serializer):
 
         if self.status == OrderStatus.VALID:
             d["certificate"] = self.certificate_url(request)
+
+        if self.proxied_error:
+            d["error"] = self.proxied_error.json_dumps()
 
         return d
 

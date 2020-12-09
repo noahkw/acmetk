@@ -455,7 +455,8 @@ class AcmeClient:
 
             if negative_predicate(result):
                 raise PollingException(
-                    result, f"Polling unsuccessful: {coro.__name__}{args}"
+                    result,
+                    f"Polling unsuccessful: {coro.__name__}{args}, {negative_predicate.__name__} became True",
                 )
 
             await asyncio.sleep(delay)

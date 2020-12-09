@@ -1366,18 +1366,22 @@ class AcmeBroker(AcmeRelayBase):
         async with self._session(request) as session:
             order = await self._db.get_order(session, kid, order_id)
 
-            order_ca = await self._client.order_create(list(names_of(order.csr)))
-
             try:
+                order_ca = await self._client.order_create(list(names_of(order.csr)))
                 await self._client.authorizations_complete(order_ca)
                 finalized = await self._client.order_finalize(order_ca, order.csr)
                 await self._obtain_and_store_cert(order, finalized)
+            except acme.messages.Error as e:
+                logger.info("Could not create order %s with remote CA: %s", order_id, e)
+                order.proxied_error = e
+                order.status = models.OrderStatus.INVALID
             except CouldNotCompleteChallenge as e:
                 logger.info(
                     "Could not complete challenge %s associated with order %s",
                     e.challenge.uri,
                     order_id,
                 )
+                order.proxied_error = e.challenge.error
                 order.status = models.OrderStatus.INVALID
             except AcmeClientException as e:
                 logger.info(
@@ -1419,10 +1423,10 @@ class AcmeProxy(AcmeRelayBase):
                 {"type": identifier.typ, "value": identifier.value}
                 for identifier in obj.identifiers
             ]
-            ca_order = await self._client.order_create(identifiers)
+            order_ca = await self._client.order_create(identifiers)
 
             order = models.Order.from_obj(account, obj, self._supported_challenges)
-            order.proxied_url = ca_order.url
+            order.proxied_url = order_ca.url
             session.add(order)
 
             await session.flush()
@@ -1453,10 +1457,12 @@ class AcmeProxy(AcmeRelayBase):
                     e.challenge.uri,
                     order_id,
                 )
+                order.proxied_error = e.challenge.error
                 order.status = models.OrderStatus.INVALID
             except AcmeClientException as e:
                 logger.info(
                     "Could not complete a challenge associated with order %s due to a general client exception: %s",
+                    order_id,
                     e,
                 )
                 order.status = models.OrderStatus.INVALID
