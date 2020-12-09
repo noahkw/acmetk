@@ -12,6 +12,7 @@ Welcome to ACME Broker's documentation!
 
    installation
    configuration
+   development
    api
 
 

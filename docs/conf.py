@@ -46,6 +46,7 @@ intersphinx_mapping = {
     "cryptography": ("https://cryptography.io/en/latest/", None),
     "dns": ("https://dnspython.readthedocs.io/en/latest/", None),
     "josepy": ("https://python-jose.readthedocs.io/en/latest/", None),
+    "python": ("https://docs.python.org/3", None),
 }
 
 autodoc_default_options = {"private-members": True}

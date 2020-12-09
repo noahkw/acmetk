@@ -125,8 +125,8 @@ class AcmeServerBase(ConfigurableMixin):
         self.app = web.Application(
             middlewares=[
                 self.host_ip_middleware,
-                self.aiohttp_jinja2_middleware,
                 self.error_middleware,
+                self.aiohttp_jinja2_middleware,
             ]
         )
         # request.app['_service_'] available in jinja2 templates

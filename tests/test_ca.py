@@ -437,11 +437,6 @@ class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
         await super().test_run()
 
 
-class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
-    async def test_run(self):
-        await super().test_run()
-
-
 class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
@@ -480,3 +475,8 @@ class TestOurClientCA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
 
     async def test_email_validation(self):
         await super().test_email_validation()
+
+
+class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
