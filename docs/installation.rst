@@ -46,15 +46,15 @@ issue the following commands:
 
 .. code-block:: bash
 
-   # create the user
+   # Create the user
    sudo -u postgres createuser acme
-   # create the database
+   # Create the database
    sudo -u postgres createdb acme
-   # give the user a password
+   # Give the user a password
    sudo -u postgres psql
-   # issue the following commands inside the psql prompt
-   postgres=$ ALTER USER acme WITH ENCRYPTED PASSWORD 'PASSWORD'; # choose a strong password
-   # grant the user privileges to access the database acme
+   # Issue the following commands inside the psql prompt
+   postgres=$ ALTER USER acme WITH ENCRYPTED PASSWORD 'PASSWORD'; # Choose a strong password!
+   # Grant the user privileges to access the database acme
    postgres=$ GRANT ALL PRIVILEGES ON DATABASE acme TO acme;
 
 Now that the database is set up, we can set up the virtual environment, install the package and create
@@ -95,8 +95,9 @@ The final step is to initialize the db's tables and then enable/start the broker
 
 .. code-block:: bash
 
-   # Initialize the database's tables
-   python -m acme_broker db init --config-file=/etc/acme_broker/config.yml
+   # Initialize the database's tables.
+   # Substitute YOUR_PASSWORD with the password chosen above.
+   python -m acme_broker db init postgresql+asyncpg://acme:YOUR_PASSWORD@localhost:5432/acme
    # Enable/start the broker app's service
    sudo systemctl enable broker.service
    sudo systemctl start broker.service
@@ -194,13 +195,18 @@ For an explanation of the configuration options, see :ref:`config_broker_proxy`.
    cp conf/proxy.config.sample.yml etc/config.yml
    chmod 600 etc/config.yml
 
-Create a :code:`.env` file that holds the database user's password defined in your :code:`config.yml` and the path of
-said config file inside the container.
-The :code:`./etc` directory is mounted to :code:`/etc/acme_broker` inside the container:
+Create a :code:`.env` file that holds the database user's (*acme_rw*) password defined in your :code:`config.yml`
+and the path of said config file inside the container.
+The initialization script also creates the users *acme_admin* and *acme_ro* with admin and read-only permissions
+respectively.
+The :code:`./etc` directory is mounted to :code:`/etc/acme_broker` inside the container.
 
 .. code-block:: ini
 
-   ACME_BROKER_PG_PW=YOUR_PASSWORD
+   ACME_SUPERUSER_PW=YOUR_SUPERUSER_PW
+   ACME_ADMIN_PW=YOUR_ADMIN_PW
+   ACME_RW_PW=YOUR_READ_WRITE_PW
+   ACME_RO_PW=YOUR_READ_ONLY_PW
    ACME_BROKER_CONFIG_FILE=/etc/acme_broker/config.yml
 
 Generate an account key for the internal ACME client:
@@ -212,13 +218,14 @@ Generate an account key for the internal ACME client:
    # Change the key's file permissions
    sudo chmod 600 etc/proxy_client_account.key
 
-Initialize the db's tables and start the proxy as a daemon:
+Initialize the db's tables as the *acme_admin* user and start the proxy as a daemon:
 
 .. code-block:: bash
 
-   # Initialize the database's tables
+   # Initialize the database's tables.
+   # Substitute YOUR_ADMIN_PW with the admin password specified in the .env file.
    sudo docker-compose run --entrypoint="" app python -m acme_broker \
-      db init --config-file=/etc/acme_broker/config.yml
+      db init postgresql+asyncpg://acme_admin:YOUR_ADMIN_PW@db:5432/acme
    # Start the proxy as a daemon via docker-compose
    sudo docker-compose up -d
 

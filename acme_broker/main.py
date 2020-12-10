@@ -95,7 +95,7 @@ def plugins():
 @main.command()
 @click.argument("root-key-file", type=click.Path())
 def generate_keys(root_key_file):
-    """Generates a self-signed root key pair/cert for the CA"""
+    """Generates a self-signed root key pair/cert for the CA."""
     click.echo("Generating root key pair/cert")
     # TODO: swap out info
     generate_root_cert(
@@ -111,7 +111,7 @@ def generate_keys(root_key_file):
 @main.command()
 @click.argument("account-key-file", type=click.Path())
 def generate_account_key(account_key_file):
-    """Generates an account key for the ACME client"""
+    """Generates an account key for the ACME client."""
     click.echo(
         f"Generating client key at {account_key_file}.\nMake sure to change its permissions,"
         f" for example with: chmod 600 {account_key_file}"
@@ -123,7 +123,7 @@ def generate_account_key(account_key_file):
 @click.option("--config-file", envvar="APP_CONFIG_FILE", type=click.Path())
 @click.option("--path", type=click.Path())
 def run(config_file, path):
-    """Starts the app as defined in the config file"""
+    """Starts the app as defined in the config file."""
     config = load_config(config_file)
 
     app_config_name = list(config.keys())[0]
@@ -223,48 +223,40 @@ async def run_relay(config, path, class_, config_name):
 
 @main.group()
 def db():
-    """Commands to interact with the database"""
+    """Commands to interact with the database."""
     pass
 
 
 @db.command()
 def migrate():
-    """Migrates the database"""
+    """Migrates the database."""
     raise click.UsageError("Migrations have not been implemented yet.")
 
 
 @db.command()
-@click.option("--config-file", envvar="APP_CONFIG_FILE", type=click.Path())
-def init(config_file):
-    """Initializes the database's tables"""
-    loop = asyncio.get_event_loop()
+@click.argument("connection-string", type=click.STRING)
+def init(connection_string):
+    """Initializes the database's tables.
 
-    config = load_config(config_file)
-    app_config_name = list(config.keys())[0]
-    db_connection_string = config[app_config_name]["db"]
-
-    db = Database(db_connection_string)
+    The user needs to have admin privileges, i.e. 'acme_admin' should be used."""
+    db = Database(connection_string)
 
     click.echo("Initializing tables...")
+    loop = asyncio.get_event_loop()
     loop.run_until_complete(db.begin())
 
 
 @db.command()
-@click.option("--config-file", envvar="APP_CONFIG_FILE", type=click.Path())
-def drop(config_file):
-    """Drops the database's tables
+@click.argument("connection-string", type=click.STRING)
+def drop(connection_string):
+    """Drops the database's tables.
 
     Make sure to backup the database before running this command.
     """
+    db = Database(connection_string)
+
+    click.echo("Initializing tables...")
     loop = asyncio.get_event_loop()
-
-    config = load_config(config_file)
-    app_config_name = list(config.keys())[0]
-    db_connection_string = config[app_config_name]["db"]
-
-    db = Database(db_connection_string)
-
-    click.echo("Dropping tables...")
     loop.run_until_complete(db.drop())
 
 

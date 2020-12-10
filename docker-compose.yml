@@ -4,10 +4,15 @@ services:
     image: postgres
     volumes:
       - ./db_data:/var/lib/postgresql/data
+      - ./docker_conf/postgres:/docker-entrypoint-initdb.d
     restart: always
     environment:
-      POSTGRES_PASSWORD: ${ACME_BROKER_PG_PW}
+      POSTGRES_PASSWORD: ${ACME_SUPERUSER_PW}
+      POSTGRES_DB: default # Database 'acme' is created by the init.sh script
       POSTGRES_USER: acme
+      ACME_ADMIN_PW: ${ACME_ADMIN_PW}
+      ACME_RW_PW: ${ACME_RW_PW}
+      ACME_RO_PW: ${ACME_RO_PW}
   app:
     image: broker_app
     restart: always
