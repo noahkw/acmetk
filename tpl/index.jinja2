@@ -10,12 +10,12 @@
     <th>Orders</th>
     <th>Certificates</th>
 </tr>
-{% for date,s,all in statistics %}
+{% for date,s,total,unique in statistics %}
 <tr class="{{loop.cycle('odd', 'even')}}">
     <td class="n">{{ date.strftime("%Y-%m-%d") }}</td>
-    <td class="n">{{ all }}</td>
-    <td class="n">{{ s.order }}</td>
-    <td class="n">{{ s.certificate }}</td>
+    <td class="n">{{ total }} ({{ unique }}) </td>
+    <td class="n">{{ s.order.unique }} ({{ s.order.total }})</td>
+    <td class="n">{{ s.certificate.unique }} ({{ s.certificate.total }})</td>
 </tr>
 {% endfor %}
 </table>
