@@ -43,7 +43,7 @@ tests:
     ca:
       hostname: *host
       port: 8180
-      db: 'postgresql+asyncpg://acme-broker:acme-broker-prod-pw@db:5432/acme-broker' # TODO: consider using a different db
+      db: 'postgresql+asyncpg://acme:acme-broker-prod-pw@db:5432/acme' # TODO: consider using a different db
       rsa_min_keysize: *rsa_min
       tos_url: *tos
       cert: '/app/certs/root.crt'
