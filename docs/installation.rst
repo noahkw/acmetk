@@ -232,3 +232,56 @@ Initialize the db's tables as the *acme_admin* user and start the proxy as a dae
 The proxy's directory should now be available at :code:`https://my-proxy.com/directory`.
 It may take up to a minute after the first request until the proxy does not use the self-signed cert anymore.
 Supervisor's log files are mounted to :code:`./logs` by default.
+
+Post-installation
+#################
+
+When the ACME server is up and running, the clients need to be pointed to its directory URL.
+This is achieved in different ways depending on the client and should be part of its documentation.
+The following clients were tested against and are thus described here.
+
+*
+   `Acmetiny <https://github.com/diafygi/acme-tiny>`_: Simply set the argument :code:`--directory-url` when running the
+   client:
+
+   .. code-block:: bash
+
+      acme-tiny --directory-url https://my-server.com/directory
+
+*
+   `Certbot <https://github.com/certbot/certbot>`_: Set the server option in the :code:`certbot.ini` and optionally
+   set the config directory to avoid confusion as it is set to :code:`/etc/letsencrypt` by default.
+
+   :code:`certbot.ini`:
+
+   .. code-block:: ini
+
+      server = https://my-server.com/directory
+      config-dir = /etc/my_server_acme
+
+*
+   :class:`~acme_broker.client.AcmeClient`: Pass the directory URL when initializing the client object.
+
+   .. code-block:: python
+
+      from acme_broker.client import AcmeClient
+
+      client = AcmeClient(
+         directory_url="https://my-server.com/directory",
+         private_key=...,
+         contact=...,
+      )
+
+*
+   `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_: Set the CA option in the :code:`config` file and specify
+   it when running dehydrated.
+
+   :code:`./config`:
+
+   .. code-block:: ini
+
+      CA=https://my-server.com/directory
+
+   .. code-block:: bash
+
+      dehydrated --config ./config
