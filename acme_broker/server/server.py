@@ -23,11 +23,9 @@ import aiohttp_jinja2
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 
-routes = web.RouteTableDef()
 
-from .management import ACMEManagement
+from acme_broker.server.management import AcmeManagement
 from acme_broker import models
-
 
 
 from acme_broker.models import messages
@@ -46,9 +44,9 @@ from acme_broker.util import (
     ConfigurableMixin,
 )
 
+from acme_broker.server.routes import routes
+
 logger = logging.getLogger(__name__)
-
-
 
 
 async def handle_get(request):
@@ -72,7 +70,7 @@ class AcmeResponse(web.Response):
         )
 
 
-class AcmeServerBase(ACMEManagement,ConfigurableMixin):
+class AcmeServerBase(AcmeManagement, ConfigurableMixin):
     """Base class for an ACME compliant server.
 
     Implementations must set the :attr:`config_name` attribute, so that the CLI script knows which
@@ -814,7 +812,6 @@ class AcmeServerBase(ACMEManagement,ConfigurableMixin):
         :return: The certificate's full chain in PEM format.
         """
         raise NotImplementedError
-
 
     async def _handle_challenge_validate(self, request, kid, challenge_id):
         logger.debug("Validating challenge %s", challenge_id)

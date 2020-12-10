@@ -18,10 +18,11 @@ import collections
 from sqlalchemy.sql import text
 from acme_broker.models.base import Entity
 
-from .server import routes
+from acme_broker.server.routes import routes
 import aiohttp_jinja2
 
-class ACMEManagement:
+
+class AcmeManagement:
     @routes.get("/mgmt/", name="mgmt-index")
     @aiohttp_jinja2.template("index.jinja2")
     async def management_index(self, request):
@@ -34,7 +35,9 @@ class ACMEManagement:
                 select(
                     sqlalchemy.func.date_trunc("day", Change.timestamp).label("dateof"),
                     sqlalchemy.func.count(Change.change).label("totalof"),
-                    sqlalchemy.func.count(sqlalchemy.distinct(Change._entity)).label("uniqueof"),
+                    sqlalchemy.func.count(sqlalchemy.distinct(Change._entity)).label(
+                        "uniqueof"
+                    ),
                     Entity.identity.label("actionof"),
                 )
                 .select_from(Change)
@@ -47,11 +50,21 @@ class ACMEManagement:
             s = collections.defaultdict(lambda: dict())
 
             for m in r.mappings():
-                s[m["dateof"].date()][m["actionof"]] = {'total':m["totalof"], 'unique':m['uniqueof']}
+                s[m["dateof"].date()][m["actionof"]] = {
+                    "total": m["totalof"],
+                    "unique": m["uniqueof"],
+                }
 
             statistics = []
             for i in sorted(s.keys()):
-                statistics.append((i, s[i], sum(map(lambda x: x['unique'], s[i].values())), sum(map(lambda x: x['total'], s[i].values()))))
+                statistics.append(
+                    (
+                        i,
+                        s[i],
+                        sum(map(lambda x: x["unique"], s[i].values())),
+                        sum(map(lambda x: x["total"], s[i].values())),
+                    )
+                )
             return {"statistics": statistics}
 
     @routes.get("/mgmt/changes", name="mgmt-changes")
