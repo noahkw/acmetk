@@ -154,7 +154,12 @@ class InfobloxClient(ChallengeSolver):
     """The views to use if none are specified during initialization."""
 
     def __init__(self, *, host, username, password, dns_servers=None, views=None):
-        self._creds = {"host": host, "username": username, "password": password}
+        self._creds = {
+            "host": host,
+            "username": username,
+            "password": password,
+            "ssl_verify": True,
+        }
         self._loop = asyncio.get_event_loop()
 
         self._resolvers = []
