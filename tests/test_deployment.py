@@ -73,7 +73,7 @@ class TestDeployment(TestAcme):
 
         await ca._db._recreate()
 
-        aiohttp_jinja2.setup(ca.app, loader=jinja2.FileSystemLoader("./tpl/"))
+        aiohttp_jinja2.setup(ca.app, loader=jinja2.FileSystemLoader("../tpl/"))
         aiohttp_jinja2.get_env(ca.app).globals.update({"url_for": _url_for})
 
         self.runner = runner
