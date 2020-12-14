@@ -265,6 +265,7 @@ def init(connection_string, password):
     click.echo("Initializing tables...")
     loop = asyncio.get_event_loop()
     loop.run_until_complete(db.begin())
+    click.echo("OK.")
 
 
 @db.command()
@@ -277,9 +278,14 @@ def drop(connection_string, password):
     """
     db = Database(connection_string.format(password))
 
-    click.echo("Initializing tables...")
+    click.echo("Dropping tables...")
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(db.drop())
+
+    if click.confirm("Really drop all tables?"):
+        loop.run_until_complete(db.drop())
+        click.echo("OK.")
+    else:
+        click.echo("Aborting...")
 
 
 if __name__ == "__main__":

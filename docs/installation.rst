@@ -152,15 +152,26 @@ Generate the self-signed fallback certificate:
       -keyout /etc/ssl/resty-auto-ssl-fallback.key \
       -out /etc/ssl/resty-auto-ssl-fallback.crt
 
-Restart both services:
+Copy the bootstrap broker systemd unit file, enable the service and start it.
+Then restart the other services.
 
 .. code-block:: bash
 
+   sudo cp acme-broker/conf/broker_bootstrap.service /etc/systemd/system
+   sudo systemctl enable broker_bootstrap.service
+   sudo systemctl start broker_bootstrap.service
    sudo systemctl restart broker.service
    sudo systemctl restart openresty.service
 
 The broker's directory should now be available at :code:`https://my-broker.com/directory`.
-It may take up to a minute after the first request until the proxy does not use the self-signed cert anymore.
+The bootstrap broker's directory is at :code:`http://localhost:8181/directory` and only accepts requests from
+localhost.
+The port is configurable in the :code:`broker_bootstrap.service` unit file.
+If it is changed there, then OpenResty's :code:`nginx.conf` needs to be pointed to the correct
+directory (line 25).
+
+It may take up to a minute after the first request until the reverse proxy does not use the self-signed cert anymore,
+because it needs to first acquire a valid cert signed by Let's Encrypt from the bootstrap broker.
 
 Docker
 ######
