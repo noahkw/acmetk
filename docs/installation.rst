@@ -96,7 +96,7 @@ The final step is to initialize the db's tables and then enable/start the broker
 .. code-block:: bash
 
    # Initialize the database's tables.
-   # Enter the password you chose above when asked.
+   # Enter the password you chose above when prompted.
    python -m acme_broker db init postgresql+asyncpg://acme:{}@localhost:5432/acme
    # Enable/start the broker app's service
    sudo systemctl enable broker.service
@@ -223,7 +223,7 @@ Initialize the db's tables as the *acme_admin* user and start the proxy as a dae
 .. code-block:: bash
 
    # Initialize the database's tables.
-   # Enter the password admin password specified in the .env file when asked.
+   # Enter the password admin password specified in the .env file when prompted.
    sudo docker-compose run --entrypoint="" app python -m acme_broker \
       db init postgresql+asyncpg://acme_admin:{}@db:5432/acme
    # Start the proxy as a daemon via docker-compose

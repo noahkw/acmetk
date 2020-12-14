@@ -1,9 +1,9 @@
 [Unit]
-Description=ACME Broker
+Description=ACME Bootstrap Broker
 
 [Service]
 WorkingDirectory=/srv/acme_broker
-ExecStart=/srv/acme_broker/venv/bin/python -m acme_broker run --config-file=/etc/acme_broker/config.yml
+ExecStart=/srv/acme_broker/venv/bin/python -m acme_broker run --config-file=/etc/acme_broker/config.yml --bootstrap-port=8181
 
 # Disable Python's buffering of STDOUT and STDERR, so that output from the
 # service shows up immediately in systemd's logs

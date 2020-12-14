@@ -108,7 +108,7 @@ class Challenge(Entity, Serializer):
         self,
         session,
         request,
-        validator: "acme_broker.server.challenge_validator.ChallengeValidator" = None,
+        validator: "acme_broker.server.challenge_validator.ChallengeValidator",
     ) -> ChallengeStatus:
         """Validates the challenge with the given validator.
 
@@ -119,11 +119,10 @@ class Challenge(Entity, Serializer):
         :param validator: The challenge validator to perform the validation with.
         :return: The challenge's status after validation.
         """
-        if validator:
-            try:
-                await validator.validate_challenge(self, request=request)
-            except acme_broker.server.challenge_validator.CouldNotValidateChallenge:
-                self.status = ChallengeStatus.INVALID
+        try:
+            await validator.validate_challenge(self, request=request)
+        except acme_broker.server.challenge_validator.CouldNotValidateChallenge:
+            self.status = ChallengeStatus.INVALID
 
         if self.status in (ChallengeStatus.PENDING, ChallengeStatus.PROCESSING):
             self.status = ChallengeStatus.VALID

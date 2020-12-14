@@ -820,25 +820,11 @@ class AcmeServerBase(AcmeManagement, ConfigurableMixin):
             Docker container.
             Challenge validation would likely fail in that case. In the RequestIPDNS challenge for example,
             the domain name does not resolve to 127.0.0.1 which is the host IP the request originates.
-            For that reason, we check whether the application is supposed to run behind a reverse proxy
-            (self._use_forwarded_header) and if the X-Forwarded-For header is missing at the same time, because
-            this implies that the request originates from the reverse proxy's ACME client - or from another
-            client running on localhost that does not go through the reverse proxy.
-            """
-            if self._use_forwarded_header and not request.headers.get(
-                "X-Forwarded-For"
-            ):
-                """The request did not pass through the reverse proxy, i.e. it originates from the within the same
-                Docker container. Do not validate challenge."""
-                logger.info(
-                    "Skipping challenge validation for %s associated with order %s",
-                    challenge_id,
-                    challenge.authorization.identifier.order_id,
-                )
-                validator = None
-            else:
-                validator = self._challenge_validators[challenge.type]
 
+            For that reason, we start a second instance of the relay that uses loose/no checks but is only
+            available within the Docker container.
+            """
+            validator = self._challenge_validators[challenge.type]
             await challenge.validate(session, request, validator)
 
             await session.commit()

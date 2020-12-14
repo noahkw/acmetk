@@ -121,9 +121,12 @@ def generate_account_key(account_key_file):
 
 @main.command()
 @click.option("--config-file", envvar="APP_CONFIG_FILE", type=click.Path())
+@click.option("--bootstrap-port", type=click.INT)
 @click.option("--path", type=click.Path())
-def run(config_file, path):
-    """Starts the app as defined in the config file."""
+def run(config_file, bootstrap_port, path):
+    """Starts the app as defined in the config file.
+
+    Starts the app in bootstrap mode if the bootstrap port is set via --bootstrap-port."""
     config = load_config(config_file)
 
     app_config_name = list(config.keys())[0]
@@ -139,7 +142,23 @@ def run(config_file, path):
 
     app_class = server_apps[app_config_name]
 
-    click.echo(f"Starting {app_class.__name__}")
+    if bootstrap_port:
+        if app_class is AcmeCA:
+            raise click.UsageError(
+                f"Bootstrapping is not supported for the {app_class} at this moment."
+            )
+
+        click.echo(
+            f"Starting {app_class.__name__} in bootstrap mode on port {bootstrap_port}"
+        )
+        config["port"] = bootstrap_port
+        config["challenge_validator"] = "dummy"  # Do not validate challenges
+        config["subnets"] = ["127.0.0.1/32"]  # Only allow localhost
+        config[
+            "use_forwarded_header"
+        ] = False  # Bootstrap app does not run behind a reverse proxy
+    else:
+        click.echo(f"Starting {app_class.__name__}")
 
     if issubclass(app_class, AcmeRelayBase):
         runner, site = loop.run_until_complete(
