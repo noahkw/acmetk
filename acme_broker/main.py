@@ -151,12 +151,13 @@ def run(config_file, bootstrap_port, path):
         click.echo(
             f"Starting {app_class.__name__} in bootstrap mode on port {bootstrap_port}"
         )
-        config["port"] = bootstrap_port
-        config["challenge_validator"] = "dummy"  # Do not validate challenges
-        config["subnets"] = ["127.0.0.1/32"]  # Only allow localhost
-        config[
-            "use_forwarded_header"
-        ] = False  # Bootstrap app does not run behind a reverse proxy
+        app_config = config[app_config_name]
+
+        app_config["port"] = bootstrap_port
+        app_config["challenge_validator"] = "dummy"  # Do not validate challenges
+        app_config["subnets"] = ["127.0.0.1/32"]  # Only allow localhost
+        # Bootstrap app does not run behind a reverse proxy:
+        app_config["use_forwarded_header"] = False
     else:
         click.echo(f"Starting {app_class.__name__}")
 
