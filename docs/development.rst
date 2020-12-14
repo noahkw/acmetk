@@ -172,3 +172,24 @@ First, create a new :code:`.env` file with the following contents in the reposit
 
 Select the new docker-compose interpreter from the bottom right, right click *test_deployment.py* in the project view
 and select "Run 'Unittests' in test_deployment.py".
+
+Contributing
+############
+
+Set up your development environment:
+
+.. code-block:: bash
+
+    # Clone the repo
+    git clone |GIT_URL|
+    cd acme-broker/
+    # Create a virtual environment
+    python -m venv venv
+    source venv/bin/activate
+    # Install the requirements
+    pip install -r requirements.txt
+    pip install -r requirements-dev.txt
+    # Install the package in dev mode
+    pip install -e .
+    # Install the pre-commit hook for linting, formatting, etc.
+    pre-commit install
