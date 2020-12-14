@@ -9,6 +9,7 @@ from sqlalchemy.orm import relationship
 
 from .base import Serializer, Entity
 from ..util import url_for
+import acme_broker.server.challenge_validator
 
 
 class ChallengeStatus(str, enum.Enum):
@@ -103,15 +104,27 @@ class Challenge(Entity, Serializer):
         """
         return [cls(type=type_, status=ChallengeStatus.PENDING) for type_ in types]
 
-    async def validate(self, session) -> ChallengeStatus:
-        """Validates the challenge.
+    async def validate(
+        self,
+        session,
+        request,
+        validator: "acme_broker.server.challenge_validator.ChallengeValidator" = None,
+    ) -> ChallengeStatus:
+        """Validates the challenge with the given validator.
 
         Also, it calls its parent authorization's :func:`~acme_broker.models.authorization.Authorization.validate`
         method and finally returns the new status after validation.
 
         :param session: The open database session.
+        :param validator: The challenge validator to perform the validation with.
         :return: The challenge's status after validation.
         """
+        if validator:
+            try:
+                await validator.validate_challenge(self, request=request)
+            except acme_broker.server.challenge_validator.CouldNotValidateChallenge:
+                self.status = ChallengeStatus.INVALID
+
         if self.status in (ChallengeStatus.PENDING, ChallengeStatus.PROCESSING):
             self.status = ChallengeStatus.VALID
             self.validated = datetime.datetime.now(datetime.timezone.utc)

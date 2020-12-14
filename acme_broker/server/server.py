@@ -31,10 +31,7 @@ from acme_broker import models
 from acme_broker.models import messages
 from acme_broker.client import CouldNotCompleteChallenge, AcmeClientException
 from acme_broker.database import Database
-from acme_broker.server import (
-    ChallengeValidator,
-    CouldNotValidateChallenge,
-)
+from acme_broker.server import ChallengeValidator
 from acme_broker.util import (
     url_for,
     generate_cert_from_csr,
@@ -819,13 +816,25 @@ class AcmeServerBase(AcmeManagement, ConfigurableMixin):
         async with self._session(request) as session:
             challenge = await self._db.get_challenge(session, kid, challenge_id)
 
-            validator = self._challenge_validators[challenge.type]
-            try:
-                await validator.validate_challenge(challenge, request=request)
-            except CouldNotValidateChallenge:
-                challenge.status = models.ChallengeStatus.INVALID
+            """We want the reverse proxy application to always be able to issue certificates for itself inside the
+            Docker container.
+            Challenge validation would likely fail in that case. In the RequestIPDNS challenge for example,
+            the domain name does not resolve to 127.0.0.1 which is the host IP the request originates.
+            For that reason, we check whether the application is supposed to run behind a reverse proxy
+            (self._use_forwarded_header) and if the X-Forwarded-For header is missing at the same time, because
+            this implies that the request originates from the reverse proxy's ACME client - or from another
+            client running on localhost that does not go through the reverse proxy.
+            """
+            if self._use_forwarded_header and not request.headers.get(
+                "X-Forwarded-For"
+            ):
+                """The request did not pass through the reverse proxy, i.e. it originates from the within the same
+                Docker container. Do not validate challenge."""
+                validator = None
+            else:
+                validator = self._challenge_validators[challenge.type]
 
-            await challenge.validate(session)
+            await challenge.validate(session, request, validator)
 
             await session.commit()
 
