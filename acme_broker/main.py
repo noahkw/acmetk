@@ -235,11 +235,12 @@ def migrate():
 
 @db.command()
 @click.argument("connection-string", type=click.STRING)
-def init(connection_string):
+@click.option("--password", type=click.STRING, prompt=True, hide_input=True)
+def init(connection_string, password):
     """Initializes the database's tables.
 
     The user needs to have admin privileges, i.e. 'acme_admin' should be used."""
-    db = Database(connection_string)
+    db = Database(connection_string.format(password))
 
     click.echo("Initializing tables...")
     loop = asyncio.get_event_loop()
@@ -248,12 +249,13 @@ def init(connection_string):
 
 @db.command()
 @click.argument("connection-string", type=click.STRING)
-def drop(connection_string):
+@click.option("--password", type=click.STRING, prompt=True, hide_input=True)
+def drop(connection_string, password):
     """Drops the database's tables.
 
     Make sure to backup the database before running this command.
     """
-    db = Database(connection_string)
+    db = Database(connection_string.format(password))
 
     click.echo("Initializing tables...")
     loop = asyncio.get_event_loop()
