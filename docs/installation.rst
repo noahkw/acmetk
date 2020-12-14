@@ -241,8 +241,9 @@ Initialize the db's tables as the *acme_admin* user and start the proxy as a dae
    sudo docker-compose up -d
 
 The proxy's directory should now be available at :code:`https://my-proxy.com/directory`.
-It may take up to a minute after the first request until the proxy does not use the self-signed cert anymore.
-Supervisor's log files are mounted to :code:`./logs` by default.
+It may take up to a minute after the first request until the proxy does not use the self-signed cert anymore,
+because it needs to first acquire a valid cert signed by Let's Encrypt from the bootstrap proxy.
+Supervisor's log files are mounted to :code:`./log` by default.
 
 Post-installation
 #################
