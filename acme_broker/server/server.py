@@ -830,6 +830,11 @@ class AcmeServerBase(AcmeManagement, ConfigurableMixin):
             ):
                 """The request did not pass through the reverse proxy, i.e. it originates from the within the same
                 Docker container. Do not validate challenge."""
+                logger.info(
+                    "Skipping challenge validation for %s associated with order %s",
+                    challenge_id,
+                    challenge.authorization.identifier.order_id,
+                )
                 validator = None
             else:
                 validator = self._challenge_validators[challenge.type]
