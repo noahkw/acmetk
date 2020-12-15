@@ -136,11 +136,11 @@ Install LuaRocks via apt and lua-resty-open-ssl via LuaRocks:
    sudo mkdir /etc/resty-auto-ssl
    sudo chown www-data: /etc/resty-auto-ssl
 
-Update the dehydrated client script to the latest version:
+Update the dehydrated client script to version 0.6.6:
 
 .. code-block::
 
-   sudo curl https://raw.githubusercontent.com/dehydrated-io/dehydrated/master/dehydrated -o \
+   sudo curl https://raw.githubusercontent.com/dehydrated-io/dehydrated/589e9f30b383751a927d745e83c0c53bf42a195c/dehydrated -o \
    /usr/local/bin/resty-auto-ssl/dehydrated
 
 Generate the self-signed fallback certificate:
@@ -188,13 +188,14 @@ Clone the git repository:
 
    git clone |GIT_URL|
 
-Build the broker image locally:
+Build the :code:`broker_app` and :code:`reverse_proxy` images locally:
 
 .. code-block:: bash
 
    cd acme-broker/
    pwd # Should return the directory that the repo was cloned to
-   sudo docker build -t broker_app .
+   sudo docker build -t broker_app -f app.Dockerfile .
+   sudo docker build -t reverse_proxy -f reverse_proxy.Dockerfile .
 
 Create the directory :code:`./etc`, copy the template config file :code:`conf/proxy.config.sample.yml` to it
 and edit it according to your use case.

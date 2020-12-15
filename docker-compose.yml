@@ -1,4 +1,12 @@
 version: "2.1"
+networks:
+  default:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+      - subnet:  10.110.0.0/24
+
 services:
   db:
     image: postgres
@@ -13,17 +21,21 @@ services:
       ACME_ADMIN_PW: ${ACME_ADMIN_PW}
       ACME_RW_PW: ${ACME_RW_PW}
       ACME_RO_PW: ${ACME_RO_PW}
-  app:
-    image: broker_app
+  reverse_proxy:
+    image: reverse_proxy
     restart: always
     ports:
       - "443:443"
+    volumes:
+      - /etc/resty-auto-ssl
+  app:
+    image: broker_app
+    restart: always
     depends_on:
       - db
     volumes:
       - .:/app
       - ./etc:/etc/acme_broker
       - ./log:/var/log/supervisor
-      - ./auto-ssl:/etc/resty-auto-ssl
     environment:
       APP_CONFIG_FILE: ${ACME_BROKER_CONFIG_FILE}

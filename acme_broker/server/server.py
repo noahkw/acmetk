@@ -22,6 +22,7 @@ import aiohttp_jinja2
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 
 
 from acme_broker.server.management import AcmeManagement
@@ -741,11 +742,16 @@ class AcmeServerBase(AcmeManagement, ConfigurableMixin):
             raise acme.messages.Error.with_code("orderNotReady")
 
         csr = messages.CertificateRequest.json_loads(jws.payload).csr
+        pub_key = csr.public_key()
 
-        if csr.public_key().key_size < self._rsa_min_keysize:
+        if not isinstance(pub_key, RSAPublicKey):
+            raise acme.messages.Error.with_code(
+                "badPublicKey", detail="At this moment, only RSA keys are supported."
+            )
+        elif (key_size := pub_key.key_size) < self._rsa_min_keysize:
             raise acme.messages.Error.with_code(
                 "badPublicKey",
-                detail=f"Only RSA keys with more than {self._rsa_min_keysize} bits are accepted.",
+                detail=f"Only RSA keys with at least {self._rsa_min_keysize} bits are accepted. (Keysize: {key_size})",
             )
         elif not csr.is_signature_valid:
             raise acme.messages.Error.with_code(

@@ -155,7 +155,10 @@ def run(config_file, bootstrap_port, path):
 
         app_config["port"] = bootstrap_port
         app_config["challenge_validator"] = "dummy"  # Do not validate challenges
-        app_config["subnets"] = ["127.0.0.1/32"]  # Only allow localhost
+        app_config["subnets"] = [
+            "127.0.0.1/32",
+            "10.110.0.0/24",
+        ]  # Only allow localhost and the docker bridge network
         # Bootstrap app does not run behind a reverse proxy:
         app_config["use_forwarded_header"] = False
     else:
