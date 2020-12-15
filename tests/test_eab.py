@@ -2,12 +2,12 @@ import urllib.parse
 import unittest
 from unittest.mock import Mock
 from cryptography.hazmat.primitives.asymmetric import rsa
-from acme_broker.server.external_account_binding import ExternalAccountBinding
+from acme_broker.server.external_account_binding import ExternalAccountBindingStore
 
 
 class TestEAB(unittest.TestCase):
     def setUp(self):
-        self._eab = ExternalAccountBinding()
+        self.eab_store = ExternalAccountBindingStore()
 
     def test_create(self):
         data = """-----BEGIN CERTIFICATE-----
@@ -47,9 +47,9 @@ oF45C4zWPYXCtz3rtFi7w9f6rf5OWiJZ01VZ4U+vbe/fSC7DgRMWUyWB
         URL = "http://localhost/new-account"
         request = Mock(headers={"X-SSL-CERT": urllib.parse.quote(data)}, url=URL)
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        kid, hmac = self._eab.create(request, key.public_key())
+        kid, hmac = self.eab_store.create(request, key.public_key())
 
         # signature = ""
         # self.assertTrue(self._eab.verify(kid, signature))
-        self.assertFalse(self._eab.verify(kid + "x", hmac))
-        self.assertFalse(self._eab.verify(kid, "x" + hmac))
+        self.assertFalse(self.eab_store.verify(kid + "x", hmac))
+        self.assertFalse(self.eab_store.verify(kid, "x" + hmac))

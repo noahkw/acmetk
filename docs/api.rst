@@ -60,6 +60,15 @@ Challenge Validators
     :members:
     :inherited-members:
 
+External Account Binding
+------------------------
+
+.. autoclass:: acme_broker.server.external_account_binding.ExternalAccountBinding
+    :members:
+
+.. autoclass:: acme_broker.server.external_account_binding.ExternalAccountBindingStore
+    :members:
+
 Models
 ######
 

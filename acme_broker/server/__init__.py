@@ -5,6 +5,10 @@ from .challenge_validator import (
     CouldNotValidateChallenge,
 )
 from .server import AcmeCA, AcmeBroker, AcmeProxy, AcmeServerBase, AcmeRelayBase
+from .external_account_binding import (
+    ExternalAccountBindingStore,
+    ExternalAccountBinding,
+)
 
 
 __all__ = [
@@ -17,4 +21,6 @@ __all__ = [
     "DummyValidator",
     "ChallengeValidator",
     "CouldNotValidateChallenge",
+    "ExternalAccountBindingStore",
+    "ExternalAccountBinding",
 ]
