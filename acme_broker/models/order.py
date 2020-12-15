@@ -85,7 +85,7 @@ class Order(Entity, Serializer):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
     )
     """The order's ID."""
-    proxied_url = Column(String, nullable=True, unique=True)
+    proxied_url = Column(String, nullable=True, unique=False)
     """The order's URL at the remote CA."""
     proxied_error = Column(AcmeErrorType, nullable=True)
     """The error that occured at the remote CA while processing the order."""
