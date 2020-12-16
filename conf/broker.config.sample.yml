@@ -4,6 +4,7 @@ broker:
   db: 'postgresql+asyncpg://acme:YOUR_PASSWORD@localhost:5432/acme'
   challenge_validator: 'requestipdns'
   rsa_min_keysize: 2048
+  ec_min_keysize: 256
   tos_url: 'https://my-broker.com/tos'
   mail_suffixes:
     - 'uni-hannover.de'

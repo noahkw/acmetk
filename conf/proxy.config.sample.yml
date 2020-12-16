@@ -4,6 +4,7 @@ proxy:
   db: 'postgresql+asyncpg://acme_rw:YOUR_READ_WRITE_PW@db:5432/acme'
   challenge_validator: 'requestipdns'
   rsa_min_keysize: 2048
+  ec_min_keysize: 256
   tos_url: 'https://my-proxy.com/tos'
   mail_suffixes:
     - 'uni-hannover.de'

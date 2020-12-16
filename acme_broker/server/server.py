@@ -767,6 +767,9 @@ class AcmeServerBase(AcmeManagement, ConfigurableMixin):
 
         csr = messages.CertificateRequest.json_loads(jws.payload).csr
         pub_key = csr.public_key()
+        logger.debug(
+            "Received CSR; Type: %s, Key Size: %s bits", type(pub_key), pub_key.key_size
+        )
 
         if isinstance(pub_key, self.SUPPORTED_CSR_KEYS):
             if (key_size := pub_key.key_size) < (

@@ -30,6 +30,7 @@ An ACME CA configuration file might look as follows:
       private_key: '/app/certs/root.key'
       challenge_validator: 'requestipdns'
       rsa_min_keysize: 2048
+      ec_min_keysize: 256
       tos_url: 'https://my-ca.com/tos'
       mail_suffixes:
         - 'uni-hannover.de'
@@ -62,6 +63,9 @@ An ACME CA configuration file might look as follows:
 
 * rsa_min_keysize (optional): The minimum supported keysize for CSR and account RSA keys.
     Defaults to *2048* if not specified.
+
+* ec_min_keysize (optional): The minimum supported keysize for CSR EC keys. Account EC keys are currently not supported.
+    Defaults to *256* if not specified.
 
 * tos_url (optional): URL of the terms of service.
     Omitted from the directory if not specified.
@@ -102,6 +106,7 @@ For a broker, the file might looks as follows:
       db: 'postgresql+asyncpg://user:password@host:5432/db'
       challenge_validator: 'requestipdns'
       rsa_min_keysize: 2048
+      ec_min_keysize: 256
       tos_url: 'https://my-broker.com/tos'
       mail_suffixes:
         - 'uni-hannover.de'
@@ -129,7 +134,7 @@ For a broker, the file might looks as follows:
               - '1.1.1.1' # Cloudflare DNS
 
 Refer to section `ACME Certificate Authority`_ for the options *hostname*, *port*, *db*, *challenge_validator*,
-*rsa_min_keysize*, *tos_url*, *mail_suffixes*, *subnets*, and *use_forwarded_header*.
+*rsa_min_keysize*, *ec_min_keysize*, *tos_url*, *mail_suffixes*, *subnets*, and *use_forwarded_header*.
 The *client* section inside the main *broker* section configures the internal
 :class:`~acme_broker.client.AcmeClient` that is used to communicate with the actual CA.
 Refer to section `ACME Client`_ for a description of the possible options.

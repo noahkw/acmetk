@@ -150,6 +150,10 @@ class TestAcmetiny:
 
 
 class TestDehydrated:
+    @property
+    def key_algo(self):
+        return "rsa"
+
     def setUp(self) -> None:
         super().setUp()
 
@@ -162,6 +166,7 @@ class TestDehydrated:
         with open(str(self.path / "config"), "wt") as f:
             f.write(
                 f"""
+KEY_ALGO={self.key_algo}
 CA={self.DIRECTORY}
 CONTACT_EMAIL={self.contact}
 IP_VERSION=4

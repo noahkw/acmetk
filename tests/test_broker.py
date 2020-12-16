@@ -12,7 +12,13 @@ from acme_broker.client import (
     DummySolver,
 )
 from acme_broker.server import DummyValidator
-from tests.test_ca import TestCA, TestAcmetiny, TestCertBot, TestOurClient
+from tests.test_ca import (
+    TestCA,
+    TestAcmetiny,
+    TestCertBot,
+    TestOurClient,
+    TestDehydrated,
+)
 
 log = logging.getLogger("acme_broker.test_broker")
 
@@ -165,6 +171,18 @@ class TestOurClientBrokerLocalCA(
 
     async def test_unregister(self):
         await super().test_unregister()
+
+
+class TestDehydratedCA(
+    TestDehydrated, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase
+):
+    @property
+    def key_algo(self):
+        return "secp384r1"
+
+    async def test_run(self):
+        # Should fail!
+        await super().test_run()
 
 
 class TestBrokerLE(TestBroker):
