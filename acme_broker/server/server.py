@@ -22,7 +22,7 @@ import aiohttp_jinja2
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
 
 from acme_broker.server.management import AcmeManagement
@@ -88,19 +88,27 @@ class AcmeServerBase(AcmeManagement, ConfigurableMixin):
     )
     """The JWS signing algorithms that the server supports."""
 
+    SUPPORTED_ACCOUNT_KEYS = (rsa.RSAPublicKey,)
+
+    SUPPORTED_CSR_KEYS = (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)
+
     subclasses = []
 
     def __init__(
         self,
         *,
         rsa_min_keysize=2048,
+        ec_min_keysize=256,
         tos_url=None,
         mail_suffixes=None,
         subnets=None,
         use_forwarded_header=False,
         **kwargs,
     ):
-        self._rsa_min_keysize = rsa_min_keysize
+        self._min_keysize = {
+            rsa.RSAPublicKey: rsa_min_keysize,
+            ec.EllipticCurvePublicKey: ec_min_keysize,
+        }
         self._tos_url = tos_url
         self._mail_suffixes = mail_suffixes
         self._subnets = (
@@ -126,6 +134,13 @@ class AcmeServerBase(AcmeManagement, ConfigurableMixin):
         self._db_session = None
 
         self._challenge_validators = {}
+
+    def _get_min_keysize(self, public_key):
+        for key_type, key_size in self._min_keysize.items():
+            if isinstance(public_key, key_type):
+                return key_size
+        else:
+            raise ValueError("This key type is not supported.")
 
     def _add_routes(self):
         specific_routes = []
@@ -481,9 +496,22 @@ class AcmeServerBase(AcmeManagement, ConfigurableMixin):
             jws, account = await self._verify_request(request, session, key_auth=True)
             reg = acme.messages.Registration.json_loads(jws.payload)
             jwk = jws.signature.combined.jwk
+            pub_key = jwk.key._wrapped
 
-            if jwk.key.key_size < self._rsa_min_keysize:
-                raise acme.messages.Error.with_code("badPublicKey")
+            if isinstance(pub_key, self.SUPPORTED_ACCOUNT_KEYS):
+                if (key_size := pub_key.key_size) < (
+                    min_key_size := self._get_min_keysize(pub_key)
+                ):
+                    raise acme.messages.Error.with_code(
+                        "badPublicKey",
+                        detail=f"Only keys with at least {min_key_size} bits are accepted. (Keysize: {key_size})",
+                    )
+            else:
+                raise acme.messages.Error.with_code(
+                    "badPublicKey",
+                    detail=f"At this moment, only the following keys are supported for accounts: "
+                    f"{', '.join([key_type.__name__ for key_type in self.SUPPORTED_ACCOUNT_KEYS])}.",
+                )
 
             if account:
                 if account.status != models.AccountStatus.VALID:
@@ -740,16 +768,22 @@ class AcmeServerBase(AcmeManagement, ConfigurableMixin):
         csr = messages.CertificateRequest.json_loads(jws.payload).csr
         pub_key = csr.public_key()
 
-        if not isinstance(pub_key, RSAPublicKey):
-            raise acme.messages.Error.with_code(
-                "badPublicKey", detail="At this moment, only RSA keys are supported."
-            )
-        elif (key_size := pub_key.key_size) < self._rsa_min_keysize:
+        if isinstance(pub_key, self.SUPPORTED_CSR_KEYS):
+            if (key_size := pub_key.key_size) < (
+                min_key_size := self._get_min_keysize(pub_key)
+            ):
+                raise acme.messages.Error.with_code(
+                    "badPublicKey",
+                    detail=f"Only keys with at least {min_key_size} bits are accepted. (Keysize: {key_size})",
+                )
+        else:
             raise acme.messages.Error.with_code(
                 "badPublicKey",
-                detail=f"Only RSA keys with at least {self._rsa_min_keysize} bits are accepted. (Keysize: {key_size})",
+                detail=f"At this moment, only the following keys are supported in CSRs: "
+                f"{', '.join([key_type.__name__ for key_type in self.SUPPORTED_CSR_KEYS])}.",
             )
-        elif not csr.is_signature_valid:
+
+        if not csr.is_signature_valid:
             raise acme.messages.Error.with_code(
                 "badCSR", detail="The CSR's signature is invalid."
             )
@@ -933,6 +967,8 @@ class AcmeCA(AcmeServerBase):
     """ACME compliant Certificate Authority."""
 
     config_name = "ca"
+
+    SUPPORTED_CSR_KEYS = (rsa.RSAPublicKey,)
 
     def __init__(self, *, cert, private_key, **kwargs):
         super().__init__(**kwargs)
