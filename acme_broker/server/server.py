@@ -157,11 +157,7 @@ class AcmeServerBase(AcmeManagement, ConfigurableMixin):
         db = Database(config["db"])
 
         instance = cls(
-            rsa_min_keysize=config.get("rsa_min_keysize"),
-            tos_url=config.get("tos_url"),
-            mail_suffixes=config.get("mail_suffixes"),
-            subnets=config.get("subnets"),
-            use_forwarded_header=config.get("use_forwarded_header"),
+            **config,
             **kwargs,
         )
         instance._db = db
@@ -952,13 +948,7 @@ class AcmeCA(AcmeServerBase):
         db = Database(config["db"])
 
         ca = cls(
-            rsa_min_keysize=config.get("rsa_min_keysize"),
-            tos_url=config.get("tos_url"),
-            mail_suffixes=config.get("mail_suffixes"),
-            subnets=config.get("subnets"),
-            use_forwarded_header=config.get("use_forwarded_header"),
-            cert=config["cert"],
-            private_key=config["private_key"],
+            **config,
             **kwargs,
         )
         ca._db = db
@@ -1027,6 +1017,29 @@ class AcmeRelayBase(AcmeServerBase):
     def __init__(self, *, client, **kwargs):
         super().__init__(**kwargs)
         self._client = client
+
+    @classmethod
+    async def create_app(
+        cls, config: typing.Dict[str, typing.Any], **kwargs
+    ) -> "AcmeRelayBase":
+        """A factory that also creates and initializes the database and session objects,
+        reading the necessary arguments from the passed config dict.
+
+        :param config: A dictionary holding the configuration. See :doc:`configuration` for supported options.
+        :return: The server instance
+        """
+        db = Database(config["db"])
+
+        config.pop("client")
+
+        instance = cls(
+            **config,
+            **kwargs,
+        )
+        instance._db = db
+        instance._db_session = db.session
+
+        return instance
 
     # @routes.post("/certificate/{id}", name="certificate")
     async def certificate(self, request):
