@@ -47,9 +47,11 @@ oF45C4zWPYXCtz3rtFi7w9f6rf5OWiJZ01VZ4U+vbe/fSC7DgRMWUyWB
         URL = "http://localhost/new-account"
         request = Mock(headers={"X-SSL-CERT": urllib.parse.quote(data)}, url=URL)
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        kid, hmac = self.eab_store.create(request, key.public_key())
+        pub_key = key.public_key()
 
-        # signature = ""
-        # self.assertTrue(self._eab.verify(kid, signature))
-        self.assertFalse(self.eab_store.verify(kid + "x", hmac))
-        self.assertFalse(self.eab_store.verify(kid, "x" + hmac))
+        kid, hmac_key = self.eab_store.create(request)
+
+        signature = list(self.eab_store._pending.values())[0].signature(pub_key)
+        self.assertTrue(self.eab_store.verify(pub_key, kid, signature))
+        self.assertFalse(self.eab_store.verify(pub_key, kid + "x", hmac_key))
+        self.assertFalse(self.eab_store.verify(pub_key, kid, "x" + hmac_key))

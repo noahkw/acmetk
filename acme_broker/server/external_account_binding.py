@@ -9,6 +9,10 @@ import acme.jws
 from cryptography import x509
 
 
+from acme_broker.server.routes import routes
+import aiohttp_jinja2
+
+
 class ExternalAccountBinding:
     """Represents an external account binding.
 
@@ -20,14 +24,9 @@ class ExternalAccountBinding:
 
     def __init__(
         self,
-        account_pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
         email: str,
         url: str,
     ):
-        self.account_pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey" = (
-            account_pub_key
-        )
-        """The ACME account key that the external account is to be bound to."""
         self.kid: str = email
         """The key identifier provided by the external binding mechanism."""
         self.url: str = url
@@ -37,13 +36,18 @@ class ExternalAccountBinding:
         self.when: datetime.datetime = datetime.datetime.now()
         """The time when the EAB request was created."""
 
-    def verify(self, signature: str) -> bool:
+    def verify(
+        self,
+        account_pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
+        signature: str,
+    ) -> bool:
         """Checks the given signature against the EAB's.
 
+        :param account_pub_key: The ACME account key that the external account is to be bound to.
         :param signature: The signature to be verified.
         :return: True iff the given signature and the EAB's are equal.
         """
-        return self.signature == signature
+        return self.signature(account_pub_key) == signature
 
     def expired(self) -> bool:
         """Returns whether the EAB has expired.
@@ -55,9 +59,9 @@ class ExternalAccountBinding:
 
         return False
 
-    def _eab(self):
+    def _eab(self, account_pub_key):
         key_json = json.dumps(
-            josepy.jwk.JWKRSA(key=self.account_pub_key).to_partial_json()
+            josepy.jwk.JWKRSA(key=account_pub_key).to_partial_json()
         ).encode()
         decoded_hmac_key = josepy.b64.b64decode(self.hmac_key)
         eab = acme.jws.JWS.sign(
@@ -71,10 +75,17 @@ class ExternalAccountBinding:
 
         return eab
 
-    @property
-    def signature(self) -> str:
-        """Returns the EAB's signature."""
-        return josepy.b64.b64encode(self._eab().signature.signature).decode()
+    def signature(
+        self,
+        account_pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
+    ) -> str:
+        """Returns the EAB's signature.
+
+        :param account_pub_key: The ACME account key that the external account is to be bound to.
+        """
+        return josepy.b64.b64encode(
+            self._eab(account_pub_key).signature.signature
+        ).decode()
 
 
 class ExternalAccountBindingStore:
@@ -83,14 +94,11 @@ class ExternalAccountBindingStore:
     def __init__(self):
         self._pending = dict()
 
-    def create(
-        self, request, key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey"
-    ) -> typing.Tuple[str, str]:
+    def create(self, request) -> typing.Tuple[str, str]:
         """Creates an :class:`ExternalAccountBinding` request and stores it internally for verification at a later
         point in time.
 
         :param request: The request that contains the PEM-encoded x509 client certificate in the *X-SSL-CERT* header.
-        :param key: The ACME account key that the external account is to be bound to.
         :return: The resulting pending EAB's :attr:`~ExternalAccountBinding.kid` and
             :attr:`~ExternalAccountBinding.hmac_key`.
         """
@@ -117,14 +125,20 @@ class ExternalAccountBindingStore:
 
         if not (pending_eab := self._pending.get(mail, None)) or pending_eab.exired():
             pending_eab = self._pending[mail] = ExternalAccountBinding(
-                key, mail, str(request.url)
+                mail, str(request.url)
             )
 
         return pending_eab.kid, pending_eab.hmac_key
 
-    def verify(self, kid: str, signature: str) -> bool:
-        """Verifies an external account binding given its kid and signature.
+    def verify(
+        self,
+        account_pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
+        kid: str,
+        signature: str,
+    ) -> bool:
+        """Verifies an external account binding given its ACME account key, kid and signature.
 
+        :param account_pub_key: The ACME account key that the external account is to be bound to.
         :param kid: The EAB's kid.
         :param signature: The EAB's signature.
         :return: True iff verification was successful.
@@ -135,4 +149,31 @@ class ExternalAccountBindingStore:
         if pending.expired():
             return False
 
-        return pending.verify(signature)
+        return pending.verify(account_pub_key, signature)
+
+
+class AcmeEAB:
+    def __init__(self):
+        super().__init__()
+        self._eab_store = ExternalAccountBindingStore()
+
+    @routes.get("/eab", name="eab")
+    @aiohttp_jinja2.template("eab.jinja2")
+    async def eab(self, request):
+        client_cert = request.headers.get("X-SSL-CERT")
+        if not client_cert:
+            response = aiohttp_jinja2.render_template("eab.jinja2", request, {})
+            response.set_status(403)
+            response.text = (
+                "An External Account Binding may only be created if a valid client certificate "
+                "is sent with the request."
+            )
+            return response
+
+        # Render the form/button for EAB creation
+        return {}
+
+    @routes.post("/create-eab", name="create-eab")
+    @aiohttp_jinja2.template("eab_create.jinja2")
+    async def create_eab(self, request):
+        return {}

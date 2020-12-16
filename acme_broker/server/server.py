@@ -33,6 +33,7 @@ from acme_broker.models import messages
 from acme_broker.client import CouldNotCompleteChallenge, AcmeClientException
 from acme_broker.database import Database
 from acme_broker.server import ChallengeValidator
+from acme_broker.server.external_account_binding import AcmeEAB
 from acme_broker.util import (
     url_for,
     generate_cert_from_csr,
@@ -68,7 +69,7 @@ class AcmeResponse(web.Response):
         )
 
 
-class AcmeServerBase(AcmeManagement, ConfigurableMixin):
+class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
     """Base class for an ACME compliant server.
 
     Implementations must set the :attr:`config_name` attribute, so that the CLI script knows which
@@ -89,8 +90,10 @@ class AcmeServerBase(AcmeManagement, ConfigurableMixin):
     """The JWS signing algorithms that the server supports."""
 
     SUPPORTED_ACCOUNT_KEYS = (rsa.RSAPublicKey,)
+    """The types of public keys that the server supports when creating ACME accounts."""
 
     SUPPORTED_CSR_KEYS = (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)
+    """The types of public keys that the server supports in a certificate signing request."""
 
     subclasses = []
 
@@ -972,6 +975,7 @@ class AcmeCA(AcmeServerBase):
     config_name = "ca"
 
     SUPPORTED_CSR_KEYS = (rsa.RSAPublicKey,)
+    """The types of public keys that the server supports in a certificate signing request."""
 
     def __init__(self, *, cert, private_key, **kwargs):
         super().__init__(**kwargs)
