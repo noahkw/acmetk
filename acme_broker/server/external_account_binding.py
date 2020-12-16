@@ -123,7 +123,7 @@ class ExternalAccountBindingStore:
 
         mail = mail.lower()
 
-        if not (pending_eab := self._pending.get(mail, None)) or pending_eab.exired():
+        if not (pending_eab := self._pending.get(mail, None)) or pending_eab.expired():
             pending_eab = self._pending[mail] = ExternalAccountBinding(
                 mail, str(request.url)
             )
@@ -160,8 +160,16 @@ class AcmeEAB:
     @routes.get("/eab", name="eab")
     @aiohttp_jinja2.template("eab.jinja2")
     async def eab(self, request):
-        client_cert = request.headers.get("X-SSL-CERT")
-        if not client_cert:
+        # Render the form/button for EAB creation
+        return {}
+
+    @routes.post("/create-eab", name="create-eab")
+    @aiohttp_jinja2.template("create_eab.jinja2")
+    async def create_eab(self, request):
+        # from unittest.mock import Mock
+        # request = Mock(headers={"X-SSL-CERT": urllib.parse.quote(self.data)}, url=request.url)
+
+        if not request.headers.get("X-SSL-CERT"):
             response = aiohttp_jinja2.render_template("eab.jinja2", request, {})
             response.set_status(403)
             response.text = (
@@ -170,10 +178,5 @@ class AcmeEAB:
             )
             return response
 
-        # Render the form/button for EAB creation
-        return {}
-
-    @routes.post("/create-eab", name="create-eab")
-    @aiohttp_jinja2.template("eab_create.jinja2")
-    async def create_eab(self, request):
-        return {}
+        kid, hmac_key = self._eab_store.create(request)
+        return {"kid": kid, "hmac_key": hmac_key}

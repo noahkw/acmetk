@@ -108,6 +108,8 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         use_forwarded_header=False,
         **kwargs,
     ):
+        super().__init__()
+
         self._min_keysize = {
             rsa.RSAPublicKey: rsa_min_keysize,
             ec.EllipticCurvePublicKey: ec_min_keysize,

@@ -1,0 +1,22 @@
+<html>
+<header>
+    <title>EAB</title>
+</header>
+<style>
+    input {
+        display: block;
+        padding: 0.2em;
+        margin: 1em 0.5em;
+    }
+</style>
+
+{% block body %}
+    <h3>External Account Binding</h3>
+    <p>
+        <label for="kid">kid</label>
+        <input id="kid" type="text" value="{{ kid }}">
+        <label for="hmac_key">hmac_key</label>
+        <input id="hmac_key" type="text" value="{{ hmac_key }}">
+    </p>
+{% endblock %}
+</html>
