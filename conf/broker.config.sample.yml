@@ -25,9 +25,9 @@ broker:
         host: 'ipam.my-broker.com'
         username: 'infobloxuser'
         password: 'infobloxpassw'
-      dns_servers:
-        - '8.8.8.8' # Google DNS
-        - '1.1.1.1' # Cloudflare DNS
+        dns_servers:
+          - '8.8.8.8' # Google DNS
+          - '1.1.1.1' # Cloudflare DNS
 logging:
   version: 1
   formatters:

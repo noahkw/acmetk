@@ -193,3 +193,87 @@ Set up your development environment:
     pip install -e .
     # Install the pre-commit hook for linting, formatting, etc.
     pre-commit install
+
+Abstract Base Classes
+#####################
+
+AcmeServerBase
+--------------
+
+:class:`~acme_broker.server.AcmeServerBase` is the base class for all ACME-compliant server implementations.
+It encapsulates a :class:`aiohttp.web.Application` to respond to ACME requests and :code:`aiohttp_jinja2`
+is used as the template engine to render the :class:`~acme_broker.server.management.AcmeManagement`
+and :class:`~acme_broker.server.external_account_binding.AcmeEAB` sites.
+
+Subclasses need to implement the methods :meth:`~acme_broker.server.AcmeServerBase.certificate`
+and :meth:`~acme_broker.server.AcmeServerBase.handle_order_finalize`.
+Subclasses must also set the :attr:`~acme_broker.server.AcmeServerBase.config_name` which corresponds
+to the section name in the config files.
+Instances should only be created using :meth:`~acme_broker.server.AcmeServerBase.create_app`
+which instantiates the server and attaches the database session at the least.
+
+To run a new server from the CLI, a :func:`run_servername` function, which is called if
+:code:`app_class` is the server class, should be created in :mod:`acme_broker.main.py`.
+Any challenge validators, internal clients, etc., as well as the server itself, should be instantiated there.
+The runner is then returned along with the server instance.
+
+AcmeRelayBase
+-------------
+
+:class:`~acme_broker.server.AcmeRelayBase` inherits from :class:`~acme_broker.server.AcmeServerBase`.
+It features an internal :class:`~acme_broker.client.AcmeClient` that is used to communicate with another
+certificate authority of choice.
+Subclasses need to implement the method :meth:`~acme_broker.server.AcmeServerBase.handle_order_finalize`.
+
+If complex configuration beyond the server itself and its internal client is not needed, then the existing
+:func:`run_relay` in :mod:`acme_broker.main.py` may be used to start the server.
+
+Challenge Solver
+----------------
+
+:class:`~acme_broker.client.challenge_solver.ChallengeSolver` is the interface that challenge solver
+plugins must implement.
+Subclasses must also set the :attr:`~acme_broker.client.challenge_solver.ChallengeSolver.config_name`
+which corresponds to the :code:`challenge_solver` child section name in client config file.
+
+:meth:`~acme_broker.client.challenge_solver.ChallengeSolver.connect` may be overridden if the plugin
+needs to connect to some resource before being able to challenge completion requests.
+
+:meth:`~acme_broker.client.challenge_solver.ChallengeSolver.complete_challenge` must be overridden by
+all plugin implementations.
+It is passed the account key, as well as the challenge and the identifier associated with the challenge.
+Upon being called, the method needs to complete the challenge, i.e. by provisioning some resource,
+and then defer returning until the remote CA is allowed to validate the challenge.
+
+:meth:`~acme_broker.client.challenge_solver.ChallengeSolver.complete_challenge` must also be overridden by
+all plugin implementations.
+Upon being called, it should de-provision the resources that were provisioned by the solver
+to complete that specific challenge.
+
+Configuration options inside the :code:`challenge_solver` section of the client's block
+are directly passed to the constructor as keyword arguments.
+If our sublass were called :code:`xyzdns`, for example, then :code:`host="example.xyz"` would be
+passed in the following example:
+
+.. code-block:: yaml
+
+    client:
+      challenge_solver:
+        xyzdns:
+          host: 'example.xyz'
+
+Challenge Validator
+-------------------
+
+:class:`~acme_broker.server.challenge_validator.ChallengeValidator` is the interface that challenge
+validator plugins must implement.
+Subclasses must also set the :attr:`~acme_broker.server.challenge_validator.ChallengeValidator.config_name`
+which corresponds to the string that :code:`challenge_validator` is set to in the server config section.
+
+:meth:`~acme_broker.server.challenge_validator.ChallengeValidator.validate_challenge` must be
+overridden by all plugin implementations.
+It is passed the challenge as well as any number of keyword arguments.
+Upon being called, the method should attempt to validate the challenge.
+If the validation was successful, then the method should just return.
+Otherwise, a :class:`~acme_broker.server.challenge_validator.CouldNotValidateChallenge`
+exception must be raised.
