@@ -1,6 +1,8 @@
 import urllib.parse
 import unittest
 from unittest.mock import Mock
+
+import yarl
 from cryptography.hazmat.primitives.asymmetric import rsa
 from acme_broker.server.external_account_binding import ExternalAccountBindingStore
 from tests.test_ca import TestCertBotCA
@@ -19,8 +21,12 @@ class TestEAB(unittest.TestCase):
         self.eab_store = ExternalAccountBindingStore()
 
     def test_create(self):
-        URL = "http://localhost/new-account"
-        request = Mock(headers={"X-SSL-CERT": load_test_cert()}, url=URL)
+        URL = yarl.URL("http://localhost/eab")
+        request = Mock(
+            headers={"X-SSL-CERT": load_test_cert()},
+            url=URL,
+            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
+        )
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         pub_key = key.public_key()
 
@@ -41,8 +47,12 @@ class TestCertbotCA_EAB(TestCertBotCA):
         super().setUp()
 
     async def test_register(self):
-        URL = "http://localhost:8000/new-account"
-        request = Mock(headers={"X-SSL-CERT": load_test_cert()}, url=URL)
+        URL = yarl.URL("http://localhost:8000/eab")
+        request = Mock(
+            headers={"X-SSL-CERT": load_test_cert()},
+            url=URL,
+            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
+        )
         kid, hmac_key = self.ca._eab_store.create(request)
 
         self.log.debug("kid: %s, hmac_key: %s", kid, hmac_key)

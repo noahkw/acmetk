@@ -11,7 +11,7 @@ import josepy
 from cryptography import x509
 
 from acme_broker.server.routes import routes
-from acme_broker.util import url_for
+from acme_broker.util import url_for, forwarded_url
 
 
 class ExternalAccountBinding:
@@ -126,7 +126,7 @@ class ExternalAccountBindingStore:
 
         if not (pending_eab := self._pending.get(mail, None)) or pending_eab.expired():
             pending_eab = self._pending[mail] = ExternalAccountBinding(
-                mail, str(request.url)
+                mail, url_for(request, "new-account")
             )
 
         return pending_eab.kid, pending_eab.hmac_key
@@ -210,9 +210,13 @@ class AcmeEAB:
                 f"Supported algorithms: {', '.join([str(alg) for alg in self.SUPPORTED_EAB_JWS_ALGORITHMS])}",
             )
 
-        kid = jws.signature.combined.kid
+        sig = jws.signature.combined
+        kid = sig.kid
         signature = josepy.b64.b64encode(jws.signature.signature).decode()
         payload_key = josepy.jwk.JWKRSA.from_json(json.loads(jws.payload))
+
+        if sig.url != str(forwarded_url(request)):
+            raise acme.messages.Error.with_code("unauthorized")
 
         if payload_key != josepy.jwk.JWKRSA(key=pub_key):
             raise acme.messages.Error.with_code(
