@@ -438,7 +438,28 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
 
         return certificate, revocation
 
-    def _validate_eab(self, request, pub_key, reg: acme.messages.Registration):
+    def _verify_eab(
+        self,
+        request,
+        pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
+        reg: acme.messages.Registration,
+    ):
+        """Verifies an ACME Registration request whose payload contains an external account binding JWS.
+
+        `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_
+
+        :param pub_key: The public key that is contained in the outer JWS, i.e. the ACME account key.
+        :param reg: The registration message.
+        :raises:
+
+            * :class:`acme.messages.Error` if any of the following are true:
+
+                * The request does not contain a valid JWS
+                * The request JWS does not contain an *externalAccountBinding* field
+                * The EAB JWS was signed with an unsupported algorithm (:attr:`SUPPORTED_EAB_JWS_ALGORITHMS`)
+                * The EAB JWS' payload does not contain the same public key as the encapsulating JWS
+                * The EAB JWS' signature is invalid
+        """
         if not reg.external_account_binding:
             raise acme.messages.Error.with_code(
                 "externalAccountRequired", detail=f"Visit {url_for(request, 'eab')}"
@@ -586,7 +607,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                     )
                 else:  # create new account
                     if self._require_eab:
-                        self._validate_eab(request, pub_key, reg)
+                        self._verify_eab(request, pub_key, reg)
 
                     self._validate_contact_info(reg)
 
