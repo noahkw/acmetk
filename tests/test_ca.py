@@ -120,6 +120,7 @@ class TestCA(TestAcme):
         await ca._db._recreate()
 
         self.runner = runner
+        self.ca = ca
 
     async def asyncTearDown(self) -> None:
         await self.runner.shutdown()

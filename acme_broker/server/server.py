@@ -89,6 +89,13 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
     )
     """The JWS signing algorithms that the server supports."""
 
+    SUPPORTED_EAB_JWS_ALGORITHMS = (
+        josepy.HS256,
+        josepy.HS384,
+        josepy.HS512,
+    )
+    """The symmetric JWS signing algorithms that the server supports for external account bindings."""
+
     SUPPORTED_ACCOUNT_KEYS = (rsa.RSAPublicKey,)
     """The types of public keys that the server supports when creating ACME accounts."""
 
@@ -106,6 +113,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         mail_suffixes=None,
         subnets=None,
         use_forwarded_header=False,
+        require_eab=False,
         **kwargs,
     ):
         super().__init__()
@@ -120,6 +128,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
             [ipaddress.ip_network(subnet) for subnet in subnets] if subnets else None
         )
         self._use_forwarded_header = use_forwarded_header
+        self._require_eab = require_eab
 
         self.app = web.Application(
             middlewares=[
@@ -429,6 +438,43 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
 
         return certificate, revocation
 
+    def _validate_eab(self, request, pub_key, reg: acme.messages.Registration):
+        external_account_binding = dict(reg.external_account_binding)
+
+        if not external_account_binding:
+            raise acme.messages.Error.with_code(
+                "externalAccountRequired", detail=f"Visit {url_for(request, 'eab')}"
+            )
+
+        try:
+            jws = acme.jws.JWS.from_json(external_account_binding)
+        except josepy.errors.DeserializationError:
+            raise acme.messages.Error.with_code(
+                "malformed", detail="The request does not contain a valid JWS."
+            )
+
+        if jws.signature.combined.alg not in self.SUPPORTED_EAB_JWS_ALGORITHMS:
+            raise acme.messages.Error.with_code(
+                "badSignatureAlgorithm",
+                detail="The external account binding JWS was signed with an unsupported algorithm. "
+                f"Supported algorithms: {', '.join([str(alg) for alg in self.SUPPORTED_EAB_JWS_ALGORITHMS])}",
+            )
+
+        kid = jws.signature.combined.kid
+        signature = josepy.b64.b64encode(jws.signature.signature).decode()
+        payload_key = josepy.jwk.JWKRSA.from_json(json.loads(jws.payload))
+
+        if payload_key != josepy.jwk.JWKRSA(key=pub_key):
+            raise acme.messages.Error.with_code(
+                "malformed",
+                detail="The external account binding does not contain the same public key as the request JWS.",
+            )
+
+        if not self._eab_store.verify(pub_key, kid, signature):
+            raise acme.messages.Error.with_code(
+                "unauthorized", detail="The external account binding is invalid."
+            )
+
     def _validate_contact_info(self, reg: acme.messages.Registration):
         for contact_url in reg.contact:
             if address := parseaddr(contact_url)[1]:
@@ -465,6 +511,9 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
 
         if self._tos_url:
             directory["meta"]["termsOfService"] = self._tos_url
+
+        if self._require_eab is not None:
+            directory["meta"]["externalAccountRequired"] = self._require_eab
 
         return self._response(request, directory)
 
@@ -538,6 +587,9 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                         title=f"The client must agree to the terms of service: {self._tos_url}.",
                     )
                 else:  # create new account
+                    if self._require_eab:
+                        self._validate_eab(request, pub_key, reg)
+
                     self._validate_contact_info(reg)
 
                     new_account = models.Account.from_obj(jwk, reg)
@@ -574,6 +626,12 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             upd = messages.AccountUpdate.json_loads(jws.payload)
+
+            if self._require_eab and upd.contact:
+                raise acme.messages.Error.with_code(
+                    "unauthorized",
+                    detail="Updates to the contact field are not allowed since external account binding is required.",
+                )
 
             self._validate_contact_info(upd)
 

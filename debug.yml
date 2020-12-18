@@ -15,7 +15,7 @@ infoblox_test:
 
 tests:
   LocalCA:
-    names:
+    names: &localca_names
       - 'localca.test.de'
       - 'localca2.test.de'
     ca:
@@ -37,6 +37,17 @@ tests:
       contact:
         # phone: ''
         email: 'woehler+testclient@luis.uni-hannover.de'
+  LocalCA_EAB:
+    names: *localca_names
+    ca:
+      hostname: *host
+      port: *port
+      db: *db_debug_ca
+      rsa_min_keysize: *rsa_min
+      tos_url: *tos
+      mail_suffixes: *mail_suffixes
+      subnets: *subnets
+      require_eab: true
   LocalCADeployment:
     names:
       - 'localhost'
