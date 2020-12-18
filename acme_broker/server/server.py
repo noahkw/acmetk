@@ -1,39 +1,34 @@
 import asyncio
+import functools
 import ipaddress
 import json
 import logging
 import re
+import types
 import typing
 import uuid
-import functools
-import types
-
 from email.utils import parseaddr
 
 import acme.jws
 import acme.messages
+import aiohttp_jinja2
 import josepy
 import yarl
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
-import aiohttp_jinja2
-
-
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
-
-from acme_broker.server.management import AcmeManagement
 from acme_broker import models
-
-
-from acme_broker.models import messages
 from acme_broker.client import CouldNotCompleteChallenge, AcmeClientException
 from acme_broker.database import Database
+from acme_broker.models import messages
 from acme_broker.server import ChallengeValidator
 from acme_broker.server.external_account_binding import AcmeEAB
+from acme_broker.server.management import AcmeManagement
+from acme_broker.server.routes import routes
 from acme_broker.util import (
     url_for,
     generate_cert_from_csr,
@@ -42,8 +37,6 @@ from acme_broker.util import (
     pem_split,
     ConfigurableMixin,
 )
-
-from acme_broker.server.routes import routes
 
 logger = logging.getLogger(__name__)
 

@@ -3,11 +3,11 @@ import asyncio
 import contextlib
 import functools
 import logging
+import typing
 
 import acme.messages
 import dns.asyncresolver
 import josepy
-import typing
 from infoblox_client import connector, objects
 
 from acme_broker.models import ChallengeType

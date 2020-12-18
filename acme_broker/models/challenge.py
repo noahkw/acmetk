@@ -7,9 +7,9 @@ from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
+import acme_broker.server.challenge_validator
 from .base import Serializer, Entity
 from ..util import url_for
-import acme_broker.server.challenge_validator
 
 
 class ChallengeStatus(str, enum.Enum):

@@ -3,11 +3,10 @@ import logging
 import logging.config
 from pathlib import Path
 
-import click
-import yaml
-
 import aiohttp_jinja2
+import click
 import jinja2
+import yaml
 
 from acme_broker.client import AcmeClient, ChallengeSolver
 from acme_broker.database import Database

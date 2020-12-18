@@ -1,16 +1,16 @@
 import enum
 import json
+import typing
 
 import OpenSSL
 import acme.messages
 import josepy
-import typing
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from josepy import JSONDeSerializable
 
-from acme_broker.models.authorization import AuthorizationStatus
 from acme_broker.models.account import AccountStatus
+from acme_broker.models.authorization import AuthorizationStatus
 
 ERROR_CODE_STATUS = {
     "unauthorized": 401,

@@ -15,8 +15,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from .base import Serializer, Entity
 from acme_broker.models.messages import RevocationReason
+from .base import Serializer, Entity
 
 
 class x509Certificate(TypeDecorator):

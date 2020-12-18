@@ -3,18 +3,15 @@ import json
 import secrets
 import typing
 import urllib.parse
-import josepy
-import acme.jws
 
+import acme.jws
+import acme.messages
+import aiohttp_jinja2
+import josepy
 from cryptography import x509
 
-
 from acme_broker.server.routes import routes
-import aiohttp_jinja2
-
 from acme_broker.util import url_for
-
-import acme.messages
 
 
 class ExternalAccountBinding:

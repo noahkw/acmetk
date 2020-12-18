@@ -3,6 +3,7 @@ import typing
 import uuid
 from datetime import datetime, timezone, timedelta
 
+import acme.messages
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from sqlalchemy import (
@@ -19,13 +20,11 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from .identifier import Identifier
 from .authorization import AuthorizationStatus, Authorization
-from .challenge import Challenge
 from .base import Serializer, Entity
+from .challenge import Challenge
+from .identifier import Identifier
 from ..util import url_for, names_of
-
-import acme.messages
 
 
 class CSRType(TypeDecorator):
