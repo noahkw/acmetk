@@ -439,15 +439,13 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         return certificate, revocation
 
     def _validate_eab(self, request, pub_key, reg: acme.messages.Registration):
-        external_account_binding = dict(reg.external_account_binding)
-
-        if not external_account_binding:
+        if not reg.external_account_binding:
             raise acme.messages.Error.with_code(
                 "externalAccountRequired", detail=f"Visit {url_for(request, 'eab')}"
             )
 
         try:
-            jws = acme.jws.JWS.from_json(external_account_binding)
+            jws = acme.jws.JWS.from_json(dict(reg.external_account_binding))
         except josepy.errors.DeserializationError:
             raise acme.messages.Error.with_code(
                 "malformed", detail="The request does not contain a valid JWS."
