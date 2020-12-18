@@ -160,12 +160,6 @@ class AcmeEAB:
     @routes.get("/eab", name="eab")
     @aiohttp_jinja2.template("eab.jinja2")
     async def eab(self, request):
-        # Render the form/button for EAB creation
-        return {}
-
-    @routes.post("/create-eab", name="create-eab")
-    @aiohttp_jinja2.template("create_eab.jinja2")
-    async def create_eab(self, request):
         # from unittest.mock import Mock
         # request = Mock(headers={"X-SSL-CERT": urllib.parse.quote(self.data)}, url=request.url)
 
