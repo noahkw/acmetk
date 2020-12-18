@@ -28,6 +28,7 @@ RUN apt-get update \
 COPY reverse_proxy_entrypoint.sh /
 COPY docker_conf/openresty/conf.d /etc/openresty/conf.d
 COPY docker_conf/openresty/nginx.conf /etc/openresty/nginx.conf
+COPY docker_conf/openresty/trusted_roots.pem /etc/ssl/trusted_roots.pem
 COPY docker_conf/resty-auto-ssl/resty_auto_ssl.sh /etc/resty-auto-ssl/letsencrypt/conf.d/
 
 RUN chmod 700 /reverse_proxy_entrypoint.sh

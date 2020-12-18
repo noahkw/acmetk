@@ -27,6 +27,7 @@ services:
     ports:
       - "443:443"
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - /etc/resty-auto-ssl
   app:
     image: broker_app
@@ -34,6 +35,7 @@ services:
     depends_on:
       - db
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - .:/app
       - ./etc:/etc/acme_broker
       - ./log:/var/log/supervisor
