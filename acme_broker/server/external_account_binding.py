@@ -12,6 +12,10 @@ from cryptography import x509
 from acme_broker.server.routes import routes
 import aiohttp_jinja2
 
+from acme_broker.util import url_for
+
+import acme.messages
+
 
 class ExternalAccountBinding:
     """Represents an external account binding.
@@ -153,13 +157,84 @@ class ExternalAccountBindingStore:
 
 
 class AcmeEAB:
+    """Mixin for an :class:`~acme_broker.server.AcmeServerBase` implementation that provides external account
+    binding creation and verification.
+
+    `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_
+
+    An external account binding request is created when the user visits the /eab route.
+    The EAB mechanism used here is email verification using an SSL client certificate.
+    A reverse proxy should be configured to include a set of root certificates that the user's browser
+    can establish a chain of trust to.
+    The reverse proxy then forwards the PEM and URL-encoded client certificate in the *X-SSL-CERT* header after
+    verifying it.
+    """
+
     def __init__(self):
         super().__init__()
         self._eab_store = ExternalAccountBindingStore()
 
+    def verify_eab(
+        self,
+        request,
+        pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
+        reg: acme.messages.Registration,
+    ):
+        """Verifies an ACME Registration request whose payload contains an external account binding JWS.
+
+        :param pub_key: The public key that is contained in the outer JWS, i.e. the ACME account key.
+        :param reg: The registration message.
+        :raises:
+
+            * :class:`acme.messages.Error` if any of the following are true:
+
+                * The request does not contain a valid JWS
+                * The request JWS does not contain an *externalAccountBinding* field
+                * The EAB JWS was signed with an unsupported algorithm (:attr:`SUPPORTED_EAB_JWS_ALGORITHMS`)
+                * The EAB JWS' payload does not contain the same public key as the encapsulating JWS
+                * The EAB JWS' signature is invalid
+        """
+        if not reg.external_account_binding:
+            raise acme.messages.Error.with_code(
+                "externalAccountRequired", detail=f"Visit {url_for(request, 'eab')}"
+            )
+
+        try:
+            jws = acme.jws.JWS.from_json(dict(reg.external_account_binding))
+        except josepy.errors.DeserializationError:
+            raise acme.messages.Error.with_code(
+                "malformed", detail="The request does not contain a valid JWS."
+            )
+
+        if jws.signature.combined.alg not in self.SUPPORTED_EAB_JWS_ALGORITHMS:
+            raise acme.messages.Error.with_code(
+                "badSignatureAlgorithm",
+                detail="The external account binding JWS was signed with an unsupported algorithm. "
+                f"Supported algorithms: {', '.join([str(alg) for alg in self.SUPPORTED_EAB_JWS_ALGORITHMS])}",
+            )
+
+        kid = jws.signature.combined.kid
+        signature = josepy.b64.b64encode(jws.signature.signature).decode()
+        payload_key = josepy.jwk.JWKRSA.from_json(json.loads(jws.payload))
+
+        if payload_key != josepy.jwk.JWKRSA(key=pub_key):
+            raise acme.messages.Error.with_code(
+                "malformed",
+                detail="The external account binding does not contain the same public key as the request JWS.",
+            )
+
+        if not self._eab_store.verify(pub_key, kid, signature):
+            raise acme.messages.Error.with_code(
+                "unauthorized", detail="The external account binding is invalid."
+            )
+
     @routes.get("/eab", name="eab")
     @aiohttp_jinja2.template("eab.jinja2")
     async def eab(self, request):
+        """Handler that displays the user's external account binding credentials, i.e. their *kid* and *hmac_key*
+        after their client certificate has been verified and forwarded by the reverse proxy.
+        """
+
         # from unittest.mock import Mock
         # request = Mock(headers={"X-SSL-CERT": urllib.parse.quote(self.data)}, url=request.url)
 

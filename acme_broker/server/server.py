@@ -438,62 +438,6 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
 
         return certificate, revocation
 
-    def _verify_eab(
-        self,
-        request,
-        pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
-        reg: acme.messages.Registration,
-    ):
-        """Verifies an ACME Registration request whose payload contains an external account binding JWS.
-
-        `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_
-
-        :param pub_key: The public key that is contained in the outer JWS, i.e. the ACME account key.
-        :param reg: The registration message.
-        :raises:
-
-            * :class:`acme.messages.Error` if any of the following are true:
-
-                * The request does not contain a valid JWS
-                * The request JWS does not contain an *externalAccountBinding* field
-                * The EAB JWS was signed with an unsupported algorithm (:attr:`SUPPORTED_EAB_JWS_ALGORITHMS`)
-                * The EAB JWS' payload does not contain the same public key as the encapsulating JWS
-                * The EAB JWS' signature is invalid
-        """
-        if not reg.external_account_binding:
-            raise acme.messages.Error.with_code(
-                "externalAccountRequired", detail=f"Visit {url_for(request, 'eab')}"
-            )
-
-        try:
-            jws = acme.jws.JWS.from_json(dict(reg.external_account_binding))
-        except josepy.errors.DeserializationError:
-            raise acme.messages.Error.with_code(
-                "malformed", detail="The request does not contain a valid JWS."
-            )
-
-        if jws.signature.combined.alg not in self.SUPPORTED_EAB_JWS_ALGORITHMS:
-            raise acme.messages.Error.with_code(
-                "badSignatureAlgorithm",
-                detail="The external account binding JWS was signed with an unsupported algorithm. "
-                f"Supported algorithms: {', '.join([str(alg) for alg in self.SUPPORTED_EAB_JWS_ALGORITHMS])}",
-            )
-
-        kid = jws.signature.combined.kid
-        signature = josepy.b64.b64encode(jws.signature.signature).decode()
-        payload_key = josepy.jwk.JWKRSA.from_json(json.loads(jws.payload))
-
-        if payload_key != josepy.jwk.JWKRSA(key=pub_key):
-            raise acme.messages.Error.with_code(
-                "malformed",
-                detail="The external account binding does not contain the same public key as the request JWS.",
-            )
-
-        if not self._eab_store.verify(pub_key, kid, signature):
-            raise acme.messages.Error.with_code(
-                "unauthorized", detail="The external account binding is invalid."
-            )
-
     def _validate_contact_info(self, reg: acme.messages.Registration):
         for contact_url in reg.contact:
             if address := parseaddr(contact_url)[1]:
@@ -607,7 +551,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                     )
                 else:  # create new account
                     if self._require_eab:
-                        self._verify_eab(request, pub_key, reg)
+                        self.verify_eab(request, pub_key, reg)
 
                     self._validate_contact_info(reg)
 

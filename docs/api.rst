@@ -69,6 +69,9 @@ External Account Binding
 .. autoclass:: acme_broker.server.external_account_binding.ExternalAccountBindingStore
     :members:
 
+.. autoclass:: acme_broker.server.external_account_binding.AcmeEAB
+    :members:
+
 Models
 ######
 
