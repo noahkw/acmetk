@@ -220,6 +220,13 @@ class AcmeEAB:
                 detail="The external account binding does not contain the same public key as the request JWS.",
             )
 
+        if kid not in reg.contact + reg.emails:
+            raise acme.messages.Error.with_code(
+                "malformed",
+                detail="The contact field must contain the email address from the "
+                "SSL client certificate which was used to request the EAB.",
+            )
+
         if not self._eab_store.verify(pub_key, kid, signature):
             raise acme.messages.Error.with_code(
                 "unauthorized", detail="The external account binding is invalid."
