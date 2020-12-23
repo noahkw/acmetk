@@ -6,7 +6,7 @@
 <table>
     <tr>
         <td>Account:</td>
-        <td><a href="{{ url_for('mgmt-account', account=order.account.account_id|string) }}">{{ order.account.contact }}</a></td>
+        <td><a href="{{ url_for('mgmt-account', account=order.account.kid|string) }}">{{ order.account.contact if '@' in order.account.contact else order.account.kid }}</a></td>
     </tr>
     <tr>
         <td>Status:</td>
@@ -20,7 +20,7 @@
         <td>Certificate:</td>
         <td>
 {% if order.certificate %}
-            <a href="{{ url_for('mgmt-certificate', certificate=order.certificate_id|string)}}">Yes</a>
+            <a href="{{ url_for('mgmt-certificate', certificate=order.certificate.certificate_id|string)}}">Yes</a>
 {% else %}
             No
 {% endif %}
