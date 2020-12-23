@@ -160,6 +160,7 @@ def run(config_file, bootstrap_port, path):
         ]  # Only allow localhost and the docker bridge network
         # Bootstrap app does not run behind a reverse proxy:
         app_config["use_forwarded_header"] = False
+        app_config["require_eab"] = False
     else:
         click.echo(f"Starting {app_class.__name__}")
 
