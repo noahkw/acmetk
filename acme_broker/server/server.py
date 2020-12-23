@@ -52,12 +52,12 @@ class AcmeResponse(web.Response):
             links = []
 
         links.append(f'<{directory_url}>; rel="index"')
+        self.headers.extend(('Link',l) for l in links)
 
         self.headers.update(
             {
                 "Replay-Nonce": nonce,
                 "Cache-Control": "no-store",
-                "Link": ", ".join(links),
             }
         )
 
@@ -1058,9 +1058,11 @@ class AcmeCA(AcmeServerBase):
 
             return self._response(
                 request,
-                text=certificate.cert.public_bytes(serialization.Encoding.PEM).decode()
-                + self._cert.public_bytes(serialization.Encoding.PEM).decode(),
+                body=certificate.cert.public_bytes(serialization.Encoding.PEM) + self._cert.public_bytes(serialization.Encoding.PEM),
+                links=None,
+                content_type='application/pem-certificate-chain'
             )
+
 
 
 class AcmeRelayBase(AcmeServerBase):
