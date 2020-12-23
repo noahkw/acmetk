@@ -459,7 +459,6 @@ class AcmeServerBase(ConfigurableMixin):
             "newNonce": url_for(request, "new-nonce"),
             "newOrder": url_for(request, "new-order"),
             "revokeCert": url_for(request, "revoke-cert"),
-            "keyChange": url_for(request, "key-change"),
             "meta": {},
         }
 
@@ -467,11 +466,6 @@ class AcmeServerBase(ConfigurableMixin):
             directory["meta"]["termsOfService"] = self._tos_url
 
         return self._response(request, directory)
-
-    @routes.post("/ca-chain")
-    @routes.get("/ca-chain", name="ca-chain")
-    async def ca_chain(self, request):
-        raise NotImplementedError()
 
     @routes.get("/new-nonce", name="new-nonce", allow_head=True)
     async def new_nonce(self, request):
@@ -702,11 +696,6 @@ class AcmeServerBase(ConfigurableMixin):
             await session.commit()
 
         return self._response(request, status=200)
-
-    @routes.post("/key-change", name="key-change")
-    async def key_change(self, request):
-        return self._response(request, status=200)
-
 
     @routes.post("/order/{id}", name="order")
     async def order(self, request):
@@ -1224,10 +1213,6 @@ class AcmeCA(AcmeServerBase):
             order.status = models.OrderStatus.VALID
             await session.commit()
 
-    async def ca_chain(self, request):
-        return self._response(request, body=self._cert.public_bytes(serialization.Encoding.PEM),
-                              content_type='application/pem-certificate-chain')
-
     # @routes.post("/certificate/{id}", name="certificate")
     async def certificate(self, request):
         async with self._session(request) as session:
@@ -1242,13 +1227,10 @@ class AcmeCA(AcmeServerBase):
             if not certificate:
                 raise web.HTTPNotFound
 
-            l = yarl.URL(url_for(request, 'ca-chain')).with_query(n=0)
-            links = [f'<{str(l)}>; rel="up"']
-
             return self._response(
                 request,
                 body=certificate.cert.public_bytes(serialization.Encoding.PEM) + self._cert.public_bytes(serialization.Encoding.PEM),
-                links=links,
+                links=None,
                 content_type='application/pem-certificate-chain'
             )
 
