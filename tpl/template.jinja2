@@ -141,6 +141,39 @@ body {
     </div>
 </div>
 
-<div id="footer">This is the footer.</div>
+<div id="footer">
+{% block footer %}
+{% if pms %}
+<table>
+<thead>
+<td>#</td>
+<td>mnemonic</td>
+<td>description</td>
+<td>duration</td>
+</thead>
+{% for p in pms.measuring_points %}
+<tr>
+<td>{{ loop.index }}</td>
+<td>{{ shorten(p.mnemonic|string, 32) }}</td>
+<td>{{ p.description }}</td>
+<td>{{ "%.03f"|format(p.duration) }}</td>
+</tr>
+{% endfor %}
+<tr>
+<td colspan="3" align="right">Sum</td>
+<td>{{ "%.03f"|format(pms.sum) }}</td>
+</tr>
+<tr>
+<td colspan="3" align="right">Duration</td>
+<td>{{ "%.03f"|format(pms.duration) }}</td>
+</tr>
+<tr>
+<td colspan="3" align="right">Missing</td>
+<td>{{ "%.03f"|format(pms.duration - pms.sum) }}</td>
+</tr>
+</table>
+{% endif %}
+{% endblock %}
+</div>
 </body>
 </html>

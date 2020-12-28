@@ -1,6 +1,7 @@
 import re
 import typing
 from datetime import datetime, timedelta
+from time import perf_counter
 from pathlib import Path
 
 from cryptography import x509
@@ -250,3 +251,41 @@ class ConfigurableMixin:
         return {
             configurable.config_name: configurable for configurable in cls.subclasses
         }
+
+
+class PerformanceMeasure:
+    def __init__(self, mnemonic, description):
+        self.mnemonic = mnemonic
+        self.description = description
+
+    async def __aenter__(self):
+        self.begin = perf_counter()
+        return self
+
+    async def __aexit__(self, type, value, traceback):
+        self.end = perf_counter()
+
+    @property
+    def duration(self):
+        return self.end - self.begin
+
+
+class PerformanceMeasurementSystem:
+    def __init__(self):
+        self.begin = perf_counter()
+        self.end = None
+        self.measuring_points = []
+
+    def measure(self, mnemonic, description=None):
+        self.measuring_points.append(r := PerformanceMeasure(mnemonic, description))
+        return r
+
+    @property
+    def sum(self):
+        return sum(map(lambda x: x.duration, self.measuring_points))
+
+    @property
+    def duration(self):
+        if self.end is None:
+            self.end = perf_counter()
+        return self.end - self.begin

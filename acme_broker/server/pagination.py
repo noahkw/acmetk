@@ -44,7 +44,7 @@ class Page:
         self.pages = int(math.ceil(total / float(page_size)))
 
 
-async def paginate(session, request, query, by="limit", total=-1):
+async def paginate(session, request, query, by="limit", total=-1, pms=None):
     if total is None:
         # None is passed at the changes endpoint if there are no changes yet.
         raise web.HTTPBadRequest(body="No changes have been logged.")
@@ -72,8 +72,13 @@ async def paginate(session, request, query, by="limit", total=-1):
         q = query.limit(page_size).offset(begin)
 
     try:
-        r = await session.execute(q)
+        if pms:
+            async with pms.measure('SQL page', q.compile(compile_kwargs={"literal_binds": True})):
+                r = await session.execute(q)
+        else:
+            r = await session.execute(q)
         items = r.scalars().all()
+
     except Exception as e:
         print(e)
         raise e

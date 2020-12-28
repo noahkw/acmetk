@@ -18,6 +18,7 @@ from acme_broker.models import (
 )
 from acme_broker.models.base import Entity
 from acme_broker.server.routes import routes
+from acme_broker.util import PerformanceMeasurementSystem
 from .pagination import paginate
 
 
@@ -26,7 +27,7 @@ class AcmeManagement:
     @aiohttp_jinja2.template("index.jinja2")
     async def management_index(self, request):
         import datetime
-
+        pms = PerformanceMeasurementSystem()
         async with self._session(request) as session:
             now = datetime.datetime.now()
             start_date = now - datetime.timedelta(days=28)
@@ -44,15 +45,18 @@ class AcmeManagement:
                 .filter(Change.timestamp.between(start_date, now))
                 .group_by(text("dateof"), Entity.identity)
             )
-            r = await session.execute(q)
+            async with pms.measure('SQL #1', q):
+                r = await session.execute(q)
 
             s = collections.defaultdict(lambda: dict())
 
             for m in r.mappings():
-                s[m["dateof"].date()][m["actionof"]] = {
+                s[m["dateof"].date()] = {k:{'total': 0, 'unique': 0} for k in ['identifier','account','order','challenge','authorization','certificate']}
+
+                s[m["dateof"].date()][m["actionof"]].update({
                     "total": m["totalof"],
                     "unique": m["uniqueof"],
-                }
+                })
 
             statistics = []
             for i in sorted(s.keys()):
@@ -64,14 +68,16 @@ class AcmeManagement:
                         sum(map(lambda x: x["total"], s[i].values())),
                     )
                 )
-            return {"statistics": statistics}
+            return {"statistics": statistics, "pms": pms}
 
     @routes.get("/mgmt/changes", name="mgmt-changes")
     @aiohttp_jinja2.template("changes.jinja2")
     async def management_changes(self, request):
+        pms = PerformanceMeasurementSystem()
         async with self._session(request) as session:
             q = select(sqlalchemy.func.max(Change.change))
-            total = (await session.execute(q)).scalars().first()
+            async with pms.measure('SQL #1', q.compile(compile_kwargs={"literal_binds": True})):
+                total = (await session.execute(q)).scalars().first()
 
             q = (
                 select(Change)
@@ -98,9 +104,9 @@ class AcmeManagement:
                 )
                 .order_by(Change.change.desc())
             )
+            page = await paginate(session, request, q, Change.change, total, pms)
 
-            page = await paginate(session, request, q, Change.change, total)
-            return {"changes": page.items, "page": page}
+            return {"changes": page.items, "page": page, "pms": pms}
 
     @routes.get("/mgmt/accounts", name="mgmt-accounts")
     @aiohttp_jinja2.template("accounts.jinja2")
