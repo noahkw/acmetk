@@ -7,7 +7,7 @@ from pathlib import Path
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.x509 import NameOID
 
 
@@ -45,6 +45,20 @@ def generate_rsa_key(path: Path) -> rsa.RSAPrivateKey:
     :return: The generated private key.
     """
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+
+    with open(path, "wb") as pem_out:
+        pem_out.write(pem)
+
+    return private_key
+
+def generate_ec_key(path: Path, curve) -> ec.EllipticCurvePrivateKey:
+    private_key = ec.generate_private_key(ec.SECP256R1())
 
     pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,

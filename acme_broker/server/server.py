@@ -17,6 +17,7 @@ import yarl
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
+import cryptography
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
@@ -79,6 +80,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         josepy.PS256,
         josepy.PS384,
         josepy.PS512,
+        josepy.jwa.ES256,
     )
     """The JWS signing algorithms that the server supports."""
 
@@ -89,10 +91,10 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
     )
     """The symmetric JWS signing algorithms that the server supports for external account bindings."""
 
-    SUPPORTED_ACCOUNT_KEYS = (rsa.RSAPublicKey,)
+    SUPPORTED_ACCOUNT_KEYS = (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)
     """The types of public keys that the server supports when creating ACME accounts."""
 
-    SUPPORTED_CSR_KEYS = (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)
+    SUPPORTED_CSR_KEYS = (rsa.RSAPublicKey, cryptography.hazmat.backends.openssl.ec._EllipticCurvePublicKey)
     """The types of public keys that the server supports in a certificate signing request."""
 
     subclasses = []
@@ -989,9 +991,6 @@ class AcmeCA(AcmeServerBase):
     """ACME compliant Certificate Authority."""
 
     config_name = "ca"
-
-    SUPPORTED_CSR_KEYS = (rsa.RSAPublicKey,)
-    """The types of public keys that the server supports in a certificate signing request."""
 
     def __init__(self, *, cert, private_key, **kwargs):
         super().__init__(**kwargs)

@@ -32,6 +32,8 @@ class TestAcme:
     contact: str
     path: Path
     client_data: ClientData
+    ACCOUNT_KEY_ALG = "RSA"
+    CERT_KEY_ALG = "RSA"
 
     @property
     def name(self):
@@ -57,8 +59,16 @@ class TestAcme:
         client_cert_key_path = dir_ / "client_cert.key"
         csr_path = dir_ / "client.csr"
 
-        acme_broker.util.generate_rsa_key(client_account_key_path)
-        client_cert_key = acme_broker.util.generate_rsa_key(client_cert_key_path)
+        if self.ACCOUNT_KEY_ALG == "RSA":
+            acme_broker.util.generate_rsa_key(client_account_key_path)
+        elif self.ACCOUNT_KEY_ALG == "EC":
+            acme_broker.util.generate_ec_key(client_account_key_path, None)
+
+        if self.CERT_KEY_ALG == "RSA":
+            client_cert_key = acme_broker.util.generate_rsa_key(client_cert_key_path)
+        elif self.CERT_KEY_ALG == "EC":
+            client_cert_key = acme_broker.util.generate_ec_key(client_cert_key_path, None)
+
         csr = acme_broker.util.generate_csr(
             self.config_sec["names"][0],
             client_cert_key,
@@ -135,7 +145,7 @@ class TestAcmetiny:
                 r.mkdir()
 
     async def _run_acmetiny(self, cmd):
-        import acme_tiny as at
+        import tests.acme_tiny.acme_tiny as at
 
         argv = shlex.split(cmd)
         log.info(shlex.join(argv))
@@ -148,6 +158,27 @@ class TestAcmetiny:
             f"{self.client_data.key_path} --csr {self.client_data.csr_path} "
             f"--acme-dir {self.path}/challenge"
         )
+
+class TestAcmetinyEC(TestAcmetiny):
+    ACCOUNT_KEY_ALG = "EC"
+    CERT_KEY_ALG = "EC"
+    async def _run_acmetiny(self, cmd):
+        import tests.acme_tiny_ec.acme_tiny as at
+
+        argv = shlex.split(cmd)
+        log.info(shlex.join(argv))
+        r = await self.loop.run_in_executor(None, at.main, argv)
+        return r
+
+    async def test_run(self):
+        import yarl
+        ca = str(yarl.URL(self.DIRECTORY).with_path(''))
+        await self._run_acmetiny(
+            f"--directory-url {self.DIRECTORY} --disable-check --contact {self.contact} --account-key "
+            f"{self.client_data.key_path} --csr {self.client_data.csr_path} "
+            f"--acme-dir {self.path}/challenge"
+        )
+
 
 
 class TestDehydrated:
@@ -201,6 +232,59 @@ WELLKNOWN="{str(self.path / 'wellknown')}"
     async def test_run(self):
         await self._run_dehydrated("--register --accept-terms")
         await self._run_dehydrated("--cron --force --domain test.de")
+
+
+class Testacmesh:
+    def setUp(self) -> None:
+        super().setUp()
+        path = self.path
+        for n in ["run", "config", "www", "certs"]:
+            if not (r := (path / n)).exists():
+                r.mkdir()
+        self._rmtree.extend(["www", "certs"])
+
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        if not (self.path / "run/acme.sh").exists():
+            import os
+            cwd = os.getcwd()
+            os.chdir("/tmp/acme.sh")
+            await self._run(
+                f"./acme.sh  --no-color --log /dev/null --log-level 0 --home {cwd}/{self.path}/run --install --nocron --noprofile --accountkey {self.client_data.key_path}",
+                prefix=False,
+            )
+            os.chdir(cwd)
+
+    async def _run(self, _cmd, prefix=True):
+        if prefix:
+            cmd = (
+                f"{self.path}/run/acme.sh --no-color --log /dev/null --log-level 0 --config-home {self.path}/config/ --cert-home {self.path}/certs --server {self.DIRECTORY} "
+                + _cmd
+            )
+        else:
+            cmd = _cmd
+        log.info(cmd)
+        p = await asyncio.create_subprocess_exec(
+            *shlex.split(cmd), stdout=asyncio.subprocess.PIPE
+        )
+
+        def llog(_line, logger):
+            if not _line:
+                return
+            args = _line.decode().strip().split("]", maxsplit=2)
+            if len(args) == 2:
+                logger(args[1])
+            else:
+                logger(_line)
+
+        while r := await p.stdout.readline():
+            llog(r, log.info)
+
+    async def test_run(self):
+        key, csr, path = self.client_data
+        await self._run(f"""--register-account --accountemail {self.contact}""")
+        domains = " ".join([f"--domain {d}" for d in acme_broker.util.names_of(csr)])
+        await self._run(f"""--issue {domains} --webroot {self.path}/www/ --force""")
 
 
 class TestCertBot:
@@ -443,6 +527,11 @@ class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
         await super().test_run()
 
 
+class TestAcmetinyECCA(TestAcmetinyEC, TestCA, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
+
+
 class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
@@ -484,5 +573,24 @@ class TestOurClientCA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
 
 
 class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
+    async def test_run(self):
+        await super().test_run()
+
+
+class TestDehydratedECCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
+    CERT_KEY_ALG = "EC"
+
+    def setUp(self):
+        super().setUp()
+
+    @property
+    def key_algo(self):
+        return "secp384r1"
+
+    async def test_run(self):
+        await super().test_run()
+
+
+class TestacmeshCA(Testacmesh, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
