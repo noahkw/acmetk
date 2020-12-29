@@ -32,8 +32,8 @@ class TestAcme:
     contact: str
     path: Path
     client_data: ClientData
-    ACCOUNT_KEY_ALG = "RSA"
-    CERT_KEY_ALG = "RSA"
+    ACCOUNT_KEY_ALG_BITS = ("RSA", 2048)
+    CERT_KEY_ALG_BITS = ("RSA", 2048)
 
     @property
     def name(self):
@@ -42,6 +42,13 @@ class TestAcme:
     @property
     def config_sec(self):
         return NotImplementedError
+
+    def _make_key(self, path, alg_and_bits):
+        if alg_and_bits[0] == "RSA":
+            return acme_broker.util.generate_rsa_key(path, alg_and_bits[1])
+        elif alg_and_bits[0] == "EC":
+            return acme_broker.util.generate_ec_key(path, alg_and_bits[1])
+
 
     def setUp(self) -> None:
         """Sets up our test object with the necessary properties for testing using a client"""
@@ -59,15 +66,8 @@ class TestAcme:
         client_cert_key_path = dir_ / "client_cert.key"
         csr_path = dir_ / "client.csr"
 
-        if self.ACCOUNT_KEY_ALG == "RSA":
-            acme_broker.util.generate_rsa_key(client_account_key_path)
-        elif self.ACCOUNT_KEY_ALG == "EC":
-            acme_broker.util.generate_ec_key(client_account_key_path, None)
-
-        if self.CERT_KEY_ALG == "RSA":
-            client_cert_key = acme_broker.util.generate_rsa_key(client_cert_key_path)
-        elif self.CERT_KEY_ALG == "EC":
-            client_cert_key = acme_broker.util.generate_ec_key(client_cert_key_path, None)
+        self._make_key(client_account_key_path, self.ACCOUNT_KEY_ALG_BITS)
+        client_cert_key = self._make_key(client_cert_key_path, self.CERT_KEY_ALG_BITS)
 
         csr = acme_broker.util.generate_csr(
             self.config_sec["names"][0],
@@ -160,8 +160,8 @@ class TestAcmetiny:
         )
 
 class TestAcmetinyEC(TestAcmetiny):
-    ACCOUNT_KEY_ALG = "EC"
-    CERT_KEY_ALG = "EC"
+    ACCOUNT_KEY_ALG_BITS = ("EC",256)
+    CERT_KEY_ALG_BITS = ("EC",256)
     async def _run_acmetiny(self, cmd):
         import tests.acme_tiny_ec.acme_tiny as at
 
@@ -448,12 +448,9 @@ class TestOurClient:
     async def test_run_stress(self):
         clients_csr = []  # (client, csr) tuples
         for i in range(10):
-            client_account_key_path = self.path / f"client_{i}_account.key"
+            self._make_key(client_account_key_path := self.path / f"client_{i}_account.key", self.ACCOUNT_KEY_ALG_BITS)
+            client_cert_key = self._make_key(self.path / f"client_{i}_cert.key", self.CERT_KEY_ALG_BITS)
 
-            acme_broker.util.generate_rsa_key(client_account_key_path)
-            client_cert_key = acme_broker.util.generate_rsa_key(
-                self.path / f"client_{i}_cert.key"
-            )
             csr = acme_broker.util.generate_csr(
                 f"{self.name}.test.de",
                 client_cert_key,
@@ -572,13 +569,27 @@ class TestOurClientCA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
         await super().test_email_validation()
 
 
+class TestOurClientEC256EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+    ACCOUNT_KEY_ALG_BITS = ("EC", 256)
+    CERT_KEY_ALG_BITS = ("EC", 256)
+
+
+class TestOurClientEC384EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+    ACCOUNT_KEY_ALG_BITS = ("EC", 384)
+    CERT_KEY_ALG_BITS = ("EC", 256)
+
+class TestOurClientEC521EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+    ACCOUNT_KEY_ALG_BITS = ("EC", 521)
+    CERT_KEY_ALG_BITS = ("EC", 256)
+
+
 class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
 
 class TestDehydratedECCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
-    CERT_KEY_ALG = "EC"
+    CERT_KEY_ALG_BITS = ("EC",384)
 
     def setUp(self):
         super().setUp()

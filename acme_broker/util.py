@@ -38,13 +38,14 @@ def generate_csr(
     return csr
 
 
-def generate_rsa_key(path: Path) -> rsa.RSAPrivateKey:
+def generate_rsa_key(path: Path, bits=2048) -> rsa.RSAPrivateKey:
     """Generates an RSA private key and saves it to the given path as PEM.
 
     :param path: The path to write the PEM-serialized key to.
+    :param bits: The RSA Key size
     :return: The generated private key.
     """
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=bits)
 
     pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -57,8 +58,9 @@ def generate_rsa_key(path: Path) -> rsa.RSAPrivateKey:
 
     return private_key
 
-def generate_ec_key(path: Path, curve) -> ec.EllipticCurvePrivateKey:
-    private_key = ec.generate_private_key(ec.SECP256R1())
+def generate_ec_key(path: Path, bits=256) -> ec.EllipticCurvePrivateKey:
+    curve = getattr(ec, f"SECP{bits}R1")
+    private_key = ec.generate_private_key(curve())
 
     pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -222,6 +224,8 @@ def pem_split(
     _PEM_TO_CLASS = {
         b"CERTIFICATE": x509.load_pem_x509_certificate,
         b"CERTIFICATE REQUEST": x509.load_pem_x509_csr,
+        b"EC PRIVATE KEY": lambda x: serialization.load_pem_private_key(x, password=None),
+        b"RSA PRIVATE KEY": lambda x: serialization.load_pem_private_key(x, password=None),
     }
 
     _PEM_RE = re.compile(

@@ -80,7 +80,9 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         josepy.PS256,
         josepy.PS384,
         josepy.PS512,
-        josepy.jwa.ES256,
+        josepy.ES256,
+        josepy.ES384,
+        josepy.ES512,
     )
     """The JWS signing algorithms that the server supports."""
 
