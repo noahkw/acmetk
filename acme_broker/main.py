@@ -203,7 +203,7 @@ async def run_ca(config, path):
 def _url_for(context, __route_name, **parts):
     try:
         return (
-            context["request"].match_info.app.router[__route_name].url_for(**parts)
+            context["request"].match_info.apps[-1].router[__route_name].url_for(**parts)
         )
     except Exception as e:
         print(e)

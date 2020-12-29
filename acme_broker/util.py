@@ -258,13 +258,14 @@ from pathlib import Path
 import os
 
 class PerformanceMeasure:
-    def __init__(self):
-        callerframerecord = inspect.stack()[2]
-        frame = callerframerecord[0]
-        info = inspect.getframeinfo(frame)
-        p = Path(info.filename).resolve()
-        p = p.relative_to(Path(os.getcwd()).resolve())
-        self.mnemonic = f"{p}:{info.lineno} {info.function}"
+    def __init__(self, init=True):
+        if init:
+            callerframerecord = inspect.stack()[2]
+            frame = callerframerecord[0]
+            info = inspect.getframeinfo(frame)
+            p = Path(info.filename).resolve()
+            p = p.relative_to(Path(os.getcwd()).resolve())
+            self.mnemonic = f"{p}:{info.lineno} {info.function}"
 
     async def __aenter__(self):
         self.begin = perf_counter()
@@ -289,7 +290,7 @@ class PerformanceMeasurementSystem:
         if self.enable:
             self.measuring_points.append(r := PerformanceMeasure())
             return r
-        return PerformanceMeasure()
+        return PerformanceMeasure(False)
 
     @property
     def sum(self):
