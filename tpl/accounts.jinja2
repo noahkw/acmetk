@@ -2,6 +2,7 @@
 
 {%  block body %}
 <h1>Accounts</h1>
+{{ paginate(page) }}
 <table>
 {% for account in accounts %}
 <tr>
@@ -11,4 +12,5 @@
 </tr>
 {% endfor %}
 </table>
+{{ paginate(page) }}
 {% endblock %}

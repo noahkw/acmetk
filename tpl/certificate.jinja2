@@ -18,6 +18,31 @@
 {{ Blob(i.to_bytes(((i.bit_length()/8)+1)|int, byteorder='big'), batchsize, off) }}
 {%- endmacro -%}
 
+{%- macro PublicKey_(key) -%}
+{%- if key.__class__.__name__ == '_RSAPublicKey' %}
+Public Key Algorithm: RSA Public Key
+    RSA Public-Key: ({{ key.key_size }} bit)
+    Modulus:
+{{ IntBlob(key.public_numbers().n, 15, 8) }}
+    Exponent: {{ key.public_numbers().e }} ({{ '0x{:x}'.format(key.public_numbers().e) }})
+{%- elif key.__class__.__name__ == '_EllipticCurvePublicKey' %}
+Public Key Algorithm: id-ecPublicKey
+    Public-Key: ({{ key.key_size }} bit)
+    pub:
+{{ Blob(key.public_bytes(encoding=cryptography.hazmat.primitives.serialization.Encoding.X962,
+format=cryptography.hazmat.primitives.serialization.PublicFormat.UncompressedPoint),15,8) }}
+    ASN1 OID: {{ key.curve.name }}
+    NIST CURVE: {{ 'P-{}'.format(key.curve.name[4:7]) if key.curve.name.startswith('secp') else 'u'}}
+{%- else %}
+Public Key Algorithm: {{key.__class__.__name__}}
+{%- endif %}
+{%- endmacro -%}
+
+{%- macro PublicKey(key, indent=12) -%}
+{{ PublicKey_(key)|indent(indent, first=True) }}
+{%- endmacro -%}
+
+{% if certificate is defined %}
 {%- set c=certificate -%}
 {%- set key=c.public_key() -%}
 
@@ -33,23 +58,7 @@ Certificate:
             Not After : {{ c.not_valid_after }}
         Subject: {{ Name(c.subject) }}
         Subject Public Key Info:
-{%- if key.__class__.__name__ == '_RSAPublicKey' %}
-            Public Key Algorithm: RSA Public Key
-                RSA Public-Key: ({{ key.key_size }} bit)
-                Modulus:
-{{ IntBlob(key.public_numbers().n, 15, 20) }}
-                Exponent: {{ key.public_numbers().e }} ({{ '0x{:x}'.format(key.public_numbers().e) }})
-{% elif key.__class__.__name__ == '_EllipticCurvePublicKey' %}
-            Public Key Algorithm: id-ecPublicKey
-                Public-Key: ({{ key.key_size }} bit)
-                pub:
-{{ Blob(key.public_bytes(encoding=cryptography.hazmat.primitives.serialization.Encoding.X962,
-format=cryptography.hazmat.primitives.serialization.PublicFormat.UncompressedPoint),15,20) }}
-                ASN1 OID: {{ key.curve.name }}
-                NIST CURVE: {{ 'P-{}'.format(key.curve.name[4:7]) if key.curve.name.startswith('secp') else 'u'}}
-{%- else %}
-            Public Key Algorithm: {{key.__class__.__name__}}
-{%- endif %}
+{{- PublicKey(key) }}
         X509v3 extensions:
 {%- for e in c.extensions %}
 {%- set v=e.value %}
@@ -87,3 +96,6 @@ format=cryptography.hazmat.primitives.serialization.PublicFormat.UncompressedPoi
     Signature Algorithm: {{c.signature_algorithm_oid._name}}
 {{ Blob(c.signature, 18, 9) }}
 {{  c.public_bytes(encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM).decode() }}
+{% else %}
+#    No Certificate
+{% endif %}
