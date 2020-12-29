@@ -27,7 +27,6 @@ import math
 
 from aiohttp import web
 
-
 class Page:
     def __init__(self, items, page, page_size, total):
         self.items = items
@@ -73,7 +72,7 @@ async def paginate(session, request, query, by="limit", total=-1, pms=None):
 
     try:
         if pms:
-            async with pms.measure('SQL page', q.compile(compile_kwargs={"literal_binds": True})):
+            async with pms.measure():
                 r = await session.execute(q)
         else:
             r = await session.execute(q)

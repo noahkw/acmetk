@@ -143,35 +143,37 @@ body {
 
 <div id="footer">
 {% block footer %}
-{% if pms %}
+{% if pms is defined and pms.enable %}
+<center>
 <table>
 <thead>
 <td>#</td>
 <td>mnemonic</td>
-<td>description</td>
 <td>duration</td>
 </thead>
 {% for p in pms.measuring_points %}
 <tr>
 <td>{{ loop.index }}</td>
-<td>{{ shorten(p.mnemonic|string, 32) }}</td>
-<td>{{ p.description }}</td>
+<td>{{ shorten(p.mnemonic|string, 128) }}</td>
 <td>{{ "%.03f"|format(p.duration) }}</td>
 </tr>
 {% endfor %}
 <tr>
-<td colspan="3" align="right">Sum</td>
+<td colspan="2" align="right">Sum</td>
 <td>{{ "%.03f"|format(pms.sum) }}</td>
 </tr>
 <tr>
-<td colspan="3" align="right">Duration</td>
+<td colspan="2" align="right">Duration</td>
 <td>{{ "%.03f"|format(pms.duration) }}</td>
 </tr>
 <tr>
-<td colspan="3" align="right">Missing</td>
+<td colspan="2" align="right">Missing</td>
 <td>{{ "%.03f"|format(pms.duration - pms.sum) }}</td>
 </tr>
 </table>
+</center>
+{% else %}
+    <a href="{{ url_for(request.match_info.route.name, **request.match_info).with_query(request.url.update_query(pms=1).query) }}">Show Performance Measurement System information</a>
 {% endif %}
 {% endblock %}
 </div>
