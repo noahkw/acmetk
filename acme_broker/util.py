@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from time import perf_counter
 from pathlib import Path
 
+
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
@@ -270,11 +271,18 @@ class ConfigurableMixin:
             configurable.config_name: configurable for configurable in cls.subclasses
         }
 
+import inspect
+from pathlib import Path
+import os
 
 class PerformanceMeasure:
-    def __init__(self, mnemonic, description):
-        self.mnemonic = mnemonic
-        self.description = description
+    def __init__(self):
+        callerframerecord = inspect.stack()[2]
+        frame = callerframerecord[0]
+        info = inspect.getframeinfo(frame)
+        p = Path(info.filename).resolve()
+        p = p.relative_to(Path(os.getcwd()).resolve())
+        self.mnemonic = f"{p}:{info.lineno} {info.function}"
 
     async def __aenter__(self):
         self.begin = perf_counter()
@@ -289,14 +297,17 @@ class PerformanceMeasure:
 
 
 class PerformanceMeasurementSystem:
-    def __init__(self):
+    def __init__(self, enable=False):
+        self.enable = enable
         self.begin = perf_counter()
         self.end = None
         self.measuring_points = []
 
-    def measure(self, mnemonic, description=None):
-        self.measuring_points.append(r := PerformanceMeasure(mnemonic, description))
-        return r
+    def measure(self):
+        if self.enable:
+            self.measuring_points.append(r := PerformanceMeasure())
+            return r
+        return PerformanceMeasure()
 
     @property
     def sum(self):

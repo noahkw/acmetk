@@ -27,7 +27,7 @@ class AcmeManagement:
     @aiohttp_jinja2.template("index.jinja2")
     async def management_index(self, request):
         import datetime
-        pms = PerformanceMeasurementSystem()
+        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
         async with self._session(request) as session:
             now = datetime.datetime.now()
             start_date = now - datetime.timedelta(days=28)
@@ -45,7 +45,7 @@ class AcmeManagement:
                 .filter(Change.timestamp.between(start_date, now))
                 .group_by(text("dateof"), Entity.identity)
             )
-            async with pms.measure('SQL #1', q):
+            async with pms.measure():
                 r = await session.execute(q)
 
             s = collections.defaultdict(lambda: dict())
@@ -73,10 +73,10 @@ class AcmeManagement:
     @routes.get("/mgmt/changes", name="mgmt-changes")
     @aiohttp_jinja2.template("changes.jinja2")
     async def management_changes(self, request):
-        pms = PerformanceMeasurementSystem()
+        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
         async with self._session(request) as session:
             q = select(sqlalchemy.func.max(Change.change))
-            async with pms.measure('SQL #1', q.compile(compile_kwargs={"literal_binds": True})):
+            async with pms.measure():
                 total = (await session.execute(q)).scalars().first()
 
             q = (
@@ -111,9 +111,11 @@ class AcmeManagement:
     @routes.get("/mgmt/accounts", name="mgmt-accounts")
     @aiohttp_jinja2.template("accounts.jinja2")
     async def management_accounts(self, request):
+        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
         async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Account.kid))
-            total = (await session.execute(q)).scalars().first()
+            async with pms.measure():
+                total = (await session.execute(q)).scalars().first()
 
             q = (
                 select(Account)
@@ -121,13 +123,14 @@ class AcmeManagement:
                 .order_by(Account._entity.desc())
             )
 
-            page = await paginate(session, request, q, "limit", total)
+            page = await paginate(session, request, q, "limit", total, pms=pms)
 
-            return {"accounts": page.items, "page": page}
+            return {"accounts": page.items, "page": page, "pms": pms}
 
     @routes.get("/mgmt/accounts/{account}", name="mgmt-account")
     @aiohttp_jinja2.template("account.jinja2")
     async def management_account(self, request):
+        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
         account = request.match_info["account"]
         async with self._session(request) as session:
             q = (
@@ -138,16 +141,19 @@ class AcmeManagement:
                 )
                 .filter(Account.kid == account)
             )
-            a = await session.execute(q)
+            async with pms.measure():
+                a = await session.execute(q)
             a = a.scalars().first()
-            return {"account": a, "orders": a.orders, "cryptography": cryptography}
+            return {"account": a, "orders": a.orders, "cryptography": cryptography, "pms": pms}
 
     @routes.get("/mgmt/orders", name="mgmt-orders")
     @aiohttp_jinja2.template("orders.jinja2")
     async def management_orders(self, request):
+        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
         async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Order.order_id))
-            total = (await session.execute(q)).scalars().first()
+            async with pms.measure():
+                total = (await session.execute(q)).scalars().first()
 
             q = (
                 select(Order)
@@ -160,12 +166,14 @@ class AcmeManagement:
             )
 
             page = await paginate(session, request, q, "limit", total)
-            return {"orders": page.items, "page": page}
+            return {"orders": page.items, "page": page, "pms": pms}
 
     @routes.get("/mgmt/orders/{order}", name="mgmt-order")
     @aiohttp_jinja2.template("order.jinja2")
     async def management_order(self, request):
         order = request.match_info["order"]
+        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
+        changes = []
         async with self._session(request) as session:
             q = (
                 select(Order)
@@ -189,32 +197,35 @@ class AcmeManagement:
                 )
                 .filter(Order.order_id == order)
             )
-
-            r = await session.execute(q)
+            async with pms.measure():
+                r = await session.execute(q)
             o = r.scalars().first()
 
-            changes = []
             changes.extend(o.changes)
 
-        for i in o.identifiers:
-            changes.extend(i.changes)
-            changes.extend(i.authorization.changes)
-            for c in i.authorization.challenges:
-                changes.extend(c.changes)
+        async with pms.measure():
 
-        if o.certificate:
-            changes.extend(o.certificate.changes)
+            for i in o.identifiers:
+                changes.extend(i.changes)
+                changes.extend(i.authorization.changes)
+                for c in i.authorization.challenges:
+                    changes.extend(c.changes)
 
-        changes = sorted(changes, key=lambda x: x.timestamp, reverse=True)
+            if o.certificate:
+                changes.extend(o.certificate.changes)
 
-        return {"order": o, "changes": changes}
+            changes = sorted(changes, key=lambda x: x.timestamp, reverse=True)
+
+        return {"order": o, "changes": changes, "pms": pms}
 
     @routes.get("/mgmt/certificates", name="mgmt-certificates")
     @aiohttp_jinja2.template("certificates.jinja2")
     async def management_certificates(self, request):
+        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
         async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Certificate.certificate_id))
-            total = (await session.execute(q)).scalars().first()
+            async with pms.measure():
+                total = (await session.execute(q)).scalars().first()
 
             q = (
                 select(Certificate)
@@ -225,8 +236,8 @@ class AcmeManagement:
                 .order_by(Certificate._entity.desc())
             )
 
-            page = await paginate(session, request, q, "limit", total)
-            return {"certificates": page.items, "page": page}
+            page = await paginate(session, request, q, "limit", total, pms=pms)
+            return {"certificates": page.items, "page": page, "pms": pms}
 
     @routes.get("/mgmt/certificates/{certificate}", name="mgmt-certificate")
     async def management_certificate(self, request):
