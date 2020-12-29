@@ -115,9 +115,15 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
     ):
         super().__init__()
 
-        self._min_keysize = {
-            rsa.RSAPublicKey: rsa_min_keysize,
-            ec.EllipticCurvePublicKey: ec_min_keysize,
+        self._keysize = {
+            'csr':{
+                rsa.RSAPublicKey: (rsa_min_keysize,4096),
+                ec.EllipticCurvePublicKey: (ec_min_keysize, 384),
+            },
+            'account': {
+                rsa.RSAPublicKey: (rsa_min_keysize, 4096),
+                ec.EllipticCurvePublicKey: (ec_min_keysize, 521),
+            }
         }
         self._tos_url = tos_url
         self._mail_suffixes = mail_suffixes
@@ -146,12 +152,16 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
 
         self._challenge_validators = {}
 
-    def _get_min_keysize(self, public_key):
-        for key_type, key_size in self._min_keysize.items():
+    def _match_keysize(self, public_key, what):
+        for key_type, key_size in self._keysize[what].items():
             if isinstance(public_key, key_type):
-                return key_size
+                (low,high) = key_size
+                break
         else:
             raise ValueError("This key type is not supported.")
+        if low <= public_key.key_size <= high:
+            return
+        raise ValueError(f"{public_key.__class__.__name__} Keysize for {what} has to be {low} <= {public_key.key_size=} <= {high}")
 
     def _add_routes(self):
         specific_routes = []
@@ -513,12 +523,12 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
             pub_key = jwk.key._wrapped
 
             if isinstance(pub_key, self.SUPPORTED_ACCOUNT_KEYS):
-                if (key_size := pub_key.key_size) < (
-                    min_key_size := self._get_min_keysize(pub_key)
-                ):
+                try:
+                    self._match_keysize(pub_key, 'account')
+                except ValueError as e:
                     raise acme.messages.Error.with_code(
                         "badPublicKey",
-                        detail=f"Only keys with at least {min_key_size} bits are accepted. (Keysize: {key_size})",
+                        detail=e.args[0],
                     )
             else:
                 raise acme.messages.Error.with_code(
@@ -795,12 +805,12 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         )
 
         if isinstance(pub_key, self.SUPPORTED_CSR_KEYS):
-            if (key_size := pub_key.key_size) < (
-                min_key_size := self._get_min_keysize(pub_key)
-            ):
+            try:
+                self._match_keysize(pub_key, 'csr')
+            except ValueError as e:
                 raise acme.messages.Error.with_code(
                     "badPublicKey",
-                    detail=f"Only keys with at least {min_key_size} bits are accepted. (Keysize: {key_size})",
+                    detail=e.args[0],
                 )
         else:
             raise acme.messages.Error.with_code(

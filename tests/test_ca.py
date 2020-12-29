@@ -445,6 +445,7 @@ class TestOurClient:
     async def test_run(self):
         await self._run_one(self.client, self.client_data.csr)
 
+class TestOurClientStress(TestOurClient):
     async def test_run_stress(self):
         clients_csr = []  # (client, csr) tuples
         for i in range(10):
@@ -520,53 +521,19 @@ class TestOurClient:
 
 
 class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
-    async def test_run(self):
-        await super().test_run()
+    pass
 
 
 class TestAcmetinyECCA(TestAcmetinyEC, TestCA, unittest.IsolatedAsyncioTestCase):
-    async def test_run(self):
-        await super().test_run()
+    pass
 
 
 class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
-    async def test_run(self):
-        await super().test_run()
-
-    async def test_subdomain_revocation(self):
-        await super().test_subdomain_revocation()
-
-    async def test_skey_revocation(self):
-        await super().test_skey_revocation()
-
-    async def test_renewal(self):
-        await super().test_renewal()
-
-    async def test_register(self):
-        await super().test_register()
-
-    async def test_unregister(self):
-        await super().test_unregister()
+    pass
 
 
-class TestOurClientCA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
-    async def test_run(self):
-        await super().test_run()
-
-    async def test_run_stress(self):
-        await super().test_run_stress()
-
-    async def test_revoke(self):
-        await super().test_revoke()
-
-    async def test_account_update(self):
-        await super().test_account_update()
-
-    async def test_unregister(self):
-        await super().test_unregister()
-
-    async def test_email_validation(self):
-        await super().test_email_validation()
+class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestCase):
+    pass
 
 
 class TestOurClientEC256EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
@@ -578,30 +545,55 @@ class TestOurClientEC384EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioT
     ACCOUNT_KEY_ALG_BITS = ("EC", 384)
     CERT_KEY_ALG_BITS = ("EC", 256)
 
+
+class TestOurClientEC384EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+    ACCOUNT_KEY_ALG_BITS = ("EC", 384)
+    CERT_KEY_ALG_BITS = ("EC", 256)
+
+
 class TestOurClientEC521EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("EC", 521)
     CERT_KEY_ALG_BITS = ("EC", 256)
 
 
-class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
+class TestOurClientEC256EC384CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+    ACCOUNT_KEY_ALG_BITS = ("EC", 256)
+    CERT_KEY_ALG_BITS = ("EC", 384)
+
+
+BAD_KEY_RE = r'urn:ietf:params:acme:error:badPublicKey :: The JWS was signed by a public key the server does not support :: \S+ Keysize for \w+ has to be \d+ <= public_key.key_size=\d+ <= \d+'
+
+
+class TestOurClientEC256EC521CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+    ACCOUNT_KEY_ALG_BITS = ("EC", 256)
+    CERT_KEY_ALG_BITS = ("EC", 521)
+
     async def test_run(self):
-        await super().test_run()
+        """"Let's Encrypt does not allow EC 521 Key Certificates due to lack of browser support"""
+        with self.assertRaisesRegex(acme.messages.Error, BAD_KEY_RE):
+            await super().test_run()
+
+
+class TestOurClientRSA1024RSA2048CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+    ACCOUNT_KEY_ALG_BITS = ("RSA", 1024)
+    CERT_KEY_ALG_BITS = ("RSA", 2048)
+
+    async def test_run(self):
+        with self.assertRaisesRegex(acme.messages.Error, BAD_KEY_RE):
+            await super().test_run()
+
+
+class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
+    pass
 
 
 class TestDehydratedECCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
-    CERT_KEY_ALG_BITS = ("EC",384)
-
-    def setUp(self):
-        super().setUp()
+    CERT_KEY_ALG_BITS = ("EC", 384)
 
     @property
     def key_algo(self):
         return "secp384r1"
 
-    async def test_run(self):
-        await super().test_run()
-
 
 class TestacmeshCA(Testacmesh, TestCA, unittest.IsolatedAsyncioTestCase):
-    async def test_run(self):
-        await super().test_run()
+    pass
