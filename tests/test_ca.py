@@ -310,6 +310,15 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
             key=lambda s: s[::-1],
         )
 
+    @property
+    def key_args(self):
+        if self.CERT_KEY_ALG_BITS[0] == "RSA":
+            return "--key-type rsa"
+        elif self.CERT_KEY_ALG_BITS[0] == "EC":
+            return (
+                f"--key-type ecdsa --elliptic-curve secp{self.CERT_KEY_ALG_BITS[1]}r1"
+            )
+
     async def _run(self, cmd):
         argv = shlex.split(f"--non-interactive -c {self.path}/certbot.ini " + cmd)
         import certbot._internal.main as cbm
@@ -341,7 +350,9 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
         await self._run(f"register --agree-tos  -m {self.contact}")
 
         arg = " --domain ".join(self.domains)
-        await self._run(f"certonly --webroot --webroot-path {self.path} --domain {arg}")
+        await self._run(
+            f"certonly {self.key_args} --webroot --webroot-path {self.path} --domain {arg}"
+        )
 
     async def test_subdomain_revocation(self):
         await self._run(f"register --agree-tos  -m {self.contact}")
@@ -351,13 +362,15 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
 
         arg = " --domain ".join(map(lambda s: f"dns.{s}", self.domains))
         await self._run(
-            f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=dns --manual-auth-hook "
+            f"certonly {self.key_args} "
+            f"--manual --manual-public-ip-logging-ok --preferred-challenges=dns --manual-auth-hook "
             f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
         )
 
         arg = " --domain ".join(map(lambda s: f"http.{s}", self.domains))
         await self._run(
-            f"certonly --manual --manual-public-ip-logging-ok --preferred-challenges=http --manual-auth-hook "
+            f"certonly {self.key_args} "
+            f"--manual --manual-public-ip-logging-ok --preferred-challenges=http --manual-auth-hook "
             f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
         )
 
@@ -542,6 +555,11 @@ class TestAcmetinyECCA(TestAcmetinyEC, TestCA, unittest.IsolatedAsyncioTestCase)
 
 class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     pass
+
+
+class TestCertBotRSA2048EC256CA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
+    ACCOUNT_KEY_ALG_BITS = ("RSA", 2048)
+    CERT_KEY_ALG_BITS = ("EC", 256)
 
 
 class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestCase):
