@@ -3,7 +3,8 @@ import typing
 from datetime import datetime, timedelta
 from time import perf_counter
 from pathlib import Path
-
+import inspect
+import os
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
@@ -58,6 +59,7 @@ def generate_rsa_key(path: Path, bits=2048) -> rsa.RSAPrivateKey:
         pem_out.write(pem)
 
     return private_key
+
 
 def generate_ec_key(path: Path, bits=256) -> ec.EllipticCurvePrivateKey:
     curve = getattr(ec, f"SECP{bits}R1")
@@ -225,8 +227,12 @@ def pem_split(
     _PEM_TO_CLASS = {
         b"CERTIFICATE": x509.load_pem_x509_certificate,
         b"CERTIFICATE REQUEST": x509.load_pem_x509_csr,
-        b"EC PRIVATE KEY": lambda x: serialization.load_pem_private_key(x, password=None),
-        b"RSA PRIVATE KEY": lambda x: serialization.load_pem_private_key(x, password=None),
+        b"EC PRIVATE KEY": lambda x: serialization.load_pem_private_key(
+            x, password=None
+        ),
+        b"RSA PRIVATE KEY": lambda x: serialization.load_pem_private_key(
+            x, password=None
+        ),
     }
 
     _PEM_RE = re.compile(
@@ -271,9 +277,6 @@ class ConfigurableMixin:
             configurable.config_name: configurable for configurable in cls.subclasses
         }
 
-import inspect
-from pathlib import Path
-import os
 
 class PerformanceMeasure:
     def __init__(self, init=True):

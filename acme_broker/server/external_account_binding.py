@@ -80,9 +80,7 @@ class ExternalAccountBinding:
 
         :param key_json: The ACME account key that the external account is to be bound to.
         """
-        return josepy.b64.b64encode(
-            self._eab(key_json).signature.signature
-        ).decode()
+        return josepy.b64.b64encode(self._eab(key_json).signature.signature).decode()
 
 
 class ExternalAccountBindingStore:
@@ -210,7 +208,9 @@ class AcmeEAB:
         if sig.url != str(forwarded_url(request)):
             raise acme.messages.Error.with_code("unauthorized")
 
-        if josepy.jwk.JWKRSA.from_json(json.loads(jws.payload)) != josepy.jwk.JWKRSA(key=pub_key):
+        if josepy.jwk.JWKRSA.from_json(json.loads(jws.payload)) != josepy.jwk.JWKRSA(
+            key=pub_key
+        ):
             raise acme.messages.Error.with_code(
                 "malformed",
                 detail="The external account binding does not contain the same public key as the request JWS.",

@@ -8,6 +8,8 @@ import acme.messages
 import josepy
 from acme import jws
 from aiohttp import ClientSession, ClientResponseError
+from cryptography.hazmat.primitives.asymmetric import rsa, ec
+
 
 from acme_broker.client.challenge_solver import ChallengeSolver
 from acme_broker.models import messages, ChallengeType
@@ -68,28 +70,26 @@ class AcmeClient:
         self._session = ClientSession()
 
         self._directory_url = directory_url
-        import cryptography
 
         with open(private_key, "rb") as pem:
             data = pem.read()
             certs = acme_broker.util.pem_split(data.decode())
             if len(certs) != 1:
-                raise ValueError(f'Bad Private Key in file {private_key}')
-            if isinstance(certs[0], cryptography.hazmat.backends.openssl.rsa._RSAPrivateKey):
+                raise ValueError(f"Bad Private Key in file {private_key}")
+            if isinstance(certs[0], rsa.RSAPrivateKeyWithSerialization):
                 self._private_key = josepy.jwk.JWKRSA.load(data)
                 self._alg = josepy.RS256
-            elif isinstance(certs[0], cryptography.hazmat.backends.openssl.ec._EllipticCurvePrivateKey):
+            elif isinstance(certs[0], ec.EllipticCurvePrivateKeyWithSerialization):
                 self._private_key = josepy.jwk.JWKEC.load(data)
                 self._alg = josepy.ES256
             else:
-                raise ValueError(f'Bad Private Key in file {private_key}')
+                raise ValueError(f"Bad Private Key in file {private_key}")
         # Filter empty strings
         self._contact = {k: v for k, v in contact.items() if len(v) > 0}
 
         self._directory = dict()
         self._nonces = set()
         self._account = None
-
 
         self._challenge_solvers = dict()
 

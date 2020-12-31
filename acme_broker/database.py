@@ -101,7 +101,10 @@ class Database:
         # https://github.com/MagicStack/asyncpg/issues/530
         # -> disable the jit via connect_args/server_settings
         self.engine = create_async_engine(
-            connection_string, pool_size=pool_size, connect_args={'server_settings':{'jit': 'off'}}, **kwargs
+            connection_string,
+            pool_size=pool_size,
+            connect_args={"server_settings": {"jit": "off"}},
+            **kwargs
         )
 
         self.session = versioned_sessionmaker(bind=self.engine, class_=AsyncSession)
