@@ -420,6 +420,12 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
 
 
 class TestOurClient:
+    BAD_KEY_RE = (
+        r"urn:ietf:params:acme:error:badPublicKey :: "
+        r"The JWS was signed by a public key the server does not support :: "
+        r"(?P<alg>\S+) Keysize for (?P<action>\w+) has to be \d+ <= public_key.key_size=(?P<bits>\d+) <= \d+"
+    )
+
     def setUp(self) -> None:
         super().setUp()
 
@@ -628,6 +634,20 @@ class TestOurClientRSA1024RSA2048CA(
             "action": "account",
             "bits": "1024",
         }.items():
+            self.assertEqual(v, m[k])
+
+
+class TestOurClientRSA2048RSA1024CA(
+    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
+):
+    ACCOUNT_KEY_ALG_BITS = ("RSA", 2048)
+    CERT_KEY_ALG_BITS = ("RSA", 1024)
+
+    async def test_run(self):
+        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
+            await super().test_run()
+        m = e.expected_regex.match(str(e.exception)).groupdict()
+        for k, v in {"alg": "_RSAPublicKey", "action": "csr", "bits": "1024"}.items():
             self.assertEqual(v, m[k])
 
 
