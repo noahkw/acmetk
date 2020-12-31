@@ -436,7 +436,15 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         else:
             # the request was probably signed with the certificate's key pair
             jwk = jws.signature.combined.jwk
-            cert_key = josepy.util.ComparableRSAKey(cert.public_key())
+            if isinstance(
+                cert_key := cert.public_key(),
+                ec.EllipticCurvePublicKeyWithSerialization,
+            ):
+                cert_key = josepy.util.ComparableECKey(cert_key)
+            elif isinstance(
+                cert_key := cert.public_key(), rsa.RSAPublicKeyWithSerialization
+            ):
+                cert_key = josepy.util.ComparableRSAKey(cert_key)
 
             if cert_key != jwk.key:
                 raise acme.messages.Error.with_code("malformed")
