@@ -17,7 +17,6 @@ import yarl
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
-import cryptography
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
@@ -53,7 +52,7 @@ class AcmeResponse(web.Response):
             links = []
 
         links.append(f'<{directory_url}>; rel="index"')
-        self.headers.extend(('Link',l) for l in links)
+        self.headers.extend(("Link", i) for i in links)
 
         self.headers.update(
             {
@@ -96,7 +95,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
     SUPPORTED_ACCOUNT_KEYS = (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)
     """The types of public keys that the server supports when creating ACME accounts."""
 
-    SUPPORTED_CSR_KEYS = (rsa.RSAPublicKey, cryptography.hazmat.backends.openssl.ec._EllipticCurvePublicKey)
+    SUPPORTED_CSR_KEYS = (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)
     """The types of public keys that the server supports in a certificate signing request."""
 
     subclasses = []
@@ -116,14 +115,14 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         super().__init__()
 
         self._keysize = {
-            'csr':{
-                rsa.RSAPublicKey: (rsa_min_keysize,4096),
+            "csr": {
+                rsa.RSAPublicKey: (rsa_min_keysize, 4096),
                 ec.EllipticCurvePublicKey: (ec_min_keysize, 384),
             },
-            'account': {
+            "account": {
                 rsa.RSAPublicKey: (rsa_min_keysize, 4096),
                 ec.EllipticCurvePublicKey: (ec_min_keysize, 521),
-            }
+            },
         }
         self._tos_url = tos_url
         self._mail_suffixes = mail_suffixes
@@ -155,13 +154,15 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
     def _match_keysize(self, public_key, what):
         for key_type, key_size in self._keysize[what].items():
             if isinstance(public_key, key_type):
-                (low,high) = key_size
+                (low, high) = key_size
                 break
         else:
             raise ValueError("This key type is not supported.")
         if low <= public_key.key_size <= high:
             return
-        raise ValueError(f"{public_key.__class__.__name__} Keysize for {what} has to be {low} <= {public_key.key_size=} <= {high}")
+        raise ValueError(
+            f"{public_key.__class__.__name__} Keysize for {what} has to be {low} <= {public_key.key_size=} <= {high}"
+        )
 
     def _add_routes(self):
         specific_routes = []
@@ -435,7 +436,15 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         else:
             # the request was probably signed with the certificate's key pair
             jwk = jws.signature.combined.jwk
-            cert_key = josepy.util.ComparableRSAKey(cert.public_key())
+            if isinstance(
+                cert_key := cert.public_key(),
+                ec.EllipticCurvePublicKeyWithSerialization,
+            ):
+                cert_key = josepy.util.ComparableECKey(cert_key)
+            elif isinstance(
+                cert_key := cert.public_key(), rsa.RSAPublicKeyWithSerialization
+            ):
+                cert_key = josepy.util.ComparableRSAKey(cert_key)
 
             if cert_key != jwk.key:
                 raise acme.messages.Error.with_code("malformed")
@@ -524,7 +533,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
 
             if isinstance(pub_key, self.SUPPORTED_ACCOUNT_KEYS):
                 try:
-                    self._match_keysize(pub_key, 'account')
+                    self._match_keysize(pub_key, "account")
                 except ValueError as e:
                     raise acme.messages.Error.with_code(
                         "badPublicKey",
@@ -806,7 +815,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
 
         if isinstance(pub_key, self.SUPPORTED_CSR_KEYS):
             try:
-                self._match_keysize(pub_key, 'csr')
+                self._match_keysize(pub_key, "csr")
             except ValueError as e:
                 raise acme.messages.Error.with_code(
                     "badPublicKey",
@@ -1069,11 +1078,11 @@ class AcmeCA(AcmeServerBase):
 
             return self._response(
                 request,
-                body=certificate.cert.public_bytes(serialization.Encoding.PEM) + self._cert.public_bytes(serialization.Encoding.PEM),
+                body=certificate.cert.public_bytes(serialization.Encoding.PEM)
+                + self._cert.public_bytes(serialization.Encoding.PEM),
                 links=None,
-                content_type='application/pem-certificate-chain'
+                content_type="application/pem-certificate-chain",
             )
-
 
 
 class AcmeRelayBase(AcmeServerBase):
