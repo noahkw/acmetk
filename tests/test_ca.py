@@ -49,7 +49,6 @@ class TestAcme:
         elif alg_and_bits[0] == "EC":
             return acme_broker.util.generate_ec_key(path, alg_and_bits[1])
 
-
     def setUp(self) -> None:
         """Sets up our test object with the necessary properties for testing using a client"""
         self._config = load_config("../debug.yml")
@@ -159,9 +158,11 @@ class TestAcmetiny:
             f"--acme-dir {self.path}/challenge"
         )
 
+
 class TestAcmetinyEC(TestAcmetiny):
-    ACCOUNT_KEY_ALG_BITS = ("EC",256)
-    CERT_KEY_ALG_BITS = ("EC",256)
+    ACCOUNT_KEY_ALG_BITS = ("EC", 256)
+    CERT_KEY_ALG_BITS = ("EC", 256)
+
     async def _run_acmetiny(self, cmd):
         import tests.acme_tiny_ec.acme_tiny as at
 
@@ -171,14 +172,11 @@ class TestAcmetinyEC(TestAcmetiny):
         return r
 
     async def test_run(self):
-        import yarl
-        ca = str(yarl.URL(self.DIRECTORY).with_path(''))
         await self._run_acmetiny(
             f"--directory-url {self.DIRECTORY} --disable-check --contact {self.contact} --account-key "
             f"{self.client_data.key_path} --csr {self.client_data.csr_path} "
             f"--acme-dir {self.path}/challenge"
         )
-
 
 
 class TestDehydrated:
@@ -247,10 +245,13 @@ class Testacmesh:
         await super().asyncSetUp()
         if not (self.path / "run/acme.sh").exists():
             import os
+
             cwd = os.getcwd()
             os.chdir("/tmp/acme.sh")
             await self._run(
-                f"./acme.sh  --no-color --log /dev/null --log-level 0 --home {cwd}/{self.path}/run --install --nocron --noprofile --accountkey {self.client_data.key_path}",
+                f"./acme.sh  --no-color --log /dev/null --log-level 0 "
+                f"--home {cwd}/{self.path}/run "
+                f"--install --nocron --noprofile --accountkey {self.client_data.key_path}",
                 prefix=False,
             )
             os.chdir(cwd)
@@ -258,8 +259,9 @@ class Testacmesh:
     async def _run(self, _cmd, prefix=True):
         if prefix:
             cmd = (
-                f"{self.path}/run/acme.sh --no-color --log /dev/null --log-level 0 --config-home {self.path}/config/ --cert-home {self.path}/certs --server {self.DIRECTORY} "
-                + _cmd
+                f"{self.path}/run/acme.sh --no-color --log /dev/null --log-level 0 "
+                f"--config-home {self.path}/config/ "
+                f"--cert-home {self.path}/certs --server {self.DIRECTORY} " + _cmd
             )
         else:
             cmd = _cmd
@@ -371,7 +373,9 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
         await self._run(f"register --agree-tos  -m {self.contact}")
 
         arg = " --domain ".join(self.domains)
-        await self._run(f"certonly --webroot --webroot-path {self.path} --domain {arg}")
+        await self._run(
+            f"certonly {self.key_args} --webroot --webroot-path {self.path} --domain {arg}"
+        )
 
         await self._run(
             f"revoke --cert-path {self.path}/etc/letsencrypt/live/{self.domains[0]}/cert.pem "
@@ -382,7 +386,9 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
         await self._run(f"register --agree-tos  -m {self.contact}")
 
         arg = " --domain ".join(self.domains)
-        await self._run(f"certonly --webroot --webroot-path {self.path} --domain {arg}")
+        await self._run(
+            f"certonly {self.key_args} --webroot --webroot-path {self.path} --domain {arg}"
+        )
 
         await self._run(
             f"renew --no-random-sleep-on-renew --webroot --webroot-path {self.path}"
@@ -445,12 +451,18 @@ class TestOurClient:
     async def test_run(self):
         await self._run_one(self.client, self.client_data.csr)
 
+
 class TestOurClientStress(TestOurClient):
     async def test_run_stress(self):
         clients_csr = []  # (client, csr) tuples
         for i in range(10):
-            self._make_key(client_account_key_path := self.path / f"client_{i}_account.key", self.ACCOUNT_KEY_ALG_BITS)
-            client_cert_key = self._make_key(self.path / f"client_{i}_cert.key", self.CERT_KEY_ALG_BITS)
+            self._make_key(
+                client_account_key_path := self.path / f"client_{i}_account.key",
+                self.ACCOUNT_KEY_ALG_BITS,
+            )
+            client_cert_key = self._make_key(
+                self.path / f"client_{i}_cert.key", self.CERT_KEY_ALG_BITS
+            )
 
             csr = acme_broker.util.generate_csr(
                 f"{self.name}.test.de",
@@ -536,51 +548,69 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
     pass
 
 
-class TestOurClientEC256EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+class TestOurClientEC256EC256CA(
+    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
+):
     ACCOUNT_KEY_ALG_BITS = ("EC", 256)
     CERT_KEY_ALG_BITS = ("EC", 256)
 
 
-class TestOurClientEC384EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+class TestOurClientEC384EC256CA(
+    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
+):
     ACCOUNT_KEY_ALG_BITS = ("EC", 384)
     CERT_KEY_ALG_BITS = ("EC", 256)
 
 
-class TestOurClientEC384EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
-    ACCOUNT_KEY_ALG_BITS = ("EC", 384)
-    CERT_KEY_ALG_BITS = ("EC", 256)
-
-
-class TestOurClientEC521EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+class TestOurClientEC521EC256CA(
+    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
+):
     ACCOUNT_KEY_ALG_BITS = ("EC", 521)
     CERT_KEY_ALG_BITS = ("EC", 256)
 
 
-class TestOurClientEC256EC384CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+class TestOurClientEC256EC384CA(
+    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
+):
     ACCOUNT_KEY_ALG_BITS = ("EC", 256)
     CERT_KEY_ALG_BITS = ("EC", 384)
 
 
-BAD_KEY_RE = r'urn:ietf:params:acme:error:badPublicKey :: The JWS was signed by a public key the server does not support :: \S+ Keysize for \w+ has to be \d+ <= public_key.key_size=\d+ <= \d+'
-
-
-class TestOurClientEC256EC521CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+class TestOurClientEC256EC521CA(
+    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
+):
     ACCOUNT_KEY_ALG_BITS = ("EC", 256)
     CERT_KEY_ALG_BITS = ("EC", 521)
 
     async def test_run(self):
         """"Let's Encrypt does not allow EC 521 Key Certificates due to lack of browser support"""
-        with self.assertRaisesRegex(acme.messages.Error, BAD_KEY_RE):
+        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
             await super().test_run()
+        m = e.expected_regex.match(str(e.exception)).groupdict()
+        for k, v in {
+            "alg": "_EllipticCurvePublicKey",
+            "action": "csr",
+            "bits": "521",
+        }.items():
+            self.assertEqual(v, m[k])
 
 
-class TestOurClientRSA1024RSA2048CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
+class TestOurClientRSA1024RSA2048CA(
+    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
+):
     ACCOUNT_KEY_ALG_BITS = ("RSA", 1024)
     CERT_KEY_ALG_BITS = ("RSA", 2048)
 
     async def test_run(self):
-        with self.assertRaisesRegex(acme.messages.Error, BAD_KEY_RE):
+        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
             await super().test_run()
+        m = e.expected_regex.match(str(e.exception)).groupdict()
+        for k, v in {
+            "alg": "_RSAPublicKey",
+            "action": "account",
+            "bits": "1024",
+        }.items():
+            self.assertEqual(v, m[k])
 
 
 class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
