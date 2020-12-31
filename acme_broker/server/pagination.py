@@ -27,6 +27,7 @@ import math
 
 from aiohttp import web
 
+
 class Page:
     def __init__(self, items, page, page_size, total):
         self.items = items
@@ -41,6 +42,7 @@ class Page:
             self.next_page = page + 1
         self.total = total
         self.pages = int(math.ceil(total / float(page_size)))
+        self.current_page = page
 
 
 async def paginate(session, request, query, by="limit", total=-1, pms=None):
@@ -49,7 +51,6 @@ async def paginate(session, request, query, by="limit", total=-1, pms=None):
         raise web.HTTPBadRequest(body="No changes have been logged.")
 
     page_size = int(request.query.get("pagesize", 25))
-    page = int(request.query.get("page", 1))
     if not (0 < page_size < 100):
         raise web.HTTPBadRequest(body=f"page_size ({page_size}) must be > 0 and < 100")
     page_count = math.ceil(total / page_size)
@@ -57,17 +58,20 @@ async def paginate(session, request, query, by="limit", total=-1, pms=None):
     if page_count < 1:
         raise web.HTTPBadRequest(body="There are 0 entries.")
 
+    page = int(request.query.get("page", page_count))
+
     if not (0 < page <= page_count):
         raise web.HTTPBadRequest(
             body=f"page ({page}) must be between > 0 and <= {page_count}"
         )
 
-    begin = (page - 1) * page_size
-    end = page * page_size
     if by != "limit":
         # BETWEEN on indexed values is way faster …
+        begin = (page - 1) * page_size
+        end = page * page_size
         q = query.filter(by.between(begin, end))
     else:
+        begin = (page_count - page) * page_size
         q = query.limit(page_size).offset(begin)
 
     try:

@@ -27,7 +27,8 @@ class AcmeManagement:
     @aiohttp_jinja2.template("index.jinja2")
     async def management_index(self, request):
         import datetime
-        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
+
+        pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
             now = datetime.datetime.now()
             start_date = now - datetime.timedelta(days=28)
@@ -48,15 +49,27 @@ class AcmeManagement:
             async with pms.measure():
                 r = await session.execute(q)
 
-            s = collections.defaultdict(lambda: dict())
+            s = collections.defaultdict(
+                lambda: {
+                    k: {"total": 0, "unique": 0}
+                    for k in [
+                        "identifier",
+                        "account",
+                        "order",
+                        "challenge",
+                        "authorization",
+                        "certificate",
+                    ]
+                }
+            )
 
             for m in r.mappings():
-                s[m["dateof"].date()] = {k:{'total': 0, 'unique': 0} for k in ['identifier','account','order','challenge','authorization','certificate']}
-
-                s[m["dateof"].date()][m["actionof"]].update({
-                    "total": m["totalof"],
-                    "unique": m["uniqueof"],
-                })
+                s[m["dateof"].date()][m["actionof"]].update(
+                    {
+                        "total": m["totalof"],
+                        "unique": m["uniqueof"],
+                    }
+                )
 
             statistics = []
             for i in sorted(s.keys()):
@@ -73,7 +86,7 @@ class AcmeManagement:
     @routes.get("/mgmt/changes", name="mgmt-changes")
     @aiohttp_jinja2.template("changes.jinja2")
     async def management_changes(self, request):
-        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
+        pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
             q = select(sqlalchemy.func.max(Change.change))
             async with pms.measure():
@@ -111,7 +124,7 @@ class AcmeManagement:
     @routes.get("/mgmt/accounts", name="mgmt-accounts")
     @aiohttp_jinja2.template("accounts.jinja2")
     async def management_accounts(self, request):
-        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
+        pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Account.kid))
             async with pms.measure():
@@ -130,7 +143,7 @@ class AcmeManagement:
     @routes.get("/mgmt/accounts/{account}", name="mgmt-account")
     @aiohttp_jinja2.template("account.jinja2")
     async def management_account(self, request):
-        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
+        pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         account = request.match_info["account"]
         async with self._session(request) as session:
             q = (
@@ -144,12 +157,17 @@ class AcmeManagement:
             async with pms.measure():
                 a = await session.execute(q)
             a = a.scalars().first()
-            return {"account": a, "orders": a.orders, "cryptography": cryptography, "pms": pms}
+            return {
+                "account": a,
+                "orders": a.orders,
+                "cryptography": cryptography,
+                "pms": pms,
+            }
 
     @routes.get("/mgmt/orders", name="mgmt-orders")
     @aiohttp_jinja2.template("orders.jinja2")
     async def management_orders(self, request):
-        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
+        pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Order.order_id))
             async with pms.measure():
@@ -172,7 +190,7 @@ class AcmeManagement:
     @aiohttp_jinja2.template("order.jinja2")
     async def management_order(self, request):
         order = request.match_info["order"]
-        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
+        pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         changes = []
         async with self._session(request) as session:
             q = (
@@ -221,7 +239,7 @@ class AcmeManagement:
     @routes.get("/mgmt/certificates", name="mgmt-certificates")
     @aiohttp_jinja2.template("certificates.jinja2")
     async def management_certificates(self, request):
-        pms = PerformanceMeasurementSystem(enable=request.query.get('pms', False))
+        pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Certificate.certificate_id))
             async with pms.measure():
