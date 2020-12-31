@@ -1,9 +1,10 @@
 import logging
 import unittest
+import acme.messages
 
 from acme_broker import AcmeProxy
 from tests.test_broker import TestBrokerLocalCA, TestBrokerLE
-from tests.test_ca import TestAcmetiny, TestOurClient, TestCertBot
+from tests.test_ca import TestAcmetiny, TestOurClient, TestOurClientStress, TestCertBot
 
 log = logging.getLogger("acme_broker.test_proxy")
 
@@ -30,49 +31,61 @@ class TestProxyLocalCA(TestProxy, TestBrokerLocalCA):
 class TestAcmetinyProxyLocalCA(
     TestAcmetiny, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
 ):
-    async def test_run(self):
-        await super().test_run()
+    pass
 
 
 class TestCertBotProxyLocalCA(
     TestCertBot, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
 ):
-    async def test_run(self):
-        await super().test_run()
-
-    async def test_subdomain_revocation(self):
-        await super().test_subdomain_revocation()
-
-    async def test_skey_revocation(self):
-        await super().test_skey_revocation()
-
-    async def test_renewal(self):
-        await super().test_renewal()
-
-    async def test_register(self):
-        await super().test_register()
-
-    async def test_unregister(self):
-        await super().test_renewal()
+    pass
 
 
 class TestOurClientProxyLocalCA(
+    TestOurClientStress, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
+):
+    pass
+
+
+class TestOurClientEC384EC384ProxyLocalCA(
+    TestOurClientStress, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
+):
+    ACCOUNT_KEY_ALG_BITS = CERT_KEY_ALG_BITS = ("EC", 384)
+
+
+class TestOurClientEC521EC521ProxyLocalCA(
     TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
 ):
+    ACCOUNT_KEY_ALG_BITS = ("EC", 521)
+    CERT_KEY_ALG_BITS = ("EC", 521)
+
     async def test_run(self):
-        await super().test_run()
+        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
+            await super().test_run()
+        self.assertBadKey(e, "_EllipticCurvePublicKey", "csr", "521")
 
-    async def test_run_stress(self):
-        await super().test_run_stress()
 
-    async def test_revoke(self):
-        await super().test_revoke()
+class TestOurClientRSA1024EC384ProxyLocalCA(
+    TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
+):
+    ACCOUNT_KEY_ALG_BITS = ("RSA", 1024)
+    CERT_KEY_ALG_BITS = ("EC", 521)
 
-    async def test_account_update(self):
-        await super().test_account_update()
+    async def test_run(self):
+        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
+            await super().test_run()
+        self.assertBadKey(e, "_RSAPublicKey", "account", "1024")
 
-    async def test_unregister(self):
-        await super().test_unregister()
+
+class TestOurClientRSA2048RSA1024ProxyLocalCA(
+    TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
+):
+    ACCOUNT_KEY_ALG_BITS = ("RSA", 2048)
+    CERT_KEY_ALG_BITS = ("RSA", 1024)
+
+    async def test_run(self):
+        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
+            await super().test_run()
+        self.assertBadKey(e, "_RSAPublicKey", "csr", "1024")
 
 
 class TestProxyLE(TestProxy, TestBrokerLE):
@@ -82,45 +95,16 @@ class TestProxyLE(TestProxy, TestBrokerLE):
 
 
 class TestAcmetinyProxyLE(TestAcmetiny, TestProxyLE, unittest.IsolatedAsyncioTestCase):
-    async def test_run(self):
-        await super().test_run()
+    pass
 
 
 class TestCertBotProxyLE(TestCertBot, TestProxyLE, unittest.IsolatedAsyncioTestCase):
-    async def test_run(self):
-        await super().test_run()
-
-    async def test_subdomain_revocation(self):
-        await super().test_subdomain_revocation()
-
-    async def test_skey_revocation(self):
-        await super().test_skey_revocation()
-
-    async def test_renewal(self):
-        await super().test_renewal()
-
-    async def test_register(self):
-        await super().test_register()
-
-    async def test_unregister(self):
-        await super().test_renewal()
+    pass
 
 
 class TestOurClientProxyLE(
-    TestOurClient, TestProxyLE, unittest.IsolatedAsyncioTestCase
+    TestOurClientStress, TestProxyLE, unittest.IsolatedAsyncioTestCase
 ):
-    async def test_run(self):
-        await super().test_run()
-
     async def test_run_stress(self):
         # rate limits!
         pass
-
-    async def test_revoke(self):
-        await super().test_revoke()
-
-    async def test_account_update(self):
-        await super().test_account_update()
-
-    async def test_unregister(self):
-        await super().test_unregister()
