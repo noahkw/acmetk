@@ -426,6 +426,11 @@ class TestOurClient:
         r"(?P<alg>\S+) Keysize for (?P<action>\w+) has to be \d+ <= public_key.key_size=(?P<bits>\d+) <= \d+"
     )
 
+    def assertBadKey(self, e, alg, action, bits):
+        m = e.expected_regex.match(str(e.exception)).groupdict()
+        for k, v in {"alg": alg, "action": action, "bits": bits}.items():
+            self.assertEqual(v, m[k])
+
     def setUp(self) -> None:
         super().setUp()
 
@@ -610,13 +615,7 @@ class TestOurClientEC256EC521CA(
         """"Let's Encrypt does not allow EC 521 Key Certificates due to lack of browser support"""
         with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
             await super().test_run()
-        m = e.expected_regex.match(str(e.exception)).groupdict()
-        for k, v in {
-            "alg": "_EllipticCurvePublicKey",
-            "action": "csr",
-            "bits": "521",
-        }.items():
-            self.assertEqual(v, m[k])
+        self.assertBadKey(e, "_EllipticCurvePublicKey", "csr", "521")
 
 
 class TestOurClientRSA1024RSA2048CA(
@@ -628,13 +627,7 @@ class TestOurClientRSA1024RSA2048CA(
     async def test_run(self):
         with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
             await super().test_run()
-        m = e.expected_regex.match(str(e.exception)).groupdict()
-        for k, v in {
-            "alg": "_RSAPublicKey",
-            "action": "account",
-            "bits": "1024",
-        }.items():
-            self.assertEqual(v, m[k])
+        self.assertBadKey(e, "_RSAPublicKey", "account", "1024")
 
 
 class TestOurClientRSA2048RSA1024CA(
@@ -646,9 +639,7 @@ class TestOurClientRSA2048RSA1024CA(
     async def test_run(self):
         with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
             await super().test_run()
-        m = e.expected_regex.match(str(e.exception)).groupdict()
-        for k, v in {"alg": "_RSAPublicKey", "action": "csr", "bits": "1024"}.items():
-            self.assertEqual(v, m[k])
+        self.assertBadKey(e, "_RSAPublicKey", "csr", "1024")
 
 
 class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):

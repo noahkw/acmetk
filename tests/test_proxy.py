@@ -61,13 +61,7 @@ class TestOurClientEC521EC521ProxyLocalCA(
     async def test_run(self):
         with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
             await super().test_run()
-        m = e.expected_regex.match(str(e.exception)).groupdict()
-        for k, v in {
-            "alg": "_EllipticCurvePublicKey",
-            "action": "csr",
-            "bits": "521",
-        }.items():
-            self.assertEqual(v, m[k])
+        self.assertBadKey(e, "_EllipticCurvePublicKey", "csr", "521")
 
 
 class TestOurClientRSA1024EC384ProxyLocalCA(
@@ -79,13 +73,7 @@ class TestOurClientRSA1024EC384ProxyLocalCA(
     async def test_run(self):
         with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
             await super().test_run()
-        m = e.expected_regex.match(str(e.exception)).groupdict()
-        for k, v in {
-            "alg": "_RSAPublicKey",
-            "action": "account",
-            "bits": "1024",
-        }.items():
-            self.assertEqual(v, m[k])
+        self.assertBadKey(e, "_RSAPublicKey", "account", "1024")
 
 
 class TestOurClientRSA2048RSA1024ProxyLocalCA(
@@ -97,9 +85,7 @@ class TestOurClientRSA2048RSA1024ProxyLocalCA(
     async def test_run(self):
         with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
             await super().test_run()
-        m = e.expected_regex.match(str(e.exception)).groupdict()
-        for k, v in {"alg": "_RSAPublicKey", "action": "csr", "bits": "1024"}.items():
-            self.assertEqual(v, m[k])
+        self.assertBadKey(e, "_RSAPublicKey", "csr", "1024")
 
 
 class TestProxyLE(TestProxy, TestBrokerLE):
