@@ -42,7 +42,7 @@
 {% else %}
     &larr;
 {% endif %}
-{{ request.query.get('page', 1) }}/{{ page.pages }}
+{{ p.current_page }}/{{ p.pages }}
 {% if p.has_next %}
     <a href="{{ url_for(request.match_info.route.name).with_query({'page':p.next_page}) }}">&rarr;</a>
 {% else %}
