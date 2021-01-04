@@ -37,6 +37,7 @@ from acmetk.util import (
     pem_split,
     ConfigurableMixin,
 )
+from acmetk.version import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,7 @@ class AcmeResponse(web.Response):
 
         self.headers.update(
             {
+                "Server": f"acmetk Server {__version__}",
                 "Replay-Nonce": nonce,
                 "Cache-Control": "no-store",
             }

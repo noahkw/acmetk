@@ -3,9 +3,13 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+version = {}
+with open(r"acmetk/version.py") as fp:
+    exec(fp.read(), version)
+
 setuptools.setup(
     name="acmetk",
-    version="0.0.1",
+    version=version["__version__"],
     author="Noah Wöhler",
     author_email="noah.woehler@gmail.com",
     description="An ACME Broker for Automated Certificate Acquisition in University Environments",

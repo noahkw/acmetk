@@ -11,6 +11,7 @@ from aiohttp import ClientSession, ClientResponseError
 
 from acmetk.client.challenge_solver import ChallengeSolver
 from acmetk.models import messages, ChallengeType
+from acmetk.version import __version__
 
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
@@ -64,7 +65,9 @@ class AcmeClient:
             # Add our self-signed server cert for testing purposes.
             self._ssl_context.load_verify_locations(cafile=server_cert)
 
-        self._session = ClientSession()
+        self._session = ClientSession(
+            headers={"User-Agent": f"acmetk Client {__version__}"}
+        )
 
         self._directory_url = directory_url
 
