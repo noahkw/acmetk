@@ -30,11 +30,11 @@ The following clients were tested against and are thus described here.
       config-dir = /etc/my_server_acme
 
 *
-   :class:`~acme_broker.client.AcmeClient`: Pass the directory URL when initializing the client object.
+   :class:`~acmetk.client.AcmeClient`: Pass the directory URL when initializing the client object.
 
    .. code-block:: python
 
-      from acme_broker.client import AcmeClient
+      from acmetk.client import AcmeClient
 
       client = AcmeClient(
          directory_url="https://my-server.com/directory",
@@ -65,7 +65,7 @@ ACME servers may be configured to require that new account registrations contain
 that the user has control over some resource outside of the account key itself, see
 `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_.
 
-The mechanism implemented in this package, :class:`~acme_broker.server.external_account_binding.AcmeEAB`,
+The mechanism implemented in this package, :class:`~acmetk.server.external_account_binding.AcmeEAB`,
 leverages SSL client certificates to identify a user.
 The user loads their SSL client certificate into a browser and visits :code:`https://my-server.com/eab`, copying
 the *kid* and *hmac_key* values which are then specified when registering a new account.

@@ -217,7 +217,7 @@ logging:
       level: WARNING
       handlers: [console]
       propagate: no
-    acme_broker:
+    acmetk:
       level: DEBUG
       handlers: [console]
       propagate: no

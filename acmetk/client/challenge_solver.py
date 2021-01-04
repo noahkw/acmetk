@@ -10,8 +10,8 @@ import dns.asyncresolver
 import josepy
 from infoblox_client import connector, objects
 
-from acme_broker.models import ChallengeType
-from acme_broker.util import ConfigurableMixin
+from acmetk.models import ChallengeType
+from acmetk.util import ConfigurableMixin
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +71,8 @@ class ChallengeSolver(ConfigurableMixin, abc.ABC):
 
         This method should de-provision the resource that was provisioned for the given challenge.
         It is called once the challenge is complete, i.e. its status has transitioned to
-        :class:`~acme_broker.models.challenge.ChallengeStatus.VALID` or
-        :class:`~acme_broker.models.challenge.ChallengeStatus.INVALID`.
+        :class:`~acmetk.models.challenge.ChallengeStatus.VALID` or
+        :class:`~acmetk.models.challenge.ChallengeStatus.INVALID`.
 
         :param key: The client's account key.
         :param identifier: The identifier that is associated with the challenge.

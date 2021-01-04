@@ -1,9 +1,9 @@
 [Unit]
-Description=ACME Broker
+Description=ACME Server
 
 [Service]
-WorkingDirectory=/srv/acme_broker
-ExecStart=/srv/acme_broker/venv/bin/python -m acme_broker run --config-file=/etc/acme_broker/config.yml
+WorkingDirectory=/srv/acmetk
+ExecStart=/srv/acmetk/venv/bin/python -m acmetk run --config-file=/etc/acmetk/config.yml
 
 # Disable Python's buffering of STDOUT and STDERR, so that output from the
 # service shows up immediately in systemd's logs
@@ -13,7 +13,7 @@ Environment=PYTHONUNBUFFERED=1
 Restart=on-failure
 
 # Use the created user to run our service
-User=acme_broker
+User=acmetk
 
 [Install]
 # Tell systemd to automatically start this service when the system boots

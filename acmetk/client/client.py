@@ -9,8 +9,8 @@ import josepy
 from acme import jws
 from aiohttp import ClientSession, ClientResponseError
 
-from acme_broker.client.challenge_solver import ChallengeSolver
-from acme_broker.models import messages, ChallengeType
+from acmetk.client.challenge_solver import ChallengeSolver
+from acmetk.models import messages, ChallengeType
 
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5

@@ -43,7 +43,7 @@ class Identifier(Entity, Serializer):
     order = relationship(
         "Order", back_populates="identifiers", lazy="joined", foreign_keys=order_id
     )
-    """The :class:`~acme_broker.models.order.Order` associated with the identifier."""
+    """The :class:`~acmetk.models.order.Order` associated with the identifier."""
     authorization = relationship(
         "Authorization",
         cascade="all, delete",
@@ -52,7 +52,7 @@ class Identifier(Entity, Serializer):
         single_parent=True,
         foreign_keys="Authorization.identifier_id",
     )
-    """The :class:`~acme_broker.models.authorization.Authorization` associated with the identifier."""
+    """The :class:`~acmetk.models.authorization.Authorization` associated with the identifier."""
 
     @classmethod
     def from_obj(cls, obj: acme.messages.Identifier) -> "Identifier":

@@ -6,14 +6,14 @@ The config file is passed to the main script like so:
 
 .. code-block:: bash
 
-    python -m acme_broker run --config-file=/path/to/config_file.yaml
+    python -m acmetk run --config-file=/path/to/config_file.yaml
 
 A config file *always* consists of one block defining the app itself and
 another block that is passed to Python's :mod:`logging` module.
 
 There are three types of apps that each require different options to
-run: :class:`~acme_broker.server.AcmeCA`, :class:`~acme_broker.server.AcmeBroker`,
-and :class:`~acme_broker.server.AcmeProxy`.
+run: :class:`~acmetk.server.AcmeCA`, :class:`~acmetk.server.AcmeBroker`,
+and :class:`~acmetk.server.AcmeProxy`.
 
 ACME Certificate Authority
 ##########################
@@ -89,7 +89,7 @@ and root certificate may be generated using the following command:
 
 .. code-block:: bash
 
-    python -m acme_broker generate-keys /app/certs/root.key
+    python -m acmetk generate-keys /app/certs/root.key
 
 .. _config_broker_proxy:
 
@@ -142,7 +142,7 @@ Refer to section `ACME Certificate Authority`_ for the options *hostname*, *port
 *rsa_min_keysize*, *ec_min_keysize*, *tos_url*, *mail_suffixes*, *subnets*, *use_forwarded_header*,
 and *require_eab*.
 The *client* section inside the main *broker* section configures the internal
-:class:`~acme_broker.client.AcmeClient` that is used to communicate with the actual CA.
+:class:`~acmetk.client.AcmeClient` that is used to communicate with the actual CA.
 Refer to section `ACME Client`_ for a description of the possible options.
 
 Challenge Validator Plugins
@@ -150,15 +150,15 @@ Challenge Validator Plugins
 
 Every type of ACME server app needs an internal challenge validator.
 There are currently two types of challenge validator, both of which do not require configuration:
-:class:`~acme_broker.server.challenge_validator.DummyValidator` and
-:class:`~acme_broker.server.challenge_validator.RequestIPDNSChallengeValidator`.
+:class:`~acmetk.server.challenge_validator.DummyValidator` and
+:class:`~acmetk.server.challenge_validator.RequestIPDNSChallengeValidator`.
 To use the former, set *challenge_validator* to :code:`'dummy'` in the server app's section in the config file.
 For the latter put :code:`'requestipdns'`.
 
-The :class:`~acme_broker.server.challenge_validator.DummyValidator` does not do any actual validation and should only
+The :class:`~acmetk.server.challenge_validator.DummyValidator` does not do any actual validation and should only
 be used in testing, as it is inherently insecure.
 
-The :class:`~acme_broker.server.challenge_validator.RequestIPDNSChallengeValidator` may be used in university or
+The :class:`~acmetk.server.challenge_validator.RequestIPDNSChallengeValidator` may be used in university or
 corporate environments where the *DNS-01* or *HTTP-01* challenge are difficult to realize.
 It does not validate any actual ACME challenge, but instead checks whether the DNS identifier that is
 to be authorized resolves to the host's IP address that requested challenge validation via an A or AAAA record.
@@ -192,8 +192,8 @@ root cert.
 ACME Client
 ###########
 
-The ACME client is usually configured as a part of an :class:`~acme_broker.server.AcmeBroker`
-or :class:`~acme_broker.server.AcmeProxy` app.
+The ACME client is usually configured as a part of an :class:`~acmetk.server.AcmeBroker`
+or :class:`~acmetk.server.AcmeProxy` app.
 
 The *client* block inside the respective app's surrounding configuration block might look as follows:
 
@@ -218,7 +218,7 @@ The *client* block inside the respective app's surrounding configuration block m
     Usually, this will be Let's Encrypt or a similar ACME CA that issues free Domain Validation certificates.
 
 * private_key (required): The RSA private key in PEM format that is used to sign requests sent to the CA.
-    May be generated with :code:`python -m acme_broker generate-keys`.
+    May be generated with :code:`python -m acmetk generate-keys`.
 
 * challenge_solver (required): Contains the configuration for the plugin that completes challenges.
     Refer to `Challenge Solver Plugins`_ for a list of possible options.
@@ -234,7 +234,7 @@ Each challenge solver plugin listed here is configured as a block inside the mai
 Dummy Solver
 ------------
 
-The :class:`~acme_broker.client.challenge_solver.DummySolver` is a mock solver mainly used in testing and does not
+The :class:`~acmetk.client.challenge_solver.DummySolver` is a mock solver mainly used in testing and does not
 require any configuration.
 However, it should not be used in production as it does not actually solve any challenges, it only logs
 its "attempts" and pauses execution for a second.
@@ -251,7 +251,7 @@ block as follows:
 Infoblox Client
 ---------------
 
-The :class:`~acme_broker.client.challenge_solver.InfobloxClient` is a *DNS-01* challenge solver that integrates
+The :class:`~acmetk.client.challenge_solver.InfobloxClient` is a *DNS-01* challenge solver that integrates
 with an `Infoblox <https://www.infoblox.com/>`_ instance to provision TXT records.
 
 The *challenge_solver* section inside the respective client's surrounding configuration block might look as follows:
@@ -272,10 +272,10 @@ The *challenge_solver* section inside the respective client's surrounding config
 The options *host*, *username*, and *password* are required and depend on the Infoblox instance's configuration.
 
 * dns_servers (optional): List of IP addresses of the DNS servers that are queried to determine when the remote CA should validate the challenge.
-    Defaults to :attr:`~acme_broker.client.challenge_solver.InfobloxClient.DEFAULT_DNS_SERVERS` if omitted.
+    Defaults to :attr:`~acmetk.client.challenge_solver.InfobloxClient.DEFAULT_DNS_SERVERS` if omitted.
 
 * views (optional): List of views to set the record in.
-    Defaults to :attr:`~acme_broker.client.challenge_solver.InfobloxClient.DEFAULT_VIEWS` if omitted.
+    Defaults to :attr:`~acmetk.client.challenge_solver.InfobloxClient.DEFAULT_VIEWS` if omitted.
 
 .. _config_logging:
 
@@ -310,7 +310,7 @@ An example logging section that should work for most scenarios looks as follows:
           level: ERROR
           handlers: [console]
           propagate: no
-        acme_broker:
+        acmetk:
           level: INFO
           handlers: [console]
           propagate: no

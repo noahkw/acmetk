@@ -15,7 +15,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from acme_broker.models.messages import RevocationReason
+from acmetk.models.messages import RevocationReason
 from .base import Serializer, Entity
 
 
@@ -66,8 +66,8 @@ class Certificate(Entity, Serializer):
 
     There exists a check constraint on the resulting table to ensure that either the attribute
     :attr:`cert` or the attribute :attr:`full_chain` is set. :attr:`cert` is used by the
-    :class:`~acme_broker.server.AcmeCA` as it appends its root certificate on certificate download.
-    :class:`full_chain` is used by all subclasses of :class:`~acme_broker.server.AcmeRelayBase` to easily
+    :class:`~acmetk.server.AcmeCA` as it appends its root certificate on certificate download.
+    :class:`full_chain` is used by all subclasses of :class:`~acmetk.server.AcmeRelayBase` to easily
     store the full certificate chain that is downloaded from the remote CA.
     """
 
@@ -98,13 +98,13 @@ class Certificate(Entity, Serializer):
         unique=True,
     )
     order = relationship("Order", back_populates="certificate", foreign_keys=order_id)
-    """The :class:`acme_broker.models.order.Order` associated with the certificate."""
+    """The :class:`acmetk.models.order.Order` associated with the certificate."""
     cert = Column(x509Certificate, nullable=True, index=True)
     """The actual client certificate (:class:`cryptography.x509.Certificate`)."""
     full_chain = Column(Text, nullable=True)
     """The full chain of the certificate (:class:`str`)."""
     reason = Column(Enum(RevocationReason), nullable=True)
-    """The revocation reason (:class:`~acme_broker.models.messages.RevocationReason`)."""
+    """The revocation reason (:class:`~acmetk.models.messages.RevocationReason`)."""
 
     def revoke(self, reason: RevocationReason):
         """Sets the certificate's :attr:`status` to *revoked* and copies the given reason.

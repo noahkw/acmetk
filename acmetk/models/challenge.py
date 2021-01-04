@@ -7,7 +7,7 @@ from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-import acme_broker.server.challenge_validator
+import acmetk.server.challenge_validator
 from .base import Serializer, Entity
 from ..util import url_for
 
@@ -65,7 +65,7 @@ class Challenge(Entity, Serializer):
         lazy="joined",
         foreign_keys=authorization_id,
     )
-    """The :class:`~acme_broker.models.authorization.Authorization` associated with the challenge."""
+    """The :class:`~acmetk.models.authorization.Authorization` associated with the challenge."""
     type = Column("type", Enum(ChallengeType), nullable=False)
     """The challenge's type (:class:`ChallengeType`)."""
     status = Column("status", Enum(ChallengeStatus), nullable=False)
@@ -108,11 +108,11 @@ class Challenge(Entity, Serializer):
         self,
         session,
         request,
-        validator: "acme_broker.server.challenge_validator.ChallengeValidator",
+        validator: "acmetk.server.challenge_validator.ChallengeValidator",
     ) -> ChallengeStatus:
         """Validates the challenge with the given validator.
 
-        Also, it calls its parent authorization's :func:`~acme_broker.models.authorization.Authorization.validate`
+        Also, it calls its parent authorization's :func:`~acmetk.models.authorization.Authorization.validate`
         method and finally returns the new status after validation.
 
         :param session: The open database session.
@@ -121,7 +121,7 @@ class Challenge(Entity, Serializer):
         """
         try:
             await validator.validate_challenge(self, request=request)
-        except acme_broker.server.challenge_validator.CouldNotValidateChallenge:
+        except acmetk.server.challenge_validator.CouldNotValidateChallenge:
             self.status = ChallengeStatus.INVALID
 
         if self.status in (ChallengeStatus.PENDING, ChallengeStatus.PROCESSING):

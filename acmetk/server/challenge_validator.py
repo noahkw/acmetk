@@ -7,8 +7,8 @@ import typing
 
 import dns.asyncresolver
 
-from acme_broker.models import ChallengeType, Challenge
-from acme_broker.util import ConfigurableMixin
+from acmetk.models import ChallengeType, Challenge
+from acmetk.util import ConfigurableMixin
 
 logger = logging.getLogger(__name__)
 

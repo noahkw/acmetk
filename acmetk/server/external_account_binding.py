@@ -10,8 +10,8 @@ import aiohttp_jinja2
 import josepy
 from cryptography import x509
 
-from acme_broker.server.routes import routes
-from acme_broker.util import url_for, forwarded_url
+from acmetk.server.routes import routes
+from acmetk.util import url_for, forwarded_url
 
 
 class ExternalAccountBinding:
@@ -154,7 +154,7 @@ class ExternalAccountBindingStore:
 
 
 class AcmeEAB:
-    """Mixin for an :class:`~acme_broker.server.AcmeServerBase` implementation that provides external account
+    """Mixin for an :class:`~acmetk.server.AcmeServerBase` implementation that provides external account
     binding creation and verification.
 
     `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_

@@ -53,7 +53,7 @@ logging:
       level: ERROR
       handlers: [console]
       propagate: no
-    acme_broker:
+    acmetk:
       level: INFO
       handlers: [console]
       propagate: no

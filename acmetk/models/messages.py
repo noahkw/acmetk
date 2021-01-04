@@ -9,8 +9,8 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from josepy import JSONDeSerializable
 
-from acme_broker.models.account import AccountStatus
-from acme_broker.models.authorization import AuthorizationStatus
+from acmetk.models.account import AccountStatus
+from acmetk.models.authorization import AuthorizationStatus
 
 ERROR_CODE_STATUS = {
     "unauthorized": 401,
@@ -92,8 +92,8 @@ def decode_csr(b64der):
 class CertificateRequest(josepy.JSONObjectWithFields):
     """Message type for certificate requests.
 
-    Received by an :class:`~acme_broker.server.AcmeServerBase` instance at the order finalization step
-    :meth:`~acme_broker.server.AcmeServerBase.finalize_order`.
+    Received by an :class:`~acmetk.server.AcmeServerBase` instance at the order finalization step
+    :meth:`~acmetk.server.AcmeServerBase.finalize_order`.
     """
 
     csr: "cryptography.x509.CertificateSigningRequest" = josepy.Field(
@@ -207,7 +207,7 @@ class NewOrder(josepy.JSONObjectWithFields):
 class Account(josepy.JSONObjectWithFields):
     """Patched :class:`acme.messages.Registration` message type that adds a *kid* field.
 
-    This is the representation of a user account that the :class:`~acme_broker.client.AcmeClient` uses internally.
+    This is the representation of a user account that the :class:`~acmetk.client.AcmeClient` uses internally.
     The :attr:`kid` field is sent to the remote server with every request and used for request verification.
     Fields that see no use inside the client have been removed.
     """
@@ -226,8 +226,8 @@ class Order(acme.messages.Order):
     """Patched :class:`acme.messages.Order` message type that adds a *URL* field.
 
     The *URL* field is populated by copying the *Location* header from responses in the
-    :class:`~acme_broker.client.AcmeClient`.
-    This field is used by the :class:`~acme_broker.server.AcmeProxy` to store the *proxied* URL and to be able
+    :class:`~acmetk.client.AcmeClient`.
+    This field is used by the :class:`~acmetk.server.AcmeProxy` to store the *proxied* URL and to be able
     to map an internal order to that of the remote CA.
     """
 

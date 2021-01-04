@@ -98,14 +98,14 @@ class Order(Entity, Serializer):
         lazy="joined",
         foreign_keys="Identifier.order_id",
     )
-    """List of identifiers (:class:`~acme_broker.models.identifier.Identifier`) associated with the order."""
+    """List of identifiers (:class:`~acmetk.models.identifier.Identifier`) associated with the order."""
     notBefore = Column(DateTime(timezone=True))
     """The requested *notBefore* field in the certificate."""
     notAfter = Column(DateTime(timezone=True))
     """The requested *notAfter* field in the certificate."""
     account_kid = Column(String, ForeignKey("accounts.kid"), nullable=False)
     account = relationship("Account", back_populates="orders", foreign_keys=account_kid)
-    """The :class:`~acme_broker.models.account.Account` that created the order."""
+    """The :class:`~acmetk.models.account.Account` that created the order."""
     certificate = relationship(
         "Certificate",
         uselist=False,
@@ -114,7 +114,7 @@ class Order(Entity, Serializer):
         lazy="joined",
         foreign_keys="Certificate.order_id",
     )
-    """The :class:`~acme_broker.models.certificate.Certificate` that was generated as a result of the order."""
+    """The :class:`~acmetk.models.certificate.Certificate` that was generated as a result of the order."""
     csr = Column(CSRType)
     """The :class:`cryptography.x509.CertificateSigningRequest` that was submitted by the client."""
 
@@ -158,7 +158,7 @@ class Order(Entity, Serializer):
         """Validates the order.
 
         This method is usually not called directly. Rather,
-        :func:`acme_broker.models.authorization.Authorization.validate` calls it as a authorization that corresponds
+        :func:`acmetk.models.authorization.Authorization.validate` calls it as a authorization that corresponds
         to the order is being validated.
 
         :param session: The open database session.
@@ -216,9 +216,9 @@ class Order(Entity, Serializer):
     @classmethod
     def from_obj(
         cls,
-        account: "acme_broker.models.account.Account",
+        account: "acmetk.models.account.Account",
         obj: acme.messages.NewOrder,
-        challenge_types: typing.Iterable["acme_broker.models.challenge.ChallengeType"],
+        challenge_types: typing.Iterable["acmetk.models.challenge.ChallengeType"],
     ) -> "Order":
         """A factory that constructs a new :class:`Order` from a message object.
 
@@ -226,8 +226,8 @@ class Order(Entity, Serializer):
         the *status* is initially set to *pending*.
 
         Furthermore, the order object is automatically associated with the given account and all
-        :class:`~acme_broker.models.identifier.Identifier`, :class:`~acme_broker.models.authorization.Authorization`,
-        and :class:`~acme_broker.models.challenge.Challenge` objects are created as well as associated with the order.
+        :class:`~acmetk.models.identifier.Identifier`, :class:`~acmetk.models.authorization.Authorization`,
+        and :class:`~acmetk.models.challenge.Challenge` objects are created as well as associated with the order.
 
         :param account: The account's key.
         :param obj: The registration message object.

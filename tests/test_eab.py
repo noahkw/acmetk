@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import yarl
 from cryptography.hazmat.primitives.asymmetric import rsa
-from acme_broker.server.external_account_binding import ExternalAccountBindingStore
+from acmetk.server.external_account_binding import ExternalAccountBindingStore
 from tests.test_ca import TestCertBotCA
 
 

@@ -10,7 +10,7 @@ The tests are run using the :py:mod:`unittest` framework.
 Each test has a corresponding section in the :code:`debug.yml` that configures the tested apps.
 The section's name is defined by the property :attr:`config_sec` that each test overrides.
 
-To run any of these, the *acme_broker* package first needs to be installed:
+To run any of these, the *acmetk* package first needs to be installed:
 
 .. code-block:: bash
     :substitutions:
@@ -62,7 +62,7 @@ The server implementations are all tested against the following clients:
 
 * `Acmetiny <https://github.com/diafygi/acme-tiny>`_
 * `Certbot <https://github.com/certbot/certbot>`_
-* This package's own client :class:`~acme_broker.client.AcmeClient`
+* This package's own client :class:`~acmetk.client.AcmeClient`
 * `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_
 
 There is one :func:`test_run` test function per client that tests the general certificate acquisition process from
@@ -81,7 +81,7 @@ Furthermore, the *Certbot* subclasses have the following test functions:
 * :func:`test_register`: Tests the account creation process.
 * :func:`test_unregister`: Registers an account, then deactivates that account.
 
-The *OurClient* (:class:`~acme_broker.client.AcmeClient`) subclasses have the following additional test functions:
+The *OurClient* (:class:`~acmetk.client.AcmeClient`) subclasses have the following additional test functions:
 
 * :func:`test_run_stress`: Carries out ten general certificate acquisition processes in parallel.
 *
@@ -96,7 +96,7 @@ The *OurClient* (:class:`~acme_broker.client.AcmeClient`) subclasses have the fo
 AcmeCA Tests
 ------------
 
-Tests the integration of the :class:`~acme_broker.server.AcmeCA` against various test clients.
+Tests the integration of the :class:`~acmetk.server.AcmeCA` against various test clients.
 
 To run all of the tests:
 
@@ -112,8 +112,8 @@ To run all of the tests:
 AcmeBroker/AcmeProxy Tests
 --------------------------
 
-Tests the integration of the :class:`~acme_broker.server.AcmeBroker`/:class:`~acme_broker.server.AcmeProxy`
-against two certificate authorities, namely a local :class:`~acme_broker.server.AcmeCA` instance and
+Tests the integration of the :class:`~acmetk.server.AcmeBroker`/:class:`~acmetk.server.AcmeProxy`
+against two certificate authorities, namely a local :class:`~acmetk.server.AcmeCA` instance and
 `Let's Encrypt staging <https://letsencrypt.org/docs/staging-environment/>`_.
 The integration with the various clients is tested at the same time.
 There is one caveat: The :class:`TestBrokerLE`/:class:`TestProxyLE` subclasses, meaning those that test against
@@ -133,7 +133,7 @@ To run all of the tests:
 InfobloxClient Tests
 --------------------
 
-Tests the main functionality of the :class:`~acme_broker.client.challenge_solver.InfobloxClient` to
+Tests the main functionality of the :class:`~acmetk.client.challenge_solver.InfobloxClient` to
 set and delete DNS TXT records.
 The credentials except for the password need to be stored inside the *infoblox* section of the :code:`debug.yml`.
 The DNS servers and default views should also be changed to be compatible with the individual infrastructure.
@@ -150,7 +150,7 @@ To run all of the tests:
 Deployment Tests
 ----------------
 
-Tests the :class:`acme_broker.server.AcmeCA` behind a reverse proxy inside a docker container spun up by
+Tests the :class:`acmetk.server.AcmeCA` behind a reverse proxy inside a docker container spun up by
 docker-compose.
 To configure running these tests, PyCharm's docker-compose remote python interpreter functionality may be
 leveraged.
@@ -200,52 +200,52 @@ Abstract Base Classes
 AcmeServerBase
 --------------
 
-:class:`~acme_broker.server.AcmeServerBase` is the base class for all ACME-compliant server implementations.
+:class:`~acmetk.server.AcmeServerBase` is the base class for all ACME-compliant server implementations.
 It encapsulates a :class:`aiohttp.web.Application` to respond to ACME requests and :code:`aiohttp_jinja2`
-is used as the template engine to render the :class:`~acme_broker.server.management.AcmeManagement`
-and :class:`~acme_broker.server.external_account_binding.AcmeEAB` sites.
+is used as the template engine to render the :class:`~acmetk.server.management.AcmeManagement`
+and :class:`~acmetk.server.external_account_binding.AcmeEAB` sites.
 
-Subclasses need to implement the methods :meth:`~acme_broker.server.AcmeServerBase.certificate`
-and :meth:`~acme_broker.server.AcmeServerBase.handle_order_finalize`.
-Subclasses must also set the :attr:`~acme_broker.server.AcmeServerBase.config_name` which corresponds
+Subclasses need to implement the methods :meth:`~acmetk.server.AcmeServerBase.certificate`
+and :meth:`~acmetk.server.AcmeServerBase.handle_order_finalize`.
+Subclasses must also set the :attr:`~acmetk.server.AcmeServerBase.config_name` which corresponds
 to the section name in the config files.
-Instances should only be created using :meth:`~acme_broker.server.AcmeServerBase.create_app`
+Instances should only be created using :meth:`~acmetk.server.AcmeServerBase.create_app`
 which instantiates the server and attaches the database session at the least.
 
 To run a new server from the CLI, a :func:`run_servername` function, which is called if
-:code:`app_class` is the server class, should be created in :mod:`acme_broker.main.py`.
+:code:`app_class` is the server class, should be created in :mod:`acmetk.main.py`.
 Any challenge validators, internal clients, etc., as well as the server itself, should be instantiated there.
 The runner is then returned along with the server instance.
 
 AcmeRelayBase
 -------------
 
-:class:`~acme_broker.server.AcmeRelayBase` inherits from :class:`~acme_broker.server.AcmeServerBase`.
-It features an internal :class:`~acme_broker.client.AcmeClient` that is used to communicate with another
+:class:`~acmetk.server.AcmeRelayBase` inherits from :class:`~acmetk.server.AcmeServerBase`.
+It features an internal :class:`~acmetk.client.AcmeClient` that is used to communicate with another
 certificate authority of choice.
-Subclasses need to implement the method :meth:`~acme_broker.server.AcmeServerBase.handle_order_finalize`.
+Subclasses need to implement the method :meth:`~acmetk.server.AcmeServerBase.handle_order_finalize`.
 
 If complex configuration beyond the server itself and its internal client is not needed, then the existing
-:func:`run_relay` in :mod:`acme_broker.main.py` may be used to start the server.
+:func:`run_relay` in :mod:`acmetk.main.py` may be used to start the server.
 
 Challenge Solver
 ----------------
 
-:class:`~acme_broker.client.challenge_solver.ChallengeSolver` is the interface that challenge solver
+:class:`~acmetk.client.challenge_solver.ChallengeSolver` is the interface that challenge solver
 plugins must implement.
-Subclasses must also set the :attr:`~acme_broker.client.challenge_solver.ChallengeSolver.config_name`
+Subclasses must also set the :attr:`~acmetk.client.challenge_solver.ChallengeSolver.config_name`
 which corresponds to the :code:`challenge_solver` child section name in client config file.
 
-:meth:`~acme_broker.client.challenge_solver.ChallengeSolver.connect` may be overridden if the plugin
+:meth:`~acmetk.client.challenge_solver.ChallengeSolver.connect` may be overridden if the plugin
 needs to connect to some resource before being able to challenge completion requests.
 
-:meth:`~acme_broker.client.challenge_solver.ChallengeSolver.complete_challenge` must be overridden by
+:meth:`~acmetk.client.challenge_solver.ChallengeSolver.complete_challenge` must be overridden by
 all plugin implementations.
 It is passed the account key, as well as the challenge and the identifier associated with the challenge.
 Upon being called, the method needs to complete the challenge, i.e. by provisioning some resource,
 and then defer returning until the remote CA is allowed to validate the challenge.
 
-:meth:`~acme_broker.client.challenge_solver.ChallengeSolver.complete_challenge` must also be overridden by
+:meth:`~acmetk.client.challenge_solver.ChallengeSolver.complete_challenge` must also be overridden by
 all plugin implementations.
 Upon being called, it should de-provision the resources that were provisioned by the solver
 to complete that specific challenge.
@@ -265,15 +265,15 @@ passed in the following example:
 Challenge Validator
 -------------------
 
-:class:`~acme_broker.server.challenge_validator.ChallengeValidator` is the interface that challenge
+:class:`~acmetk.server.challenge_validator.ChallengeValidator` is the interface that challenge
 validator plugins must implement.
-Subclasses must also set the :attr:`~acme_broker.server.challenge_validator.ChallengeValidator.config_name`
+Subclasses must also set the :attr:`~acmetk.server.challenge_validator.ChallengeValidator.config_name`
 which corresponds to the string that :code:`challenge_validator` is set to in the server config section.
 
-:meth:`~acme_broker.server.challenge_validator.ChallengeValidator.validate_challenge` must be
+:meth:`~acmetk.server.challenge_validator.ChallengeValidator.validate_challenge` must be
 overridden by all plugin implementations.
 It is passed the challenge as well as any number of keyword arguments.
 Upon being called, the method should attempt to validate the challenge.
 If the validation was successful, then the method should just return.
-Otherwise, a :class:`~acme_broker.server.challenge_validator.CouldNotValidateChallenge`
+Otherwise, a :class:`~acmetk.server.challenge_validator.CouldNotValidateChallenge`
 exception must be raised.

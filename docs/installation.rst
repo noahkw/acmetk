@@ -3,12 +3,12 @@ Installation
 
 There are two supported installation methods: *bare-metal* and *docker*.
 
-The bare-metal section focuses on deploying an :class:`~acme_broker.server.AcmeBroker` with a PostgreSQL
+The bare-metal section focuses on deploying an :class:`~acmetk.server.AcmeBroker` with a PostgreSQL
 instance on a virtual machine running Debian Stretch (9).
 The section after that explains how to run this same setup behind an
 `OpenResty reverse proxy <https://openresty.org/>`_.
 
-The docker section deploys a :class:`~acme_broker.server.AcmeProxy`, also with a PostgreSQL database, behind
+The docker section deploys a :class:`~acmetk.server.AcmeProxy`, also with a PostgreSQL database, behind
 an OpenResty reverse proxy.
 
 Bare-metal
@@ -31,17 +31,17 @@ First, create the user that will run the broker app and clone the repository:
    :substitutions:
 
    # create the user
-   sudo useradd acme_broker -m -d /srv/acme_broker -s /bin/bash
+   sudo useradd acmetk -m -d /srv/acmetk -s /bin/bash
    # create the configuration directory and grant permissions
-   sudo mkdir /etc/acme_broker && sudo chown acme_broker: /etc/acme_broker
+   sudo mkdir /etc/acmetk && sudo chown acmetk: /etc/acmetk
    # change user to the newly created one
-   sudo su acme_broker
+   sudo su acmetk
    # clone the repository to the user's home directory
-   cd /srv/acme_broker
+   cd /srv/acmetk
    git clone |GIT_URL|
 
 
-To create the database user and the database needed for the :class:`~acme_broker.server.AcmeBroker`,
+To create the database user and the database needed for the :class:`~acmetk.server.AcmeBroker`,
 issue the following commands:
 
 .. code-block:: bash
@@ -66,8 +66,8 @@ points to the right binary.
 
 .. code-block:: bash
 
-   # Log into user acme_broker and change dir to its home directory
-   sudo su acme_broker
+   # Log into user acmetk and change dir to its home directory
+   sudo su acmetk
    cd
    # Create the virtual environment and activate it
    python -m venv venv
@@ -76,9 +76,9 @@ points to the right binary.
    pip install -r acme-broker/requirements.txt
    pip install acme-broker/.
    # Generate an account key for the internal ACME client
-   python -m acme_broker generate-account-key /etc/acme_broker/broker_client_account.key
+   python -m acmetk generate-account-key /etc/acmetk/broker_client_account.key
    # Change the key's file permissions
-   chmod 600 /etc/acme_broker/broker_client_account.key
+   chmod 600 /etc/acmetk/broker_client_account.key
 
 Copy the template config file :code:`conf/broker.config.sample.yml` and the systemd unit file
 :code:`conf/broker.service` and edit them according to your use case.
@@ -86,10 +86,10 @@ For an explanation of the configuration options, see :ref:`config_broker_proxy`.
 
 .. code-block:: bash
 
-   cp acme_broker/conf/broker.config.sample.yml /etc/acme_broker/config.yml
-   chmod 600 /etc/acme_broker/config.yml
+   cp acmetk/conf/broker.config.sample.yml /etc/acmetk/config.yml
+   chmod 600 /etc/acmetk/config.yml
    exit
-   sudo cp acme_broker/conf/broker.service /etc/systemd/system
+   sudo cp acmetk/conf/broker.service /etc/systemd/system
 
 The final step is to initialize the db's tables and then enable/start the broker app:
 
@@ -97,7 +97,7 @@ The final step is to initialize the db's tables and then enable/start the broker
 
    # Initialize the database's tables.
    # Enter the password you chose above when prompted.
-   python -m acme_broker db init postgresql+asyncpg://acme:{}@localhost:5432/acme
+   python -m acmetk db init postgresql+asyncpg://acme:{}@localhost:5432/acme
    # Enable/start the broker app's service
    sudo systemctl enable broker.service
    sudo systemctl start broker.service
@@ -115,7 +115,7 @@ Copy the modified :code:`nginx.conf` as well as the broker site config file:
 
 .. code-block:: bash
 
-   cd /srv/acme_broker
+   cd /srv/acmetk
    sudo cp acme-broker/conf/nginx.conf /etc/openresty/nginx.conf
    sudo mkdir /etc/openresty/conf.d
    sudo cp acme-broker/conf/broker_site.conf /etc/openresty/conf.d/
@@ -225,13 +225,13 @@ The :code:`/home/acme/etc/acme_server` directory is mounted to :code:`/etc/acme_
    ACME_RW_PW=YOUR_READ_WRITE_PW
    ACME_RO_PW=YOUR_READ_ONLY_PW
    ACME_PREFIX=/home/acme
-   ACME_BROKER_CONFIG_FILE=/etc/acme_server/config.yml
+   ACME_CONFIG_FILE=/etc/acme_server/config.yml
 
 Generate an account key for the internal ACME client:
 
 .. code-block:: bash
 
-   sudo docker-compose run --entrypoint="" app python -m acme_broker \
+   sudo docker-compose run --entrypoint="" app python -m acmetk \
       generate-account-key /etc/acme_server/proxy_client_account.key
    # Change the key's file permissions
    sudo chmod 600 /home/acme/etc/acme_server/proxy_client_account.key
@@ -242,7 +242,7 @@ Initialize the db's tables as the *acme_admin* user and start the proxy as a dae
 
    # Initialize the database's tables.
    # Enter the password admin password specified in the .env file when prompted.
-   sudo docker-compose run --entrypoint="" app python -m acme_broker \
+   sudo docker-compose run --entrypoint="" app python -m acmetk \
       db init postgresql+asyncpg://acme_admin:{}@db:5432/acme
    # Start the proxy as a daemon via docker-compose
    sudo docker-compose up -d

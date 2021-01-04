@@ -7,8 +7,8 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, defaultload
 
-from acme_broker import models
-from acme_broker.models import (
+from acmetk import models
+from acmetk.models import (
     Account,
     Identifier,
     Order,
@@ -16,7 +16,7 @@ from acme_broker.models import (
     Challenge,
     Certificate,
 )
-from acme_broker.models.base import Base
+from acmetk.models.base import Base
 
 
 class versioned_sessionmaker(sessionmaker):
@@ -104,7 +104,7 @@ class Database:
         self.session = versioned_sessionmaker(bind=self.engine, class_=AsyncSession)
 
     async def begin(self):
-        """Creates the database's tables according to the models defined in :mod:`acme_broker.models`."""
+        """Creates the database's tables according to the models defined in :mod:`acmetk.models`."""
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 

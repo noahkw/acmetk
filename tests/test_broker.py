@@ -4,14 +4,14 @@ import unittest
 
 from aiohttp import web
 
-import acme_broker.util
-from acme_broker import AcmeCA, AcmeBroker
-from acme_broker.client import (
+import acmetk.util
+from acmetk import AcmeCA, AcmeBroker
+from acmetk.client import (
     AcmeClient,
     InfobloxClient,
     DummySolver,
 )
-from acme_broker.server import DummyValidator
+from acmetk.server import DummyValidator
 from tests.test_ca import (
     TestCA,
     TestAcmetiny,
@@ -20,7 +20,7 @@ from tests.test_ca import (
     TestDehydrated,
 )
 
-log = logging.getLogger("acme_broker.test_broker")
+log = logging.getLogger("acmetk.test_broker")
 
 
 class TestBroker(TestCA):
@@ -37,7 +37,7 @@ class TestBroker(TestCA):
         )
 
         if not self.brokerclient_account_key_path.exists():
-            acme_broker.util.generate_rsa_key(self.brokerclient_account_key_path)
+            acmetk.util.generate_rsa_key(self.brokerclient_account_key_path)
 
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
