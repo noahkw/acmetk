@@ -165,6 +165,30 @@ to be authorized resolves to the host's IP address that requested challenge vali
 To achieve this, the *DNS-01* and *HTTP-01* challenge are repurposed, so that no further client-side configuration is
 required.
 
+External Account Binding
+########################
+
+External Account Binding is an optional feature which requires that new ACME accounts be bound to an external account
+via some mechanism outside of the ACME specification, see :ref:`config_clients_eab`.
+ACME servers may be configured to require an external account binding for new registrations by setting
+:code:`require_eab: true` in the configuration file.
+
+Furthermore, the ACME server needs to be run behind a reverse proxy that verifies the user's SSL client certificate
+and passes it to the server via the *X-SSL-CERT* header.
+The provided Nginx/Openresty configuration files already contain the necessary directives to enable SSL client certs.
+Uncomment lines 60 - 63 of your :code:`broker_site.conf`/:code:`app.conf`, so the section looks as follows:
+
+.. code-block:: ini
+
+    ssl_client_certificate /etc/ssl/trusted_roots.pem;
+    ssl_verify_client optional;
+    ssl_verify_depth 3;
+
+Point :code:`ssl_client_certificate` to a text file that contains all PEM encoded intermediates and
+the root certificate (at the very bottom) needed to verify the client certificates.
+:code:`ssl_verify_depth` should be equal or greater than the number of certificates in the chain of trust, including the
+root cert.
+
 ACME Client
 ###########
 

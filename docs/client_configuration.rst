@@ -56,6 +56,8 @@ The following clients were tested against and are thus described here.
 
       dehydrated --config ./config
 
+.. _config_clients_eab:
+
 External Account Binding
 ########################
 
