@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 import acmetk.server.challenge_validator
-from .base import Serializer, Entity
+from .base import Serializer, Entity, AcmeErrorType
 from ..util import url_for
 
 
@@ -75,6 +75,8 @@ class Challenge(Entity, Serializer):
     token = Column(UUID(as_uuid=True), default=uuid.uuid4, unique=True)
     """The token that is used during the challenge validation process.
     See `8.1.  Key Authorizations <https://tools.ietf.org/html/rfc8555#section-8.1>`_"""
+    error = Column(AcmeErrorType, nullable=True)
+    """The error that occured while validating the challenge."""
 
     def url(self, request) -> str:
         """Returns the challenge's URL.
@@ -87,6 +89,10 @@ class Challenge(Entity, Serializer):
     def serialize(self, request=None) -> dict:
         d = super().serialize(request)
         d["url"] = self.url(request)
+
+        if self.error:
+            d["error"] = self.error.to_partial_json()
+
         return d
 
     @classmethod
@@ -121,7 +127,8 @@ class Challenge(Entity, Serializer):
         """
         try:
             await validator.validate_challenge(self, request=request)
-        except acmetk.server.challenge_validator.CouldNotValidateChallenge:
+        except acmetk.server.challenge_validator.CouldNotValidateChallenge as e:
+            self.error = e.to_acme_error()
             self.status = ChallengeStatus.INVALID
 
         if self.status in (ChallengeStatus.PENDING, ChallengeStatus.PROCESSING):

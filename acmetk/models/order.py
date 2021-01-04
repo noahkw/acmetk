@@ -15,13 +15,12 @@ from sqlalchemy import (
     LargeBinary,
     TypeDecorator,
     Integer,
-    JSON,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from .authorization import AuthorizationStatus, Authorization
-from .base import Serializer, Entity
+from .base import Serializer, Entity, AcmeErrorType
 from .challenge import Challenge
 from .identifier import Identifier
 from ..util import url_for, names_of
@@ -40,20 +39,6 @@ class CSRType(TypeDecorator):
     def process_result_value(self, value, dialect):
         if value:
             return x509.load_pem_x509_csr(value)
-        return value
-
-
-class AcmeErrorType(TypeDecorator):
-    impl = JSON
-
-    def process_bind_param(self, value, dialect):
-        if value:
-            return value.json_dumps()
-        return value
-
-    def process_result_value(self, value, dialect):
-        if value:
-            return acme.messages.Error.json_loads(value)
         return value
 
 
@@ -209,7 +194,7 @@ class Order(Entity, Serializer):
             d["certificate"] = self.certificate_url(request)
 
         if self.proxied_error:
-            d["error"] = self.proxied_error.json_dumps()
+            d["error"] = self.proxied_error.to_partial_json()
 
         return d
 
