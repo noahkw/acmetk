@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Welcome to ACME Toolkit's documentation!
-=======================================
+========================================
 
 .. toctree::
    :maxdepth: 3

@@ -1,10 +1,10 @@
+.. _config_clients:
+
 Client Configuration
 ====================
 
 Setting the directory
 #####################
-
-.. _config_clients:
 
 When the ACME server is up and running, the clients need to be pointed to its directory URL.
 This is achieved in different ways depending on the client and should be part of its documentation.
