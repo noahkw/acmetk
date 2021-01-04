@@ -39,11 +39,11 @@ class ExternalAccountBinding:
 
     def verify(
         self,
-        jws: object,
+        jws: acme.jws.JWS,
     ) -> bool:
         """Checks the given signature against the EAB's.
 
-        :param jws: The signature to be verified.
+        :param jws: The EAB request JWS to be verified.
         :return: True iff the given signature and the EAB's are equal.
         """
         key = josepy.jwk.JWKOct(key=josepy.b64.b64decode(self.hmac_key))
@@ -80,9 +80,7 @@ class ExternalAccountBinding:
 
         :param key_json: The ACME account key that the external account is to be bound to.
         """
-        return josepy.b64.b64encode(
-            self._eab(key_json).signature.signature
-        ).decode()
+        return josepy.b64.b64encode(self._eab(key_json).signature.signature).decode()
 
 
 class ExternalAccountBindingStore:
@@ -130,12 +128,12 @@ class ExternalAccountBindingStore:
     def verify(
         self,
         kid: str,
-        jws: object,
+        jws: acme.jws.JWS,
     ) -> bool:
         """Verifies an external account binding given its ACME account key, kid and signature.
 
         :param kid: The EAB's kid.
-        :param signature: The EAB's signature.
+        :param jws: The EAB request JWS.
         :return: True iff verification was successful.
         """
         if not (pending := self._pending.get(kid.lower(), None)):
@@ -210,7 +208,9 @@ class AcmeEAB:
         if sig.url != str(forwarded_url(request)):
             raise acme.messages.Error.with_code("unauthorized")
 
-        if josepy.jwk.JWKRSA.from_json(json.loads(jws.payload)) != josepy.jwk.JWKRSA(key=pub_key):
+        if josepy.jwk.JWKRSA.from_json(json.loads(jws.payload)) != josepy.jwk.JWKRSA(
+            key=pub_key
+        ):
             raise acme.messages.Error.with_code(
                 "malformed",
                 detail="The external account binding does not contain the same public key as the request JWS.",
