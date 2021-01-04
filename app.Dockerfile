@@ -6,8 +6,6 @@ RUN apt-get update \
 COPY acme_broker /app/acme_broker
 COPY requirements.txt app_entrypoint.sh setup.py README.md /app/
 
-COPY docker_conf/supervisor/conf.d /etc/supervisor/conf.d
-
 VOLUME /var/log/supervisor
 
 WORKDIR /app

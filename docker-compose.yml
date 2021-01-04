@@ -9,10 +9,10 @@ networks:
 
 services:
   db:
-    image: postgres
+    image: postgres:12
     volumes:
-      - ./db_data:/var/lib/postgresql/data
-      - ./docker_conf/postgres:/docker-entrypoint-initdb.d
+      - ${ACME_PREFIX}/db_data:/var/lib/postgresql/data
+      - ${ACME_PREFIX}/etc/postgres:/docker-entrypoint-initdb.d
     restart: always
     environment:
       POSTGRES_PASSWORD: ${ACME_SUPERUSER_PW}
@@ -22,22 +22,27 @@ services:
       ACME_RW_PW: ${ACME_RW_PW}
       ACME_RO_PW: ${ACME_RO_PW}
   reverse_proxy:
-    image: reverse_proxy
+    image: acme/reverse_proxy:latest
     restart: always
     ports:
       - "443:443"
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /etc/resty-auto-ssl
+      - ${ACME_PREFIX}/etc/openresty/nginx.conf:/etc/openresty/nginx.conf
+      - ${ACME_PREFIX}/etc/openresty/conf.d:/etc/openresty/conf.d
+      - ${ACME_PREFIX}/etc/openresty/trusted_roots.pem:/etc/ssl/trusted_roots.pem:ro
+      - ${ACME_PREFIX}/etc/resty-auto-ssl/resty_auto_ssl.sh:/etc/resty-auto-ssl/letsencrypt/conf.d/resty_auto_ssl.sh
   app:
-    image: broker_app
+    image: acme/app:latest
     restart: always
     depends_on:
       - db
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - .:/app
-      - ./etc:/etc/acme_broker
-      - ./log:/var/log/supervisor
+      - ${ACME_PREFIX}/etc/acme_server:/etc/acme_server
+      - ${ACME_PREFIX}/log:/var/log/supervisor
+      - ${ACME_PREFIX}/etc/supervisor/conf.d:/etc/supervisor/conf.d
     environment:
-      APP_CONFIG_FILE: ${ACME_BROKER_CONFIG_FILE}
+      APP_CONFIG_FILE: ${ACME_CONFIG_FILE}

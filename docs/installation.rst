@@ -188,30 +188,35 @@ Clone the git repository:
 
    git clone |GIT_URL|
 
-Build the :code:`broker_app` and :code:`reverse_proxy` images locally:
+Build the :code:`acme/app` and :code:`acme/reverse_proxy` images locally:
 
 .. code-block:: bash
 
    cd acme-broker/
    pwd # Should return the directory that the repo was cloned to
-   sudo docker build -t broker_app -f app.Dockerfile .
-   sudo docker build -t reverse_proxy -f reverse_proxy.Dockerfile .
+   sudo docker build -t acme/app -f app.Dockerfile .
+   sudo docker build -t acme/reverse_proxy -f reverse_proxy.Dockerfile .
 
-Create the directory :code:`./etc`, copy the template config file :code:`conf/proxy.config.sample.yml` to it
-and edit it according to your use case.
+Create a directory that holds all the application data and configuration files, for example :code:`/home/acme`.
+Copy the docker configuration files as well as the template config file :code:`conf/proxy.config.sample.yml` to it
+and edit it the latter according to your use case.
 For an explanation of the configuration options, see :ref:`config_broker_proxy`.
 
 .. code-block:: yaml
 
-   mkdir etc
-   cp conf/proxy.config.sample.yml etc/config.yml
-   chmod 600 etc/config.yml
+   sudo mkdir /home/acme
+   sudo chown -R $(whoami) /home/acme
+   cp -r docker_conf /home/acme/etc
+   mkdir /home/acme/etc/acme_server
+   cp conf/proxy.config.sample.yml /home/acme/etc/acme_server/config.yml
+   chmod 600 /home/acme/etc/acme_server/config.yml
 
 Create a :code:`.env` file that holds the database user's (*acme_rw*) password defined in your :code:`config.yml`
 and the path of said config file inside the container.
 The initialization script also creates the users *acme_admin* and *acme_ro* with admin and read-only permissions
 respectively.
-The :code:`./etc` directory is mounted to :code:`/etc/acme_broker` inside the container.
+*ACME_PREFIX* should contain the absolute path (without trailing slash) of the data directory that you created earlier.
+The :code:`/home/acme/etc/acme_server` directory is mounted to :code:`/etc/acme_server` inside the container.
 
 .. code-block:: ini
 
@@ -219,16 +224,17 @@ The :code:`./etc` directory is mounted to :code:`/etc/acme_broker` inside the co
    ACME_ADMIN_PW=YOUR_ADMIN_PW
    ACME_RW_PW=YOUR_READ_WRITE_PW
    ACME_RO_PW=YOUR_READ_ONLY_PW
-   ACME_BROKER_CONFIG_FILE=/etc/acme_broker/config.yml
+   ACME_PREFIX=/home/acme
+   ACME_BROKER_CONFIG_FILE=/etc/acme_server/config.yml
 
 Generate an account key for the internal ACME client:
 
 .. code-block:: bash
 
    sudo docker-compose run --entrypoint="" app python -m acme_broker \
-      generate-account-key /etc/acme_broker/proxy_client_account.key
+      generate-account-key /etc/acme_server/proxy_client_account.key
    # Change the key's file permissions
-   sudo chmod 600 etc/proxy_client_account.key
+   sudo chmod 600 /home/acme/etc/acme_server/proxy_client_account.key
 
 Initialize the db's tables as the *acme_admin* user and start the proxy as a daemon:
 

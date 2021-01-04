@@ -19,7 +19,7 @@ broker:
   require_eab: false
   client:
     directory: 'https://acme-v02.api.letsencrypt.org/directory' # Let's Encrypt directory
-    private_key: '/etc/acme_broker/broker_client_account.key'
+    private_key: '/etc/acme_server/broker_client_account.key'
     contact:
       email: 'broker@my-broker.com'
     challenge_solver:

@@ -19,7 +19,7 @@ proxy:
   require_eab: false
   client:
     directory: 'https://acme-v02.api.letsencrypt.org/directory' # Let's Encrypt directory
-    private_key: '/etc/acme_broker/proxy_client_account.key'
+    private_key: '/etc/acme_server/proxy_client_account.key'
     contact:
       email: 'proxy@my-proxy.com'
     challenge_solver:
