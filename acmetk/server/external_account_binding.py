@@ -39,16 +39,15 @@ class ExternalAccountBinding:
 
     def verify(
         self,
-        account_pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
-        signature: str,
+        jws: acme.jws.JWS,
     ) -> bool:
         """Checks the given signature against the EAB's.
 
-        :param account_pub_key: The ACME account key that the external account is to be bound to.
-        :param signature: The signature to be verified.
+        :param jws: The EAB request JWS to be verified.
         :return: True iff the given signature and the EAB's are equal.
         """
-        return self.signature(account_pub_key) == signature
+        key = josepy.jwk.JWKOct(key=josepy.b64.b64decode(self.hmac_key))
+        return jws.verify(key)
 
     def expired(self) -> bool:
         """Returns whether the EAB has expired.
@@ -60,10 +59,7 @@ class ExternalAccountBinding:
 
         return False
 
-    def _eab(self, account_pub_key):
-        key_json = json.dumps(
-            josepy.jwk.JWKRSA(key=account_pub_key).to_partial_json()
-        ).encode()
+    def _eab(self, key_json):
         decoded_hmac_key = josepy.b64.b64decode(self.hmac_key)
         eab = acme.jws.JWS.sign(
             key_json,
@@ -78,15 +74,13 @@ class ExternalAccountBinding:
 
     def signature(
         self,
-        account_pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
+        key_json: str,
     ) -> str:
         """Returns the EAB's signature.
 
-        :param account_pub_key: The ACME account key that the external account is to be bound to.
+        :param key_json: The ACME account key that the external account is to be bound to.
         """
-        return josepy.b64.b64encode(
-            self._eab(account_pub_key).signature.signature
-        ).decode()
+        return josepy.b64.b64encode(self._eab(key_json).signature.signature).decode()
 
 
 class ExternalAccountBindingStore:
@@ -133,15 +127,13 @@ class ExternalAccountBindingStore:
 
     def verify(
         self,
-        account_pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
         kid: str,
-        signature: str,
+        jws: acme.jws.JWS,
     ) -> bool:
         """Verifies an external account binding given its ACME account key, kid and signature.
 
-        :param account_pub_key: The ACME account key that the external account is to be bound to.
         :param kid: The EAB's kid.
-        :param signature: The EAB's signature.
+        :param jws: The EAB request JWS.
         :return: True iff verification was successful.
         """
         if not (pending := self._pending.get(kid.lower(), None)):
@@ -150,7 +142,7 @@ class ExternalAccountBindingStore:
         if pending.expired():
             return False
 
-        return pending.verify(account_pub_key, signature)
+        return pending.verify(jws)
 
 
 class AcmeEAB:
@@ -212,13 +204,13 @@ class AcmeEAB:
 
         sig = jws.signature.combined
         kid = sig.kid
-        signature = josepy.b64.b64encode(jws.signature.signature).decode()
-        payload_key = josepy.jwk.JWKRSA.from_json(json.loads(jws.payload))
 
         if sig.url != str(forwarded_url(request)):
             raise acme.messages.Error.with_code("unauthorized")
 
-        if payload_key != josepy.jwk.JWKRSA(key=pub_key):
+        if josepy.jwk.JWKRSA.from_json(json.loads(jws.payload)) != josepy.jwk.JWKRSA(
+            key=pub_key
+        ):
             raise acme.messages.Error.with_code(
                 "malformed",
                 detail="The external account binding does not contain the same public key as the request JWS.",
@@ -231,7 +223,7 @@ class AcmeEAB:
                 "SSL client certificate which was used to request the EAB.",
             )
 
-        if not self._eab_store.verify(pub_key, kid, signature):
+        if not self._eab_store.verify(kid, jws):
             raise acme.messages.Error.with_code(
                 "unauthorized", detail="The external account binding is invalid."
             )
