@@ -6,7 +6,8 @@ networks:
       driver: default
       config:
       - subnet:  10.110.0.0/24
-
+volumes:
+  ssl_data:
 services:
   db:
     image: postgres:12
@@ -28,7 +29,7 @@ services:
       - "443:443"
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /etc/resty-auto-ssl
+      - ssl_data:/etc/resty-auto-ssl
       - ${ACME_PREFIX}/etc/openresty/nginx.conf:/etc/openresty/nginx.conf
       - ${ACME_PREFIX}/etc/openresty/conf.d:/etc/openresty/conf.d
       - ${ACME_PREFIX}/etc/openresty/trusted_roots.pem:/etc/ssl/trusted_roots.pem:ro
