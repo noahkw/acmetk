@@ -40,14 +40,14 @@ def generate_csr(
     return csr
 
 
-def generate_rsa_key(path: Path, bits=2048) -> rsa.RSAPrivateKey:
+def generate_rsa_key(path: Path, key_size=2048) -> rsa.RSAPrivateKey:
     """Generates an RSA private key and saves it to the given path as PEM.
 
     :param path: The path to write the PEM-serialized key to.
-    :param bits: The RSA Key size
+    :param key_size: The RSA key size.
     :return: The generated private key.
     """
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=bits)
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=key_size)
 
     pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
@@ -61,8 +61,14 @@ def generate_rsa_key(path: Path, bits=2048) -> rsa.RSAPrivateKey:
     return private_key
 
 
-def generate_ec_key(path: Path, bits=256) -> ec.EllipticCurvePrivateKey:
-    curve = getattr(ec, f"SECP{bits}R1")
+def generate_ec_key(path: Path, key_size=256) -> ec.EllipticCurvePrivateKey:
+    """Generates an EC private key and saves it to the given path as PEM.
+
+    :param path: The path to write the PEM-serialized key to.
+    :param key_size: The EC key size.
+    :return: The generated private key.
+    """
+    curve = getattr(ec, f"SECP{key_size}R1")
     private_key = ec.generate_private_key(curve())
 
     pem = private_key.private_bytes(

@@ -53,7 +53,7 @@ class AcmeResponse(web.Response):
             links = []
 
         links.append(f'<{directory_url}>; rel="index"')
-        self.headers.extend(("Link", i) for i in links)
+        self.headers.extend(("Link", link) for link in links)
 
         self.headers.update(
             {
