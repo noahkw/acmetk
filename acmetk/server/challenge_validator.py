@@ -5,10 +5,11 @@ import itertools
 import logging
 import typing
 
+import acme.messages
 import dns.asyncresolver
 
-from acme_broker.models import ChallengeType, Challenge
-from acme_broker.util import ConfigurableMixin
+from acmetk.models import ChallengeType, Challenge
+from acmetk.util import ConfigurableMixin
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,16 @@ logger = logging.getLogger(__name__)
 class CouldNotValidateChallenge(Exception):
     """Exception that is raised when any given challenge could not be validated."""
 
-    pass
+    def __init__(self, *args, detail=None):
+        super().__init__(*args)
+        self.detail = detail
+
+    def to_acme_error(self):
+        return acme.messages.Error(
+            typ="CouldNotValidateChallenge",
+            title="Challenge validation failed",
+            detail=self.detail,
+        )
 
 
 class ChallengeValidator(ConfigurableMixin, abc.ABC):
@@ -110,8 +120,19 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
 
         resolved_ips = await self.query_records(identifier)
 
-        if request["actual_ip"] not in resolved_ips:
-            raise CouldNotValidateChallenge
+        actual_ip = request["actual_ip"]
+        if actual_ip not in resolved_ips:
+            logger.debug(
+                "Validation of challenge %s failed; %s does not resolve to IP %s. Resolved IPs: %s",
+                challenge.challenge_id,
+                identifier,
+                actual_ip,
+                resolved_ips,
+            )
+
+            raise CouldNotValidateChallenge(
+                detail=f"Identifier '{identifier}' does not resolve to host IP '{actual_ip}'."
+            )
 
 
 class DummyValidator(ChallengeValidator):

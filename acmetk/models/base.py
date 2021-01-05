@@ -1,7 +1,16 @@
 import datetime
 
+import acme.messages
 import asyncpg
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, JSON
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    ForeignKey,
+    DateTime,
+    JSON,
+    TypeDecorator,
+)
 from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.inspection import inspect
@@ -41,6 +50,20 @@ class Change(Base):
     timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     remote_host = Column(INET, index=True)
     data = Column(JSON, nullable=False)
+
+
+class AcmeErrorType(TypeDecorator):
+    impl = JSON
+
+    def process_bind_param(self, value, dialect):
+        if value:
+            return value.json_dumps()
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value:
+            return acme.messages.Error.json_loads(value)
+        return value
 
 
 class Serializer(object):

@@ -4,10 +4,10 @@ import unittest
 import uuid
 
 
-from acme_broker.client import InfobloxClient
-from acme_broker.main import load_config
+from acmetk.client import InfobloxClient
+from acmetk.main import load_config
 
-log = logging.getLogger("acme_broker.test_infoblox")
+log = logging.getLogger("acmetk.test_infoblox")
 
 
 class TestInfobloxClient(unittest.IsolatedAsyncioTestCase):

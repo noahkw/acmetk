@@ -6,9 +6,9 @@ import aiohttp_jinja2
 import jinja2
 import trustme
 
-from acme_broker import AcmeCA
-from acme_broker.main import _url_for
-from acme_broker.server import RequestIPDNSChallengeValidator
+from acmetk import AcmeCA
+from acmetk.main import _url_for
+from acmetk.server import RequestIPDNSChallengeValidator
 from tests.test_ca import TestAcmetiny, TestAcme, TestOurClient, TestCertBot
 
 

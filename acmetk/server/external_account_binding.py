@@ -10,8 +10,8 @@ import aiohttp_jinja2
 import josepy
 from cryptography import x509
 
-from acme_broker.server.routes import routes
-from acme_broker.util import url_for, forwarded_url
+from acmetk.server.routes import routes
+from acmetk.util import url_for, forwarded_url
 
 
 class ExternalAccountBinding:
@@ -39,11 +39,11 @@ class ExternalAccountBinding:
 
     def verify(
         self,
-        jws: object,
+        jws: acme.jws.JWS,
     ) -> bool:
         """Checks the given signature against the EAB's.
 
-        :param jws: The signature to be verified.
+        :param jws: The EAB request JWS to be verified.
         :return: True iff the given signature and the EAB's are equal.
         """
         key = josepy.jwk.JWKOct(key=josepy.b64.b64decode(self.hmac_key))
@@ -128,12 +128,12 @@ class ExternalAccountBindingStore:
     def verify(
         self,
         kid: str,
-        jws: object,
+        jws: acme.jws.JWS,
     ) -> bool:
         """Verifies an external account binding given its ACME account key, kid and signature.
 
         :param kid: The EAB's kid.
-        :param signature: The EAB's signature.
+        :param jws: The EAB request JWS.
         :return: True iff verification was successful.
         """
         if not (pending := self._pending.get(kid.lower(), None)):
@@ -146,7 +146,7 @@ class ExternalAccountBindingStore:
 
 
 class AcmeEAB:
-    """Mixin for an :class:`~acme_broker.server.AcmeServerBase` implementation that provides external account
+    """Mixin for an :class:`~acmetk.server.AcmeServerBase` implementation that provides external account
     binding creation and verification.
 
     `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_

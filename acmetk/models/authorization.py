@@ -55,7 +55,7 @@ class Authorization(Entity, Serializer):
         lazy="joined",
         foreign_keys=identifier_id,
     )
-    """The :class:`~acme_broker.models.identifier.Identifier` associated with the authorization."""
+    """The :class:`~acmetk.models.identifier.Identifier` associated with the authorization."""
     status = Column("status", Enum(AuthorizationStatus), nullable=False)
     """The authorization's status."""
     expires = Column(DateTime(timezone=True))
@@ -69,7 +69,7 @@ class Authorization(Entity, Serializer):
         lazy="joined",
         foreign_keys="Challenge.authorization_id",
     )
-    """List of challenges (:class:`~acme_broker.models.challenge.Challenge`) associated with the authorization."""
+    """List of challenges (:class:`~acmetk.models.challenge.Challenge`) associated with the authorization."""
 
     def url(self, request) -> str:
         """Returns the authorization's URL.
@@ -82,7 +82,7 @@ class Authorization(Entity, Serializer):
     async def validate(self, session) -> AuthorizationStatus:
         """Validates the authorization.
 
-        This method is usually not called directly. Rather, :func:`acme_broker.models.challenge.Challenge.validate`
+        This method is usually not called directly. Rather, :func:`acmetk.models.challenge.Challenge.validate`
         calls it as a challenge that corresponds to the authorization is being validated.
 
         :param session: The open database session.
@@ -123,7 +123,7 @@ class Authorization(Entity, Serializer):
         """
         return datetime.now(timezone.utc) > self.expires
 
-    def update(self, upd: "acme_broker.models.messages.AuthorizationUpdate"):
+    def update(self, upd: "acmetk.models.messages.AuthorizationUpdate"):
         """Updates the authoziation's status.
 
         :param upd: The requested status update.
@@ -167,10 +167,10 @@ class Authorization(Entity, Serializer):
 
     @classmethod
     def for_identifier(
-        cls, identifier: "acme_broker.models.identifier.Identifier"
+        cls, identifier: "acmetk.models.identifier.Identifier"
     ) -> "Authorization":
         """A factory that constructs a new authorization given an
-        :class:`~acme_broker.models.identifier.Identifier`.
+        :class:`~acmetk.models.identifier.Identifier`.
 
         The field *expires* is set to 7 days in the future from the time this method is called and
         the *status* is initially set to *pending*.

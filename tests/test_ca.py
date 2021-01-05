@@ -9,17 +9,17 @@ from pathlib import Path
 
 import acme.messages
 
-import acme_broker.util
-from acme_broker import AcmeCA
-from acme_broker.client import (
+import acmetk.util
+from acmetk import AcmeCA
+from acmetk.client import (
     AcmeClient,
     DummySolver,
 )
-from acme_broker.main import load_config
-from acme_broker.models.messages import RevocationReason
-from acme_broker.server import DummyValidator
+from acmetk.main import load_config
+from acmetk.models.messages import RevocationReason
+from acmetk.server import DummyValidator
 
-log = logging.getLogger("acme_broker.test_ca")
+log = logging.getLogger("acmetk.test_ca")
 
 ClientData = collections.namedtuple("ClientData", "key_path csr csr_path")
 CAData = collections.namedtuple("CADAta", "key_path cert_path")
@@ -45,14 +45,14 @@ class TestAcme:
 
     def _make_key(self, path, alg_and_bits):
         if alg_and_bits[0] == "RSA":
-            return acme_broker.util.generate_rsa_key(path, alg_and_bits[1])
+            return acmetk.util.generate_rsa_key(path, alg_and_bits[1])
         elif alg_and_bits[0] == "EC":
-            return acme_broker.util.generate_ec_key(path, alg_and_bits[1])
+            return acmetk.util.generate_ec_key(path, alg_and_bits[1])
 
     def setUp(self) -> None:
         """Sets up our test object with the necessary properties for testing using a client"""
         self._config = load_config("../debug.yml")
-        self.log = logging.getLogger(f"acme_broker.tests.{self.name}")
+        self.log = logging.getLogger(f"acmetk.tests.{self.name}")
         self.contact = f"woehler+{self.name}@luis.uni-hannover.de"
 
         dir_ = Path("./tmp") / self.name
@@ -68,7 +68,7 @@ class TestAcme:
         self._make_key(client_account_key_path, self.ACCOUNT_KEY_ALG_BITS)
         client_cert_key = self._make_key(client_cert_key_path, self.CERT_KEY_ALG_BITS)
 
-        csr = acme_broker.util.generate_csr(
+        csr = acmetk.util.generate_csr(
             self.config_sec["names"][0],
             client_cert_key,
             csr_path,
@@ -116,8 +116,8 @@ class TestCA(TestAcme):
 
         self.ca_data = CAData(ca_key_path, ca_cert_path)
 
-        acme_broker.util.generate_root_cert(
-            ca_key_path, "DE", "Lower Saxony", "Hanover", "Acme Broker", "AB CA"
+        acmetk.util.generate_root_cert(
+            ca_key_path, "DE", "Lower Saxony", "Hanover", "Acme Toolkit", "ACMETK CA"
         )
 
     async def asyncSetUp(self) -> None:
@@ -285,7 +285,7 @@ class Testacmesh:
     async def test_run(self):
         key, csr, path = self.client_data
         await self._run(f"""--register-account --accountemail {self.contact}""")
-        domains = " ".join([f"--domain {d}" for d in acme_broker.util.names_of(csr)])
+        domains = " ".join([f"--domain {d}" for d in acmetk.util.names_of(csr)])
         await self._run(f"""--issue {domains} --webroot {self.path}/www/ --force""")
 
 
@@ -306,7 +306,7 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
         self._rmtree.extend(["etc"])
 
         self.domains = sorted(
-            map(lambda x: x.lower(), acme_broker.util.names_of(self.client_data.csr)),
+            map(lambda x: x.lower(), acmetk.util.names_of(self.client_data.csr)),
             key=lambda s: s[::-1],
         )
 
@@ -435,7 +435,7 @@ class TestOurClient:
         super().setUp()
 
         self.domains = sorted(
-            map(lambda x: x.lower(), acme_broker.util.names_of(self.client_data.csr)),
+            map(lambda x: x.lower(), acmetk.util.names_of(self.client_data.csr)),
             key=lambda s: s[::-1],
         )
 
@@ -463,7 +463,7 @@ class TestOurClient:
         await client.start()
 
         domains = sorted(
-            map(lambda x: x.lower(), acme_broker.util.names_of(csr)),
+            map(lambda x: x.lower(), acmetk.util.names_of(csr)),
             key=lambda s: s[::-1],
         )
 
@@ -488,7 +488,7 @@ class TestOurClientStress(TestOurClient):
                 self.path / f"client_{i}_cert.key", self.CERT_KEY_ALG_BITS
             )
 
-            csr = acme_broker.util.generate_csr(
+            csr = acmetk.util.generate_csr(
                 f"{self.name}.test.de",
                 client_cert_key,
                 self.path / f"client_{i}.csr",
@@ -511,7 +511,7 @@ class TestOurClientStress(TestOurClient):
 
     async def test_revoke(self):
         full_chain = await self._run_one(self.client, self.client_data.csr)
-        certs = acme_broker.util.pem_split(full_chain)
+        certs = acmetk.util.pem_split(full_chain)
         await self.client.certificate_revoke(
             certs[0], reason=RevocationReason.keyCompromise
         )

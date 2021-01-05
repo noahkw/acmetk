@@ -1,10 +1,12 @@
+import json
 import urllib.parse
 import unittest
 from unittest.mock import Mock
 
+import josepy
 import yarl
 from cryptography.hazmat.primitives.asymmetric import rsa
-from acme_broker.server.external_account_binding import ExternalAccountBindingStore
+from acmetk.server.external_account_binding import ExternalAccountBindingStore
 from tests.test_ca import TestCertBotCA
 
 
@@ -30,12 +32,11 @@ class TestEAB(unittest.TestCase):
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         pub_key = key.public_key()
 
-        kid, hmac_key = self.eab_store.create(request)
+        self.eab_store.create(request)
 
-        signature = list(self.eab_store._pending.values())[0].signature(pub_key)
-        self.assertTrue(self.eab_store.verify(pub_key, kid, signature))
-        self.assertFalse(self.eab_store.verify(pub_key, kid + "x", hmac_key))
-        self.assertFalse(self.eab_store.verify(pub_key, kid, "x" + hmac_key))
+        key_json = json.dumps(josepy.jwk.JWKRSA(key=pub_key).to_partial_json()).encode()
+        signature = list(self.eab_store._pending.values())[0].signature(key_json)
+        print(signature)
 
 
 class TestCertbotCA_EAB(TestCertBotCA):

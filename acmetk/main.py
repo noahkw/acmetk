@@ -8,15 +8,15 @@ import click
 import jinja2
 import yaml
 
-from acme_broker.client import AcmeClient, ChallengeSolver
-from acme_broker.database import Database
-from acme_broker.server import (
+from acmetk.client import AcmeClient, ChallengeSolver
+from acmetk.database import Database
+from acmetk.server import (
     AcmeServerBase,
     AcmeRelayBase,
     AcmeCA,
     ChallengeValidator,
 )
-from acme_broker.util import generate_root_cert, generate_rsa_key
+from acmetk.util import generate_root_cert, generate_rsa_key
 
 logger = logging.getLogger(__name__)
 
@@ -102,8 +102,8 @@ def generate_keys(root_key_file):
         "DE",
         "Lower Saxony",
         "Hanover",
-        "ACME Broker",
-        "ACMEBroker",
+        "ACME Toolkit",
+        "ACMEToolkit",
     )
 
 

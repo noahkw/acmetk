@@ -10,10 +10,10 @@ from acme import jws
 from aiohttp import ClientSession, ClientResponseError
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
-
-from acme_broker.client.challenge_solver import ChallengeSolver
-from acme_broker.models import messages, ChallengeType
-import acme_broker.util
+from acmetk.client.challenge_solver import ChallengeSolver
+from acmetk.models import messages, ChallengeType
+from acmetk.version import __version__
+import acmetk.util
 
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
@@ -67,13 +67,15 @@ class AcmeClient:
             # Add our self-signed server cert for testing purposes.
             self._ssl_context.load_verify_locations(cafile=server_cert)
 
-        self._session = ClientSession()
+        self._session = ClientSession(
+            headers={"User-Agent": f"acmetk Client {__version__}"}
+        )
 
         self._directory_url = directory_url
 
         with open(private_key, "rb") as pem:
             data = pem.read()
-            certs = acme_broker.util.pem_split(data.decode())
+            certs = acmetk.util.pem_split(data.decode())
             if len(certs) != 1:
                 raise ValueError(f"Bad Private Key in file {private_key}")
             if isinstance(certs[0], rsa.RSAPrivateKeyWithSerialization):

@@ -2,11 +2,11 @@ import logging
 import unittest
 import acme.messages
 
-from acme_broker import AcmeProxy
+from acmetk import AcmeProxy
 from tests.test_broker import TestBrokerLocalCA, TestBrokerLE
 from tests.test_ca import TestAcmetiny, TestOurClient, TestOurClientStress, TestCertBot
 
-log = logging.getLogger("acme_broker.test_proxy")
+log = logging.getLogger("acmetk.test_proxy")
 
 
 class TestProxy:

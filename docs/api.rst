@@ -4,14 +4,14 @@ API
 ACME Client
 ###########
 
-.. autoclass:: acme_broker.client.AcmeClient
+.. autoclass:: acmetk.client.AcmeClient
     :members:
     :inherited-members:
 
 Challenge Solvers
 -----------------
 
-.. automodule:: acme_broker.client.challenge_solver
+.. automodule:: acmetk.client.challenge_solver
     :members:
     :inherited-members:
 
@@ -21,55 +21,55 @@ ACME Servers
 ACME Server Base
 ----------------
 
-.. autoclass:: acme_broker.server.AcmeServerBase
+.. autoclass:: acmetk.server.AcmeServerBase
     :members:
     :inherited-members:
 
 ACME Relay Base
 ---------------
 
-.. autoclass:: acme_broker.server.AcmeRelayBase
+.. autoclass:: acmetk.server.AcmeRelayBase
     :members:
     :show-inheritance:
 
 ACME Certificate Authority
 --------------------------
 
-.. autoclass:: acme_broker.server.AcmeCA
+.. autoclass:: acmetk.server.AcmeCA
     :members:
     :show-inheritance:
 
 ACME Broker
 -----------
 
-.. autoclass:: acme_broker.server.AcmeBroker
+.. autoclass:: acmetk.server.AcmeBroker
     :members:
     :show-inheritance:
 
 ACME Proxy
 ----------
 
-.. autoclass:: acme_broker.server.AcmeProxy
+.. autoclass:: acmetk.server.AcmeProxy
     :members:
     :show-inheritance:
 
 Challenge Validators
 --------------------
 
-.. automodule:: acme_broker.server.challenge_validator
+.. automodule:: acmetk.server.challenge_validator
     :members:
     :inherited-members:
 
 External Account Binding
 ------------------------
 
-.. autoclass:: acme_broker.server.external_account_binding.ExternalAccountBinding
+.. autoclass:: acmetk.server.external_account_binding.ExternalAccountBinding
     :members:
 
-.. autoclass:: acme_broker.server.external_account_binding.ExternalAccountBindingStore
+.. autoclass:: acmetk.server.external_account_binding.ExternalAccountBindingStore
     :members:
 
-.. autoclass:: acme_broker.server.external_account_binding.AcmeEAB
+.. autoclass:: acmetk.server.external_account_binding.AcmeEAB
     :members:
 
 Models
@@ -78,7 +78,7 @@ Models
 Message types
 -------------
 
-.. automodule:: acme_broker.models.messages
+.. automodule:: acmetk.models.messages
     :members:
     :show-inheritance:
 
@@ -87,38 +87,38 @@ Database models
 
 Account
 ^^^^^^^
-.. autoclass:: acme_broker.models.account.Account
+.. autoclass:: acmetk.models.account.Account
     :members:
 
 Authorization
 ^^^^^^^^^^^^^
-.. autoclass:: acme_broker.models.authorization.Authorization
+.. autoclass:: acmetk.models.authorization.Authorization
     :members:
 
 Certificate
 ^^^^^^^^^^^
-.. autoclass:: acme_broker.models.certificate.Certificate
+.. autoclass:: acmetk.models.certificate.Certificate
     :members:
 
 Challenge
 ^^^^^^^^^
-.. autoclass:: acme_broker.models.challenge.Challenge
+.. autoclass:: acmetk.models.challenge.Challenge
     :members:
 
-.. autoclass:: acme_broker.models.challenge.ChallengeType
+.. autoclass:: acmetk.models.challenge.ChallengeType
     :members:
 
 Identifier
 ^^^^^^^^^^
-.. automodule:: acme_broker.models.identifier
+.. automodule:: acmetk.models.identifier
     :members:
 
 Order
 ^^^^^
-.. autoclass:: acme_broker.models.order.Order
+.. autoclass:: acmetk.models.order.Order
     :members:
 
 Utils
 #####
-.. automodule:: acme_broker.util
+.. automodule:: acmetk.util
     :members:

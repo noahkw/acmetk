@@ -62,7 +62,7 @@ class Account(Entity, Serializer):
         lazy="joined",
         foreign_keys="Order.account_kid",
     )
-    """List of orders (:class:`~acme_broker.models.order.Order`) associated with the account."""
+    """List of orders (:class:`~acmetk.models.order.Order`) associated with the account."""
 
     def orders_url(self, request) -> str:
         """Returns the URL of account's orders list.
@@ -113,7 +113,7 @@ class Account(Entity, Serializer):
             self.authorized_identifiers(lower=True)
         )
 
-    def update(self, upd: "acme_broker.models.messages.AccountUpdate"):
+    def update(self, upd: "acmetk.models.messages.AccountUpdate"):
         """Updates the account with new information.
 
         Possible updates are currently to the :attr:`contact` field and to the :attr:`status` field.

@@ -10,8 +10,8 @@ import dns.asyncresolver
 import josepy
 from infoblox_client import connector, objects
 
-from acme_broker.models import ChallengeType
-from acme_broker.util import ConfigurableMixin
+from acmetk.models import ChallengeType
+from acmetk.util import ConfigurableMixin
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +71,8 @@ class ChallengeSolver(ConfigurableMixin, abc.ABC):
 
         This method should de-provision the resource that was provisioned for the given challenge.
         It is called once the challenge is complete, i.e. its status has transitioned to
-        :class:`~acme_broker.models.challenge.ChallengeStatus.VALID` or
-        :class:`~acme_broker.models.challenge.ChallengeStatus.INVALID`.
+        :class:`~acmetk.models.challenge.ChallengeStatus.VALID` or
+        :class:`~acmetk.models.challenge.ChallengeStatus.INVALID`.
 
         :param key: The client's account key.
         :param identifier: The identifier that is associated with the challenge.
@@ -267,6 +267,7 @@ class InfobloxClient(ChallengeSolver):
             logger.debug(
                 f"{name} does not have TXT {text} yet. Retrying (Records seen by all name servers: {seen_by_all}"
             )
+            logger.debug(f"Records seen: {record_sets}")
             await asyncio.sleep(1.0)
 
     async def complete_challenge(
@@ -278,7 +279,7 @@ class InfobloxClient(ChallengeSolver):
         """Completes the given DNS-01 challenge.
 
         This method provisions the TXT record needed to complete the given challenge.
-        Then it polls the DNS for up to 60 seconds to ensure that the record is visible
+        Then it polls the DNS for up to :attr:`POLLING_TIMEOUT` seconds to ensure that the record is visible
         to the remote CA's DNS.
 
         :param key: The client's account key.
@@ -292,7 +293,9 @@ class InfobloxClient(ChallengeSolver):
         await self.set_txt_record(name, text)
 
         # Poll the DNS until the correct record is available
-        await asyncio.wait_for(self._query_until_completed(name, text), 60.0)
+        await asyncio.wait_for(
+            self._query_until_completed(name, text), self.POLLING_TIMEOUT
+        )
 
     async def cleanup_challenge(
         self,

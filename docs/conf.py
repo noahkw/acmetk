@@ -23,7 +23,7 @@ rst_prolog = """
 
 # -- Project information -----------------------------------------------------
 
-project = "ACME Broker"
+project = "ACME Toolkit"
 copyright = "2020, Noah Wöhler"
 author = "Noah Wöhler"
 
