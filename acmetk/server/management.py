@@ -6,6 +6,7 @@ import sqlalchemy
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, selectin_polymorphic
 from sqlalchemy.sql import text
+import sqlalchemy.dialects.postgresql
 
 from acmetk.models import (
     Change,
