@@ -75,22 +75,22 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
     """The string that maps to the server implementation inside configuration files."""
 
     SUPPORTED_JWS_ALGORITHMS = (
-        josepy.RS256,
-        josepy.RS384,
-        josepy.RS512,
-        josepy.PS256,
-        josepy.PS384,
-        josepy.PS512,
-        josepy.ES256,
-        josepy.ES384,
-        josepy.ES512,
+        josepy.jwa.RS256,
+        josepy.jwa.RS384,
+        josepy.jwa.RS512,
+        josepy.jwa.PS256,
+        josepy.jwa.PS384,
+        josepy.jwa.PS512,
+        josepy.jwa.ES256,
+        josepy.jwa.ES384,
+        josepy.jwa.ES512,
     )
     """The JWS signing algorithms that the server supports."""
 
     SUPPORTED_EAB_JWS_ALGORITHMS = (
-        josepy.HS256,
-        josepy.HS384,
-        josepy.HS512,
+        josepy.jwa.HS256,
+        josepy.jwa.HS384,
+        josepy.jwa.HS512,
     )
     """The symmetric JWS signing algorithms that the server supports for external account bindings."""
 

@@ -80,10 +80,10 @@ class AcmeClient:
                 raise ValueError(f"Bad Private Key in file {private_key}")
             if isinstance(certs[0], rsa.RSAPrivateKeyWithSerialization):
                 self._private_key = josepy.jwk.JWKRSA.load(data)
-                self._alg = josepy.RS256
+                self._alg = josepy.jwa.RS256
             elif isinstance(certs[0], ec.EllipticCurvePrivateKeyWithSerialization):
                 self._private_key = josepy.jwk.JWKEC.load(data)
-                self._alg = josepy.ES256
+                self._alg = josepy.jwa.ES256
             else:
                 raise ValueError(f"Bad Private Key in file {private_key}")
         # Filter empty strings
