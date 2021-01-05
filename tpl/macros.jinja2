@@ -38,15 +38,47 @@
 {% macro paginate(p) %}
 <div id="pagination">
 {% if p.has_previous %}
-    <a href="{{ url_for(request.match_info.route.name).with_query({'page':p.previous_page}) }}">&larr;</a>
+    <a href="{{ url_for(request.match_info.route.name).with_query(request.url.update_query({'page':p.previous_page}).query) }}">&larr;</a>
 {% else %}
     &larr;
 {% endif %}
 {{ p.current_page }}/{{ p.pages }}
 {% if p.has_next %}
-    <a href="{{ url_for(request.match_info.route.name).with_query({'page':p.next_page}) }}">&rarr;</a>
+    <a href="{{ url_for(request.match_info.route.name).with_query(request.url.update_query({'page':p.next_page}).query) }}">&rarr;</a>
 {% else %}
     &rarr;
 {% endif %}
 </div>
+{% endmacro %}
+
+{% macro change(c) %}
+{% if c.op == 'add' %}
+<li>
+    + {{ c.path }} = {{ c.value }}
+</li>
+{% elif c.op == 'test' %}
+<li>
+    = {{ c.path }} == {{ c.value }}
+{% elif c.op == 'replace' %}
+    => {{ c.value }}
+</li>
+{% else %}
+    {{ c.op }}
+{% endif %}
+{% endmacro %}
+
+{% macro change(c) %}
+{% if c.op == 'add' %}
+<li>
+    + {{ c.path }} = {{ c.value }}
+</li>
+{% elif c.op == 'test' %}
+<li>
+    = {{ c.path }} == {{ c.value }}
+{% elif c.op == 'replace' %}
+    => {{ c.value }}
+</li>
+{% else %}
+    {{ c.op }}
+{% endif %}
 {% endmacro %}

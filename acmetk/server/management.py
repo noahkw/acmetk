@@ -72,13 +72,13 @@ class AcmeManagement:
                 )
 
             statistics = []
-            for i in sorted(s.keys()):
+            for i in sorted(s.keys(), reverse=True):
                 statistics.append(
                     (
                         i,
                         s[i],
-                        sum(map(lambda x: x["unique"], s[i].values())),
                         sum(map(lambda x: x["total"], s[i].values())),
+                        sum(map(lambda x: x["unique"], s[i].values())),
                     )
                 )
             return {"statistics": statistics, "pms": pms}
@@ -88,36 +88,84 @@ class AcmeManagement:
     async def management_changes(self, request):
         pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
-            q = select(sqlalchemy.func.max(Change.change))
+            f = []
+            for value in request.query.getall("q", []):
+                # JSON Patch query for value regex like
+                # FIXME … though ' is taken care of " in q still breaks it but everything below does not work either
+                v = sqlalchemy.String().literal_processor(
+                    dialect=session._proxied.bind.dialect
+                )(value=value)
+                v = v.replace('"', ".")
+                f.append(
+                    sqlalchemy.cast(
+                        Change.data, sqlalchemy.dialects.postgresql.JSONB
+                    ).op("@@")(
+                        sqlalchemy.text(
+                            f"'$[*].value like_regex \"{v[1:-1]}\"'::jsonpath"
+                        )
+                    )
+                )
+
+                # This text() construct doesn't define a bound parameter named 'n'
+                #                f.append(sqlalchemy.cast(Change.data, sqlalchemy.dialects.postgresql.JSONB).op('@@')(
+                #                   sqlalchemy.text('\'$[*].value like_regex \"\:n\"\'::jsonpath').bindparams(n=value)))
+
+                # the server expects 0 arguments for this query, 1 was passed
+                #                f.append(sqlalchemy.cast(Change.data, sqlalchemy.dialects.postgresql.JSONB).op('@@')(
+                #                    sqlalchemy.text('\'$[*].value like_regex ":n"\'::jsonpath').params(n=value)))
+
+                # the resultset is incomplete
+                #                f.append(sqlalchemy.cast(Change.data, sqlalchemy.dialects.postgresql.JSONB).op('@@')(
+                #                    sqlalchemy.text('\'$[*].value like_regex \"\:n\"\'::jsonpath').params(n=value)))
+
+                # remote host ipaddress cidr query
+                try:
+                    import ipaddress
+
+                    ipaddress.ip_interface(value)
+                    f.append(
+                        Change.remote_host.op("<<=")(
+                            sqlalchemy.cast(value, sqlalchemy.dialects.postgresql.INET)
+                        )
+                    )
+                except ValueError:
+                    pass
+
+            q = select(sqlalchemy.func.count(Change.change))
+            if f:
+                q = q.filter(sqlalchemy.or_(*f))
+
             async with pms.measure():
                 total = (await session.execute(q)).scalars().first()
 
-            q = (
-                select(Change)
-                .options(
-                    selectin_polymorphic(Change.entity, [Account]),
-                    selectinload(Change.entity.of_type(Authorization))
-                    .selectinload(Authorization.identifier)
-                    .selectinload(Identifier.order)
-                    .selectinload(Order.account),
-                    selectinload(Change.entity.of_type(Challenge))
-                    .selectinload(Challenge.authorization)
-                    .selectinload(Authorization.identifier)
-                    .selectinload(Identifier.order)
-                    .selectinload(Order.account),
-                    selectinload(Change.entity.of_type(Certificate))
-                    .selectinload(Certificate.order)
-                    .selectinload(Order.account),
-                    selectinload(Change.entity.of_type(Identifier))
-                    .selectinload(Identifier.order)
-                    .selectinload(Order.account),
-                    selectinload(Change.entity.of_type(Order)).selectinload(
-                        Order.account
-                    ),
-                )
-                .order_by(Change.change.desc())
+            q = select(Change).options(
+                selectin_polymorphic(Change.entity, [Account]),
+                selectinload(Change.entity.of_type(Authorization))
+                .selectinload(Authorization.identifier)
+                .selectinload(Identifier.order)
+                .selectinload(Order.account),
+                selectinload(Change.entity.of_type(Challenge))
+                .selectinload(Challenge.authorization)
+                .selectinload(Authorization.identifier)
+                .selectinload(Identifier.order)
+                .selectinload(Order.account),
+                selectinload(Change.entity.of_type(Certificate))
+                .selectinload(Certificate.order)
+                .selectinload(Order.account),
+                selectinload(Change.entity.of_type(Identifier))
+                .selectinload(Identifier.order)
+                .selectinload(Order.account),
+                selectinload(Change.entity.of_type(Order)).selectinload(Order.account),
             )
-            page = await paginate(session, request, q, Change.change, total, pms)
+            if f:
+                q = q.filter(sqlalchemy.or_(*f))
+            q = q.order_by(Change.change.desc())
+            print(q)
+            if f:
+                limit = "limit"
+            else:
+                limit = Change.change
+            page = await paginate(session, request, q, limit, total, pms)
 
             return {"changes": page.items, "page": page, "pms": pms}
 
@@ -133,6 +181,7 @@ class AcmeManagement:
             q = (
                 select(Account)
                 .options(selectinload(Account.orders))
+                .options(selectinload(Account.changes).selectinload(Change.entity))
                 .order_by(Account._entity.desc())
             )
 

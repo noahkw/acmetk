@@ -1,22 +1,6 @@
-{% from "macros.jinja2" import time, account_url, entity_url, order_url, shorten, paginate with context %}
+{% from "macros.jinja2" import time, account_url, entity_url, order_url, shorten, paginate, change with context %}
 
 <html>
-{% macro change(c) %}
-{% if c.op == 'add' %}
-<li>
-    + {{ c.path }} = {{ c.value }}
-</li>
-{% elif c.op == 'test' %}
-<li>
-    = {{ c.path }} == {{ c.value }}
-{% elif c.op == 'replace' %}
-    => {{ c.value }}
-</li>
-{% else %}
-    {{ c.op }}
-{% endif %}
-{% endmacro %}
-
 <style>
 body     { font-family: "Lucida Console", Monaco, monospace }
 tr.h { font-size: large; font-weight: bold; text-align: center;}

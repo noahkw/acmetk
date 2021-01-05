@@ -2,10 +2,18 @@
 
 {%  block body %}
 <h1>Changes</h1>
+<p>
+
+<form method="GET">
+<input type="text" name="q" value="{{ request.query.get('q', '') }}">
+<input type="submit" value="Suchen">
+</form>
+</p>
 {{ paginate(page) }}
 <table>
 <tr class="h">
     <th>Time</th>
+    <th>Remote</th>
     <th align="left">Account<br>Identifier/Order</th>
     <th>Change</th>
 </tr>
@@ -13,12 +21,13 @@
 {% set zebra=loop.cycle('odd', 'even') %}
 {% if loop.changed(time(c.timestamp, fmt='%Y-%m-%d')) %}
 <tr class="h">
-<td colspan="3" >{{ time(c.timestamp, fmt='%Y-%m-%d')  }}</td>
+<td colspan="4" >{{ time(c.timestamp, fmt='%Y-%m-%d')  }}</td>
 </tr>
 {% endif %}
 
 <tr class="{{ zebra }}">
-    <td>{{ time(c.timestamp, fmt='%H:%M:%S.%f %Z') }}</td>
+    <td>{{ time(c.timestamp, fmt='%H:%M:%S %Z') }}</td>
+    <td>{{ c.remote_host }}</td>
     <td>
         <div>{{ account_url(c.entity, l=13) }}</div>
         <div>{{ c.entity.identity }}/{{ entity_url(c.entity) }}</div>

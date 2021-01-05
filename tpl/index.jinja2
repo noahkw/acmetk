@@ -5,17 +5,30 @@
 
 <table>
 <tr class="h">
-    <th>Date</th>
-    <th>Changes</th>
-    <th>Orders</th>
-    <th>Certificates</th>
+    <th rowspan="2">Date</th>
+    <th colspan="2">Changes</th>
+    <th colspan="2">Orders</th>
+    <th colspan="2">Certificates</th>
 </tr>
+<tr>
+    <th>Total</th>
+    <th>Unique</th>
+    <th>T…</th>
+    <th>O…</th>
+    <th>T…</th>
+    <th>O…</th>
+</tr>
+
+
 {% for date,s,total,unique in statistics %}
 <tr class="{{loop.cycle('odd', 'even')}}">
     <td class="n">{{ date.strftime("%Y-%m-%d") }}</td>
-    <td class="n">{{ total }} ({{ unique }}) </td>
-    <td class="n">{{ s.order.unique }} ({{ s.order.total }})</td>
-    <td class="n">{{ s.certificate.unique }} ({{ s.certificate.total }})</td>
+    <td class="n">{{ total }} </td>
+    <td class="n">{{ unique }} </td>
+    <td class="n">{{ s.order.total }}</td>
+    <td class="n">{{ s.order.unique }}</td>
+    <td class="n">{{ s.certificate.total }}</td>
+    <td class="n">{{ s.certificate.unique }}</td>
 </tr>
 {% endfor %}
 </table>

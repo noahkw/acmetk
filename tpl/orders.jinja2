@@ -12,15 +12,16 @@
     <th>Identifiers</th>
 </tr>
 {% for o in orders %}
+{% set zebra=loop.cycle('odd', 'even') %}
 {% set c = o.changes[-1] %}
 {% if loop.changed(time(c.timestamp, fmt='%Y-%m-%d')) %}
 <tr class="h">
-<td colspan="4" >{{ time(c.timestamp, fmt='%Y-%m-%d')  }}</td>
+<td colspan="5" >{{ time(c.timestamp, fmt='%Y-%m-%d')  }}</td>
 </tr>
 {% endif %}
 
-<tr>
-    <td>{{ time(c.timestamp, fmt='%H:%M:%S.%f %Z') }}</td>
+<tr class="{{ zebra }}">
+    <td>{{ time(c.timestamp, fmt='%H:%M:%S %Z') }}</td>
     <td>{{ o.changes|map(attribute="remote_host")|unique|join(' ') }}</td>
     <td>{{ account_url(o, l=13) }}</td>
     <td>{{ order_url(o) }}</td>

@@ -4,8 +4,24 @@
 <h1>Accounts</h1>
 {{ paginate(page) }}
 <table>
+<tr class="h">
+    <th>Time</th>
+    <th>Remote</th>
+    <th>Account</th>
+    <th>Contact</th>
+    <th>Status</th>
+</tr>
 {% for account in accounts %}
-<tr>
+{% set zebra=loop.cycle('odd', 'even') %}
+{% set c = account.changes[0] %}
+{% if loop.changed(time(c.timestamp, fmt='%Y-%m-%d')) %}
+<tr class="h">
+<td colspan="5" >{{ time(c.timestamp, fmt='%Y-%m-%d')  }}</td>
+</tr>
+{% endif %}
+<tr  class="{{ zebra }}">
+    <td>{{ time(c.timestamp, fmt='%H:%M:%S %Z') }}</td>
+    <td>{{ c.remote_host }}</td>
     <td>{{ account_url(account) }}</td>
     <td>{{ account.contact }}</td>
     <td>{{ account.status.name }}</td>
