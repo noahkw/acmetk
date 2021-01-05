@@ -10,10 +10,11 @@ from acme import jws
 from aiohttp import ClientSession, ClientResponseError
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
+import acmetk.util
 from acmetk.client.challenge_solver import ChallengeSolver
+from acmetk.client.exceptions import PollingException, CouldNotCompleteChallenge
 from acmetk.models import messages, ChallengeType
 from acmetk.version import __version__
-import acmetk.util
 
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
@@ -21,25 +22,6 @@ NONCE_RETRIES = 5
 
 # Monkey patch acme's status codes to allow 'expired' for authorizations
 STATUS_EXPIRED = acme.messages.Status("expired")
-
-
-class AcmeClientException(Exception):
-    pass
-
-
-class CouldNotCompleteChallenge(AcmeClientException):
-    def __init__(self, challenge, *args):
-        super().__init__(*args)
-        self.challenge = challenge
-
-    def __str__(self):
-        return f"Could not complete challenge: {self.challenge}"
-
-
-class PollingException(AcmeClientException):
-    def __init__(self, obj, *args):
-        super().__init__(*args)
-        self.obj = obj
 
 
 def is_valid(obj):
@@ -315,50 +297,24 @@ class AcmeClient:
             type(solver).__name__,
         )
 
-        processing_challenges: typing.List[
+        challenges_to_complete: typing.List[
             typing.Tuple[acme.messages.Identifier, acme.messages.ChallengeBody]
         ] = []
 
         for authorization in authorizations:
             for challenge in authorization.challenges:
                 if ChallengeType(challenge.chall.typ) == chosen_challenge_type:
-                    try:
-                        await solver.complete_challenge(
-                            self._private_key,
-                            authorization.identifier,
-                            challenge,
-                        )
-                        processing_challenges.append(
-                            (authorization.identifier, challenge)
-                        )
+                    challenges_to_complete.append((authorization.identifier, challenge))
 
-                        break
-                    except asyncio.TimeoutError:
-                        raise CouldNotCompleteChallenge(challenge)
-
-        await asyncio.gather(
-            *[
-                self.challenge_validate(challenge.uri)
-                for _, challenge in processing_challenges
-            ]
-        )
+                    break
 
         try:
-            await asyncio.gather(
-                *[
-                    self._poll_until(
-                        self.challenge_get,
-                        challenge.uri,
-                        predicate=is_valid,
-                        negative_predicate=is_invalid,
-                        delay=5.0,
-                        max_tries=50,
-                    )
-                    for _, challenge in processing_challenges
-                ]
-            )
-        except PollingException as e:
-            raise CouldNotCompleteChallenge(e.obj)
+            await self.challenges_complete(solver, challenges_to_complete)
+        except Exception:
+            await self.challenges_cleanup(solver, challenges_to_complete)
+            raise
+        else:
+            await self.challenges_cleanup(solver, challenges_to_complete)
 
         # Realistically, polling for the authorizations to become valid should never fail since we have already
         # ensured that one challenge per authorization is valid.
@@ -374,13 +330,67 @@ class AcmeClient:
             ]
         )
 
-        # Clean up all completed challenges
+    async def challenges_cleanup(
+        self,
+        solver: ChallengeSolver,
+        challenges: typing.List[
+            typing.Tuple[acme.messages.Identifier, acme.messages.ChallengeBody]
+        ],
+    ):
+        """Cleans up after the challenges leveraging the given solver.
+
+        :param solver: The challenge solver to use.
+        :param challenges: List of identifier, challenge tuples to clean up after."""
         await asyncio.gather(
             *[
                 solver.cleanup_challenge(self._private_key, identifier, challenge)
-                for identifier, challenge in processing_challenges
+                for identifier, challenge in challenges
             ]
         )
+
+    async def challenges_complete(
+        self,
+        solver: ChallengeSolver,
+        challenges: typing.List[
+            typing.Tuple[acme.messages.Identifier, acme.messages.ChallengeBody]
+        ],
+    ):
+        """Attempts to complete the challenges leveraging the given solver.
+
+        :param solver: The challenge solver to use.
+        :param challenges: List of identifier, challenge tuples to complete.
+        :raises: :class:`CouldNotCompleteChallenge` If completion of one of the challenges failed.
+        """
+        # Complete the pending challenges
+        await asyncio.gather(
+            *[
+                solver.complete_challenge(self._private_key, identifier, challenge)
+                for (identifier, challenge) in challenges
+            ]
+        )
+
+        # Tell the server that we are ready for challenge validation
+        await asyncio.gather(
+            *[self.challenge_validate(challenge.uri) for _, challenge in challenges]
+        )
+
+        # Poll until all challenges have become valid
+        try:
+            await asyncio.gather(
+                *[
+                    self._poll_until(
+                        self.challenge_get,
+                        challenge.uri,
+                        predicate=is_valid,
+                        negative_predicate=is_invalid,
+                        delay=5.0,
+                        max_tries=50,
+                    )
+                    for _, challenge in challenges
+                ]
+            )
+        except PollingException as e:
+            raise CouldNotCompleteChallenge(e.obj)
 
     async def challenge_get(self, challenge_url: str) -> acme.messages.ChallengeBody:
         """Fetches a challenge given its URL.

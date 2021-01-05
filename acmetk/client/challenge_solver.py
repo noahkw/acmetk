@@ -10,6 +10,7 @@ import dns.asyncresolver
 import josepy
 from infoblox_client import connector, objects
 
+from acmetk.client.exceptions import CouldNotCompleteChallenge
 from acmetk.models import ChallengeType
 from acmetk.util import ConfigurableMixin
 
@@ -44,7 +45,7 @@ class ChallengeSolver(ConfigurableMixin, abc.ABC):
     @abc.abstractmethod
     async def complete_challenge(
         self,
-        key: josepy.jwk.JWKRSA,
+        key: josepy.jwk.JWK,
         identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
@@ -56,14 +57,15 @@ class ChallengeSolver(ConfigurableMixin, abc.ABC):
         :param key: The client's account key.
         :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to be completed.
-        :raises: :class:`asyncio.TimeoutError` If the challenge completion attempt timed out.
+        :raises: :class:`~acmetk.client.exceptions.CouldNotCompleteChallenge`
+            If the challenge completion attempt failed.
         """
         pass
 
     @abc.abstractmethod
     async def cleanup_challenge(
         self,
-        key: josepy.jwk.JWKRSA,
+        key: josepy.jwk.JWK,
         identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
@@ -73,6 +75,9 @@ class ChallengeSolver(ConfigurableMixin, abc.ABC):
         It is called once the challenge is complete, i.e. its status has transitioned to
         :class:`~acmetk.models.challenge.ChallengeStatus.VALID` or
         :class:`~acmetk.models.challenge.ChallengeStatus.INVALID`.
+
+        This method should not assume that the challenge was successfully completed,
+        meaning it should silently return if there is nothing to clean up.
 
         :param key: The client's account key.
         :param identifier: The identifier that is associated with the challenge.
@@ -91,7 +96,7 @@ class DummySolver(ChallengeSolver):
 
     async def complete_challenge(
         self,
-        key: josepy.jwk.JWKRSA,
+        key: josepy.jwk.JWK,
         identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
@@ -111,7 +116,7 @@ class DummySolver(ChallengeSolver):
 
     async def cleanup_challenge(
         self,
-        key: josepy.jwk.JWKRSA,
+        key: josepy.jwk.JWK,
         identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
@@ -272,7 +277,7 @@ class InfobloxClient(ChallengeSolver):
 
     async def complete_challenge(
         self,
-        key: josepy.jwk.JWKRSA,
+        key: josepy.jwk.JWK,
         identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
@@ -285,7 +290,8 @@ class InfobloxClient(ChallengeSolver):
         :param key: The client's account key.
         :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to be completed.
-        :raises: :class:`asyncio.TimeoutError` If the challenge completion attempt timed out.
+        :raises: :class:`~acmetk.client.exceptions.CouldNotCompleteChallenge`
+            If the challenge completion attempt failed.
         """
         name = challenge.chall.validation_domain_name(identifier.value)
         text = challenge.chall.validation(key)
@@ -293,13 +299,18 @@ class InfobloxClient(ChallengeSolver):
         await self.set_txt_record(name, text)
 
         # Poll the DNS until the correct record is available
-        await asyncio.wait_for(
-            self._query_until_completed(name, text), self.POLLING_TIMEOUT
-        )
+        try:
+            await asyncio.wait_for(
+                self._query_until_completed(name, text), self.POLLING_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            raise CouldNotCompleteChallenge(
+                challenge, "Could not complete challenge due to a DNS polling timeout"
+            )
 
     async def cleanup_challenge(
         self,
-        key: josepy.jwk.JWKRSA,
+        key: josepy.jwk.JWK,
         identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):

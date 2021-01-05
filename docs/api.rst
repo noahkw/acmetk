@@ -15,6 +15,12 @@ Challenge Solvers
     :members:
     :inherited-members:
 
+Exceptions
+----------
+
+.. automodule:: acmetk.client.exceptions
+    :members:
+
 ACME Servers
 ############
 
