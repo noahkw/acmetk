@@ -85,12 +85,35 @@ Certificate:
                 {% for e in v -%}
 {{listsep(loop)}}{{ e._name }}
 {%- endfor %}
-{%- elif v.__class__.__name__ == 'AuthorityKeyIdentifier'%}
+{%- elif v.__class__.__name__ == 'AuthorityKeyIdentifier' %}
                 keyid:{{ v.key_identifier.hex(':') }}
-{%- elif v.__class__.__name__ == 'SubjectKeyIdentifier'%}
+{%- elif v.__class__.__name__ == 'SubjectKeyIdentifier' %}
                 keyid:{{ v.digest.hex(':') }}
+{%- elif v.__class__.__name__ == 'PrecertificateSignedCertificateTimestamps' %}
+                CT Precertificate SCTs:
+{%- for sct in v %}
+                    Signed Certificate Timestamp:
+                        Version   : {{ sct.version.name }} ({{ sct.version.value }})
+                        Log ID    : {{ Blob(sct.log_id, 16, 0)|indent(36) }}
+                        Timestamp : {{ sct.timestamp }}
+                        Extensions: unknown
+                        Signature : {# ecdsa-with-SHA256 #}unkown-alg-no-nid-available
+                                    {{ Blob(sct._signature, 16, 0)|indent(36) }}
+{%- endfor %}
+{%- elif v.__class__.__name__ == 'AuthorityInformationAccess' %}
+            Authority Information Access:
+{%- for i in v %}
+                {{ i.access_method.dotted_string }} - URI:{{ i.access_location.value }}
+{%- endfor %}
+{%- elif v.__class__.__name__ == 'CertificatePolicies' %}
+{%- for i in v %}
+                Policy: {{ i.policy_identifier.dotted_string }}
+{%- for q in i.policy_qualifiers or [] %}
+                  CPS: {{ q }}
+{%- endfor %}
+{%- endfor %}
 {%- else %}
-                Can't decode
+                Can't decode {{ v.__class__.__name__ }}
 {%- endif %}
 {%- endfor %}
     Signature Algorithm: {{c.signature_algorithm_oid._name}}
