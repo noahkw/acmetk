@@ -132,7 +132,7 @@ body {
 {# set _= pms.profile.create_stats() #}
 {% set s= pstats.Stats(pms.profile) %}
 {% set _= s.sort_stats('tottime') %}
-{% set _= s.print_stats() %}
+{# set _= s.print_stats() #}
 {% set sp = s.get_stats_profile() %}
 <center>
 {% set r=dict() %}

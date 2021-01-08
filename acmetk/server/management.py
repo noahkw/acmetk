@@ -161,7 +161,6 @@ class AcmeManagement:
             if f:
                 q = q.filter(sqlalchemy.or_(*f))
             q = q.order_by(Change.change.desc())
-            print(q)
             if f:
                 limit = "limit"
             else:
