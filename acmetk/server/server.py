@@ -8,6 +8,8 @@ import types
 import typing
 import uuid
 from email.utils import parseaddr
+import cProfile
+import pstats
 
 import acme.jws
 import acme.messages
@@ -976,12 +978,20 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         ):
             # using subapps -> functools.partial
             # aiohttp_jinja2 context
-            request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {"request": request}
+            request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {
+                "request": request,
+                "cprofile": cProfile,
+                "pstats": pstats,
+            }
         elif isinstance(handler, types.MethodType):
             if handler.__self__.__class__ == web.AbstractRoute:
                 pass
             else:
-                request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {"request": request}
+                request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {
+                    "request": request,
+                    "cprofile": cProfile,
+                    "pstats": pstats,
+                }
         elif isinstance(handler, types.FunctionType):  # index_of
             pass
         else:

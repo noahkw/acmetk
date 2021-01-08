@@ -128,7 +128,37 @@ body {
 <div id="footer">
 {% block footer %}
 {% if pms is defined and pms.enable %}
+{% set _= pms.profile.disable() %}
+{# set _= pms.profile.create_stats() #}
+{% set s= pstats.Stats(pms.profile) %}
+{% set _= s.sort_stats('tottime') %}
+{% set _= s.print_stats() %}
+{% set sp = s.get_stats_profile() %}
 <center>
+{% set r=dict() %}
+{% for funcname, p in sp.func_profiles.items() %}
+{% set _ = r.__setitem__(p, funcname) %}
+{% endfor %}
+{{s.total_calls}} function calls ({{s.prim_calls}} primitive calls) in {{s.total_tt}} seconds
+order by {{request.query.get('pms_sort','tottime')}}
+<table>
+<tr>
+{% for i in ["ncalls","tottime","percall_tottime","cumtime","percall_cumtime"] %}
+<th><a href="{{ url_for(request.match_info.route.name, **request.match_info).with_query(request.url.update_query(pms_sort=i).query) }}">{{ i }}</a></th>
+{% endfor %}
+<th>filename:lineno(function)</th>
+</tr>
+{% for p in sp.func_profiles.values()|sort(attribute=request.query.get('pms_sort','tottime'), reverse=True) %}
+<tr>
+<td>{{p.ncalls}}</td>
+<td>{{p.tottime}}</td>
+<td>{{p.percall_tottime}}</td>
+<td>{{p.cumtime}}</td>
+<td>{{p.percall_cumtime}}</td>
+<td>{{p.file_name}}:{{p.line_number}}({{r.get(p)}})</td>
+</tr>
+{% endfor %}
+</table>
 <table>
 <thead>
 <td>#</td>
