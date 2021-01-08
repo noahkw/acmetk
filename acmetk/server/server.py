@@ -1390,10 +1390,15 @@ class AcmeProxy(AcmeRelayBase):
                 """AcmeClient.order_finalize does not return if the order never becomes valid.
                 Thus, we handle that case here and set the order's status to invalid
                 if the CA takes too long."""
-                await asyncio.wait_for(self._client.order_finalize(order_ca, csr), 10.0)
+                await asyncio.wait_for(
+                    self._client.order_finalize(order_ca, csr), 120.0
+                )
             except asyncio.TimeoutError:
-                # TODO: consider returning notReady instead to let the client try again
-                order.status = models.OrderStatus.INVALID
+                logger.info(f"finalize_order timeout for order {order.order_id}")
+                raise acme.messages.Error(
+                    typ="orderInvalid",
+                    detail="This order cannot be finalized because it timed out",
+                )
             else:
                 """The CA's order is valid, we can set our order's status to PROCESSING and
                 request the certificate from the CA in _handle_order_finalize."""
