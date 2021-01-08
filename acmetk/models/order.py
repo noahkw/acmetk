@@ -80,7 +80,7 @@ class Order(Entity, Serializer):
     identifiers = relationship(
         "Identifier",
         cascade="all, delete",
-        lazy="joined",
+        lazy="noload",
         foreign_keys="Identifier.order_id",
     )
     """List of identifiers (:class:`~acmetk.models.identifier.Identifier`) associated with the order."""
@@ -89,14 +89,16 @@ class Order(Entity, Serializer):
     notAfter = Column(DateTime(timezone=True))
     """The requested *notAfter* field in the certificate."""
     account_kid = Column(String, ForeignKey("accounts.kid"), nullable=False)
-    account = relationship("Account", back_populates="orders", foreign_keys=account_kid)
+    account = relationship(
+        "Account", back_populates="orders", lazy="noload", foreign_keys=account_kid
+    )
     """The :class:`~acmetk.models.account.Account` that created the order."""
     certificate = relationship(
         "Certificate",
         uselist=False,
         single_parent=True,
         back_populates="order",
-        lazy="joined",
+        lazy="noload",
         foreign_keys="Certificate.order_id",
     )
     """The :class:`~acmetk.models.certificate.Certificate` that was generated as a result of the order."""

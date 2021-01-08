@@ -5,7 +5,7 @@ from aiohttp import web
 from sqlalchemy import select, event
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, defaultload
+from sqlalchemy.orm import sessionmaker, selectinload
 
 from acmetk import models
 from acmetk.models import (
@@ -136,6 +136,12 @@ class Database:
     async def get_authz(session, kid, authz_id):
         statement = (
             select(Authorization)
+            .options(
+                selectinload(Authorization.identifier)
+                .selectinload(Identifier.order)
+                .selectinload(Order.account),
+                selectinload(Authorization.challenges),
+            )
             .join(Identifier, Authorization.identifier_id == Identifier.identifier_id)
             .join(Order, Identifier.order_id == Order.order_id)
             .join(Account, Order.account_kid == Account.kid)
@@ -154,16 +160,15 @@ class Database:
         statement = (
             select(Challenge)
             .options(
-                defaultload(Challenge.authorization).selectinload(
-                    Authorization.challenges
+                selectinload(Challenge.authorization).options(
+                    selectinload(Authorization.challenges),
+                    selectinload(Authorization.identifier).options(
+                        selectinload(Identifier.authorization),
+                        selectinload(Identifier.order)
+                        .selectinload(Order.identifiers)
+                        .joinedload(Identifier.authorization),
+                    ),
                 )
-            )
-            .options(
-                defaultload(Challenge.authorization)
-                .selectinload(Authorization.identifier)
-                .selectinload(Identifier.order)
-                .selectinload(Order.identifiers)
-                .selectinload(Identifier.authorization)
             )
             .join(
                 Authorization,
@@ -186,6 +191,11 @@ class Database:
     async def get_order(session, kid, order_id):
         statement = (
             select(Order)
+            .options(
+                selectinload(Order.account),
+                selectinload(Order.identifiers).selectinload(Identifier.authorization),
+                selectinload(Order.certificate),
+            )
             .join(Account, Order.account_kid == Account.kid)
             .filter((kid == Account.kid) & (order_id == Order.order_id))
         )
@@ -202,6 +212,7 @@ class Database:
         if kid and certificate_id:
             statement = (
                 select(Certificate)
+                .options(selectinload(Order.certificate), selectinload(Order.account))
                 .join(Order, Certificate.order_id == Order.order_id)
                 .join(Account, Order.account_kid == Account.kid)
                 .filter(

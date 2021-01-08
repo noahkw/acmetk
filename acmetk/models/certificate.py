@@ -97,7 +97,9 @@ class Certificate(Entity, Serializer):
         index=True,
         unique=True,
     )
-    order = relationship("Order", back_populates="certificate", foreign_keys=order_id)
+    order = relationship(
+        "Order", back_populates="certificate", lazy="noload", foreign_keys=order_id
+    )
     """The :class:`acmetk.models.order.Order` associated with the certificate."""
     cert = Column(x509Certificate, nullable=True, index=True)
     """The actual client certificate (:class:`cryptography.x509.Certificate`)."""

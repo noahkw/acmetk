@@ -59,7 +59,7 @@ class Account(Entity, Serializer):
         "Order",
         cascade="all, delete",
         back_populates="account",
-        lazy="joined",
+        lazy="noload",
         foreign_keys="Order.account_kid",
     )
     """List of orders (:class:`~acmetk.models.order.Order`) associated with the account."""

@@ -4,7 +4,7 @@ import aiohttp_jinja2
 import cryptography
 import sqlalchemy
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload, selectin_polymorphic
+from sqlalchemy.orm import selectinload, selectin_polymorphic, defer
 from sqlalchemy.sql import text
 import sqlalchemy.dialects.postgresql
 
@@ -226,9 +226,12 @@ class AcmeManagement:
             q = (
                 select(Order)
                 .options(
-                    selectinload(Order.account),
+                    defer("csr"),
+                    selectinload(Order.account).options(defer("key")),
                     selectinload(Order.identifiers),
-                    selectinload(Order.changes),
+                    selectinload(Order.changes).options(
+                        defer("data"),
+                    ),
                 )
                 .order_by(Order._entity.desc())
             )
@@ -298,8 +301,12 @@ class AcmeManagement:
             q = (
                 select(Certificate)
                 .options(
-                    selectinload(Certificate.changes),
-                    selectinload(Certificate.order).selectinload(Order.account),
+                    defer("cert"),
+                    selectinload(Certificate.changes).options(defer("data")),
+                    selectinload(Certificate.order)
+                    .options(defer("csr"), selectinload(Order.identifiers))
+                    .selectinload(Order.account)
+                    .options(defer("key")),
                 )
                 .order_by(Certificate._entity.desc())
             )
