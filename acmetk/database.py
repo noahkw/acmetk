@@ -228,7 +228,11 @@ class Database:
         if kid and certificate_id:
             statement = (
                 select(Certificate)
-                .options(selectinload(Order.certificate), selectinload(Order.account))
+                .options(
+                    selectinload(Order.certificate),
+                    selectinload(Order.account),
+                    selectinload(Certificate.order).selectinload(Order.account),
+                )
                 .join(Order, Certificate.order_id == Order.order_id)
                 .join(Account, Order.account_kid == Account.kid)
                 .filter(
@@ -237,7 +241,13 @@ class Database:
                 )
             )
         elif certificate:
-            statement = select(Certificate).filter(Certificate.cert == certificate)
+            statement = (
+                select(Certificate)
+                .filter(Certificate.cert == certificate)
+                .options(selectinload(Certificate.order).selectinload(Order.account))
+                .join(Order, Certificate.order_id == Order.order_id)
+                .join(Account, Order.account_kid == Account.kid)
+            )
         else:
             raise ValueError(
                 "Either kid and certificate_id OR certificate should be specified"

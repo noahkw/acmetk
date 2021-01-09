@@ -446,11 +446,11 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
             raise web.HTTPNotFound
 
         if account:
-            # check that the account holds authorizations for all of the identifiers in the certificate
-            if not account.validate_cert(cert):
+            # Check whether the cert was originally issued for that account
+            if not certificate.account_of.kid == account.kid:
                 raise acme.messages.Error.with_code("unauthorized")
         else:
-            # the request was probably signed with the certificate's key pair
+            # The request was probably signed with the certificate's key pair
             jwk = jws.signature.combined.jwk
             if isinstance(
                 cert_key := cert.public_key(),
