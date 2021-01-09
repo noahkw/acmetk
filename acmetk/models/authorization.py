@@ -106,15 +106,18 @@ class Authorization(Entity, Serializer):
         await self.identifier.order.validate()
         return self.status
 
-    def is_valid(self) -> bool:
+    def is_valid(self, expired=False) -> bool:
         """Returns whether the authorization is currently valid.
 
         Takes into account not only the current *status*, but also whether
-        the authorization is expired.
+        the authorization has expired.
 
+        :param expired: Reports an otherwise valid but expired authorization as valid if set to *True*.
         :return: *True* iff the authorization is valid.
         """
-        return self.status == AuthorizationStatus.VALID and not self.is_expired()
+        return self.status == AuthorizationStatus.VALID and (
+            not self.is_expired() or expired
+        )
 
     def is_expired(self) -> bool:
         """Returns whether the authorization has expired.

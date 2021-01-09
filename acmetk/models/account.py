@@ -93,9 +93,11 @@ class Account(Entity, Serializer):
 
         # We deliberately don't check whether the identifiers' authorizations have expired,
         # so that older certs may still be revoked.
-        # TODO: does this mean that authorizations that were never valid are considered here?
         identifiers = [
-            identifier for order in self.orders for identifier in order.identifiers
+            identifier
+            for order in self.orders
+            for identifier in order.identifiers
+            if identifier.authorization.is_valid(expired=True)
         ]
 
         return set(
