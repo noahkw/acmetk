@@ -52,7 +52,7 @@ class Authorization(Entity, Serializer):
     identifier = relationship(
         "Identifier",
         back_populates="authorization",
-        lazy="joined",
+        lazy="noload",
         foreign_keys=identifier_id,
     )
     """The :class:`~acmetk.models.identifier.Identifier` associated with the authorization."""
@@ -66,7 +66,7 @@ class Authorization(Entity, Serializer):
         "Challenge",
         cascade="all, delete",
         back_populates="authorization",
-        lazy="joined",
+        lazy="noload",
         foreign_keys="Challenge.authorization_id",
     )
     """List of challenges (:class:`~acmetk.models.challenge.Challenge`) associated with the authorization."""

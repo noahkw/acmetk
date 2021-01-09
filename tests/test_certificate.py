@@ -1,0 +1,50 @@
+from jinja2 import FileSystemLoader, Environment
+import cryptography
+from acmetk.util import pem_split
+
+CERT_PEM = """-----BEGIN CERTIFICATE-----
+MIIFBzCCA++gAwIBAgITAPr7P4i1Xl01WvscAEckA9MfHjANBgkqhkiG9w0BAQsF
+ADAiMSAwHgYDVQQDDBdGYWtlIExFIEludGVybWVkaWF0ZSBYMTAeFw0yMTAxMDcy
+MTQyMjFaFw0yMTA0MDcyMTQyMjFaMCgxJjAkBgNVBAMTHXRlc3QwMTUwMy5pdHMu
+dW5pLWhhbm5vdmVyLmRlMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEQcOsH+jq
+UXaIY5IRccc7sw9Jn+IUaf8BRTew8E64OD5Qd557TiCievAUzlAGQthVyRXLEyCK
+PfLYJKyWsXjP06OCAvkwggL1MA4GA1UdDwEB/wQEAwIHgDAdBgNVHSUEFjAUBggr
+BgEFBQcDAQYIKwYBBQUHAwIwDAYDVR0TAQH/BAIwADAdBgNVHQ4EFgQUfiFkv7xE
+08rxRhEgWGp1De5mBK8wHwYDVR0jBBgwFoAUwMwDRrlYIMxccnDz4S7LIKb1aDow
+dwYIKwYBBQUHAQEEazBpMDIGCCsGAQUFBzABhiZodHRwOi8vb2NzcC5zdGctaW50
+LXgxLmxldHNlbmNyeXB0Lm9yZzAzBggrBgEFBQcwAoYnaHR0cDovL2NlcnQuc3Rn
+LWludC14MS5sZXRzZW5jcnlwdC5vcmcvMIGmBgNVHREEgZ4wgZuCHXRlc3QwMTUw
+My5pdHMudW5pLWhhbm5vdmVyLmRlgh10ZXN0MDE1MDQuaXRzLnVuaS1oYW5ub3Zl
+ci5kZYIddGVzdDAxNTA1Lml0cy51bmktaGFubm92ZXIuZGWCHXRlc3QwMTUwNi5p
+dHMudW5pLWhhbm5vdmVyLmRlgh10ZXN0MDE1MDcuaXRzLnVuaS1oYW5ub3Zlci5k
+ZTBMBgNVHSAERTBDMAgGBmeBDAECATA3BgsrBgEEAYLfEwEBATAoMCYGCCsGAQUF
+BwIBFhpodHRwOi8vY3BzLmxldHNlbmNyeXB0Lm9yZzCCAQQGCisGAQQB1nkCBAIE
+gfUEgfIA8AB2ALDMg+Wl+X1rr3wJzChJBIcqx+iLEyxjULfG/SbhbGx3AAABdt8D
+4DsAAAQDAEcwRQIhAM4Lr/ouK6s6qDFlXBs2WiS+lQchzVa8Rwp0JlIlsW7hAiBh
+qnIEt/MtEpNRRXqZ4845wtAOvNAK7BYC9yVmRIHBpQB2AAPt8dqXdrbzjDQeOe2d
+cHp1cDac+YRPMn/p4UE4NhtgAAABdt8D4jAAAAQDAEcwRQIhAN0/2tDgyObmzDih
+iPASXHjVMkTcP85Z1vhNYSMjrs2hAiA7t4oqAG5UAy2gEyc1vpOF69EC3rhPioKi
+P+8YvBiWUTANBgkqhkiG9w0BAQsFAAOCAQEAi9/9dfTPdAUhKKaPA94THH0ZgrH7
+2PxmHAFSTTYDk9OBCZBwiNfxdbWo4n+3jOPEshSqehhfT4ezzOEVvEgY5IIuEOpM
+LvJaPZElcm7nKIyATKjTnFkbem2ecFncIKL10XZSIS9XRwVKkc1GunBhvX2Mp/3p
+tqY+OQjtg/DNMGvy39iw5ExIC55kkJrnzj4sjoDRUqskUGvpl2x9Ax+IYKfnMK5R
+bX2MUfiVeypOlu4myq4WI5IBAV73S/VbM1jk/Mkm8cUmAQ8AiYCBLbbEaLq2tVfZ
+evCs3CyaIPT75iehkmfqSplnx8NyXsTCmaYYbdtQSqTfeijTCQpp4h8eMw==
+-----END CERTIFICATE-----
+"""
+
+
+def main():
+    c = pem_split(CERT_PEM)[0]
+
+    loader = FileSystemLoader("../tpl/")
+    env = Environment(
+        loader=loader, extensions=["jinja2.ext.loopcontrols"]
+    )  # , trim_blocks=True, lstrip_blocks=True)
+    template = env.get_template("certificate.jinja2")
+
+    print(template.render(certificate=c, cryptography=cryptography))
+
+
+if __name__ == "__main__":
+    main()

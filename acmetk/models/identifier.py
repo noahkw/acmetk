@@ -47,7 +47,7 @@ class Identifier(Entity, Serializer):
     authorization = relationship(
         "Authorization",
         cascade="all, delete",
-        lazy="joined",
+        lazy="noload",
         uselist=False,
         single_parent=True,
         foreign_keys="Authorization.identifier_id",

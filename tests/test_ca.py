@@ -526,7 +526,7 @@ class TestOurClientStress(TestOurClient):
         )
         await self.client.account_update(contact=new_contact)
         await self.client.account_lookup()
-        self.assertEqual(self.client._account.contact, new_contact)
+        self.assertEqual(new_contact, self.client._account.contact)
 
     async def test_email_validation(self):
         await self.client.start()
@@ -574,7 +574,8 @@ class TestCertBotRSA2048EC256CA(TestCertBot, TestCA, unittest.IsolatedAsyncioTes
 
 
 class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestCase):
-    pass
+    async def test_revoke(self):
+        await super().test_revoke()
 
 
 class TestOurClientEC256EC256CA(

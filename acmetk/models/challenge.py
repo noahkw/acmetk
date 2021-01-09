@@ -62,7 +62,7 @@ class Challenge(Entity, Serializer):
     authorization = relationship(
         "Authorization",
         back_populates="challenges",
-        lazy="joined",
+        lazy="noload",
         foreign_keys=authorization_id,
     )
     """The :class:`~acmetk.models.authorization.Authorization` associated with the challenge."""

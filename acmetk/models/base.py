@@ -37,7 +37,7 @@ class Entity(Base):
 
     entity = Column(Integer, primary_key=True, index=True)
     identity = Column(String(50), index=True)
-    changes = relationship("Change", backref="entity")
+    changes = relationship("Change", backref="entity", lazy="noload")
 
     __mapper_args__ = {"polymorphic_identity": "entity", "polymorphic_on": identity}
 

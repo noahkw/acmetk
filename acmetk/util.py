@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from time import perf_counter
 from pathlib import Path
 import inspect
-import os
+import cProfile
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
@@ -285,21 +285,31 @@ class ConfigurableMixin:
 
 
 class PerformanceMeasure:
-    def __init__(self, init=True):
+    def __init__(self, profile_, init=True):
         if init:
             callerframerecord = inspect.stack()[2]
             frame = callerframerecord[0]
             info = inspect.getframeinfo(frame)
-            p = Path(info.filename).resolve()
-            p = p.relative_to(Path(os.getcwd()).resolve())
-            self.mnemonic = f"{p}:{info.lineno} {info.function}"
+            # cProfile is full path anyway …
+            # p = Path(info.filename).resolve()
+            # for i in sorted(sys.path, key=lambda x: len(x), reverse=True):
+            #     if not p.is_relative_to((parent := Path(i)).resolve()):
+            #         continue
+            #     p = p.relative_to(parent)
+            #     break
+            self.mnemonic = f"{info.filename}:{info.lineno} {info.function}"
+
+    #        self.profile = cProfile.Profile()
 
     async def __aenter__(self):
         self.begin = perf_counter()
+        #        self.profile.enable()
         return self
 
     async def __aexit__(self, type, value, traceback):
         self.end = perf_counter()
+
+    #        self.profile.disable()
 
     @property
     def duration(self):
@@ -312,12 +322,14 @@ class PerformanceMeasurementSystem:
         self.begin = perf_counter()
         self.end = None
         self.measuring_points = []
+        self.profile = cProfile.Profile()
+        self.profile.enable()
 
     def measure(self):
         if self.enable:
-            self.measuring_points.append(r := PerformanceMeasure())
+            self.measuring_points.append(r := PerformanceMeasure(self.profile))
             return r
-        return PerformanceMeasure(False)
+        return PerformanceMeasure(self.profile, False)
 
     @property
     def sum(self):

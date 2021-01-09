@@ -8,6 +8,8 @@ import types
 import typing
 import uuid
 from email.utils import parseaddr
+import cProfile
+import pstats
 
 import acme.jws
 import acme.messages
@@ -303,7 +305,12 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
             raise acme.messages.Error.with_code("badNonce", detail=nonce)
 
     async def _verify_request(
-        self, request, session, key_auth: bool = False, post_as_get: bool = False
+        self,
+        request,
+        session,
+        key_auth: bool = False,
+        post_as_get: bool = False,
+        expunge_account: bool = True,
     ):
         """Verifies an ACME request whose payload is encapsulated in a JWS.
 
@@ -312,10 +319,12 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         All requests to handlers apart from :meth:`new_nonce` and :meth:`directory`
         are authenticated.
 
-        :param key_auth: True if the JWK inside the JWS should be used to \
+        :param key_auth: *True* if the JWK inside the JWS should be used to \
             verify its signature. False otherwise
-        :param post_as_get: True if a `POST-as-GET <https://tools.ietf.org/html/rfc8555#section-6.3>`_ \
+        :param post_as_get: *True* if a `POST-as-GET <https://tools.ietf.org/html/rfc8555#section-6.3>`_ \
             request is expected. False otherwise
+        :param expunge_account: *True* if the account object should be expunged from the session. \
+            Needs to be False if the account object is to be updated in the database later.
         :raises:
 
             * :class:`aiohttp.web.HTTPNotFound` if the JWS contains a kid, \
@@ -404,6 +413,11 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                 raise acme.messages.Error.with_code("unauthorized")
         else:
             raise acme.messages.Error.with_code("malformed")
+
+        # Fix bug where models that contain the "account" object do not get populated properly -
+        # most likely due to caching.
+        if account and expunge_account:
+            session.expunge(account)
 
         return jws, account
 
@@ -605,7 +619,9 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         :return: The account object.
         """
         async with self._session(request) as session:
-            jws, account = await self._verify_request(request, session)
+            jws, account = await self._verify_request(
+                request, session, expunge_account=False
+            )
             upd = messages.AccountUpdate.json_loads(jws.payload)
 
             if self._require_eab and upd.contact:
@@ -976,12 +992,20 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         ):
             # using subapps -> functools.partial
             # aiohttp_jinja2 context
-            request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {"request": request}
+            request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {
+                "request": request,
+                "cprofile": cProfile,
+                "pstats": pstats,
+            }
         elif isinstance(handler, types.MethodType):
             if handler.__self__.__class__ == web.AbstractRoute:
                 pass
             else:
-                request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {"request": request}
+                request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {
+                    "request": request,
+                    "cprofile": cProfile,
+                    "pstats": pstats,
+                }
         elif isinstance(handler, types.FunctionType):  # index_of
             pass
         else:
@@ -1380,10 +1404,16 @@ class AcmeProxy(AcmeRelayBase):
                 """AcmeClient.order_finalize does not return if the order never becomes valid.
                 Thus, we handle that case here and set the order's status to invalid
                 if the CA takes too long."""
-                await asyncio.wait_for(self._client.order_finalize(order_ca, csr), 10.0)
+                await asyncio.wait_for(
+                    self._client.order_finalize(order_ca, csr), 120.0
+                )
             except asyncio.TimeoutError:
-                # TODO: consider returning notReady instead to let the client try again
+                logger.info(f"finalize_order timeout for order {order.order_id}")
                 order.status = models.OrderStatus.INVALID
+                raise acme.messages.Error(
+                    typ="orderInvalid",
+                    detail="This order cannot be finalized because it timed out",
+                )
             else:
                 """The CA's order is valid, we can set our order's status to PROCESSING and
                 request the certificate from the CA in _handle_order_finalize."""
