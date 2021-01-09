@@ -127,7 +127,23 @@ class Database:
 
     @staticmethod
     async def get_account(session, key=None, kid=None):
-        statement = select(Account).filter((Account.key == key) | (Account.kid == kid))
+        statement = (
+            select(Account)
+            .options(
+                selectinload(Account.orders)
+                .selectinload(Order.identifiers)
+                .selectinload(Identifier.authorization)
+            )
+            .filter((Account.key == key) | (Account.kid == kid))
+            .join(Order, Account.kid == Order.account_kid, isouter=True)
+            .join(Identifier, Order.order_id == Identifier.order_id, isouter=True)
+            .join(
+                Authorization,
+                Identifier.identifier_id == Authorization.identifier_id,
+                isouter=True,
+            )
+        )
+
         result = (await session.execute(statement)).first()
 
         return result[0] if result else None

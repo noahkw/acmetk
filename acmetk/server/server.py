@@ -305,7 +305,12 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
             raise acme.messages.Error.with_code("badNonce", detail=nonce)
 
     async def _verify_request(
-        self, request, session, key_auth: bool = False, post_as_get: bool = False
+        self,
+        request,
+        session,
+        key_auth: bool = False,
+        post_as_get: bool = False,
+        expunge_account: bool = True,
     ):
         """Verifies an ACME request whose payload is encapsulated in a JWS.
 
@@ -314,10 +319,12 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         All requests to handlers apart from :meth:`new_nonce` and :meth:`directory`
         are authenticated.
 
-        :param key_auth: True if the JWK inside the JWS should be used to \
+        :param key_auth: *True* if the JWK inside the JWS should be used to \
             verify its signature. False otherwise
-        :param post_as_get: True if a `POST-as-GET <https://tools.ietf.org/html/rfc8555#section-6.3>`_ \
+        :param post_as_get: *True* if a `POST-as-GET <https://tools.ietf.org/html/rfc8555#section-6.3>`_ \
             request is expected. False otherwise
+        :param expunge_account: *True* if the account object should be expunged from the session. \
+            Needs to be False if the account object is to be updated in the database later.
         :raises:
 
             * :class:`aiohttp.web.HTTPNotFound` if the JWS contains a kid, \
@@ -406,6 +413,11 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                 raise acme.messages.Error.with_code("unauthorized")
         else:
             raise acme.messages.Error.with_code("malformed")
+
+        # Fix bug where models that contain the "account" object do not get populated properly -
+        # most likely due to caching.
+        if account and expunge_account:
+            session.expunge(account)
 
         return jws, account
 
@@ -607,7 +619,9 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         :return: The account object.
         """
         async with self._session(request) as session:
-            jws, account = await self._verify_request(request, session)
+            jws, account = await self._verify_request(
+                request, session, expunge_account=False
+            )
             upd = messages.AccountUpdate.json_loads(jws.payload)
 
             if self._require_eab and upd.contact:
@@ -1395,6 +1409,7 @@ class AcmeProxy(AcmeRelayBase):
                 )
             except asyncio.TimeoutError:
                 logger.info(f"finalize_order timeout for order {order.order_id}")
+                order.status = models.OrderStatus.INVALID
                 raise acme.messages.Error(
                     typ="orderInvalid",
                     detail="This order cannot be finalized because it timed out",
