@@ -1,4 +1,5 @@
 import abc
+import asyncio
 import contextlib
 import ipaddress
 import itertools
@@ -125,18 +126,16 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
         """
         if challenge.authorization.wildcard:
             identifier = identifier[2:]
-            r = dict()
             names = ["www", "mail", "smtp", "gitlab"]
             rnames = [
                 "".join([random.choice(string.ascii_lowercase) for j in range(i)])
                 for i in range(6)
             ]
             names.extend(rnames)
-            for i in names:
-                r[i] = await self.query_records(f"{i}.{identifier}")
-            resolved_ips = set(r.values())
-            for i in r.values():
-                resolved_ips &= i
+            resolved = await asyncio.gather(
+                *[self.query_records(f"{i}.{identifier}") for i in names]
+            )
+            resolved_ips = set.intersection(*resolved)
         else:
             resolved_ips = await self.query_records(identifier)
 
