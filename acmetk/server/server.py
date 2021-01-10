@@ -102,6 +102,13 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
     SUPPORTED_CSR_KEYS = (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)
     """The types of public keys that the server supports in a certificate signing request."""
 
+    VALID_DOMAIN_RE = re.compile(
+        r"^(((?!-))(xn--|_{1,1})?[a-z0-9-]{0,61}[a-z0-9]"
+        r"{1,1}\.)*(xn--)?([a-z0-9][a-z0-9\-]{0,60}|[a-z0-9-]{1,30}\.[a-z]{2,})$"
+    )
+    """https://stackoverflow.com/questions/
+    10306690/what-is-a-regular-expression-which-will-match-a-valid-domain-name-without-a-subd"""
+
     subclasses = []
 
     def __init__(
@@ -486,6 +493,29 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                         detail=f"The contact email '{address}' is not supported.",
                     )
 
+    def _verify_order(self, obj: acme.messages.NewOrder):
+        """Verify the identifiers in an Order
+
+        Remove wildcards and validate with regex
+
+        :raises:
+
+            * :class:`acme.messages.Error` If the Order has invalid identifiers.
+        """
+        r = set(
+            map(
+                lambda identifier: self.VALID_DOMAIN_RE.match(
+                    identifier.value.lstrip("*.")
+                )
+                is not None,
+                obj.identifiers,
+            )
+        )
+        if False in r:
+            raise acme.messages.Error.with_code(
+                "rejectedIdentifier", detail="The Order has invalid identifiers."
+            )
+
     @routes.get("/directory", name="directory")
     async def directory(self, request):
         """Handler that returns the server's directory.
@@ -654,7 +684,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
-
+            self._verify_order(obj)
             order = models.Order.from_obj(account, obj, self._supported_challenges)
             session.add(order)
 
@@ -1320,11 +1350,13 @@ class AcmeProxy(AcmeRelayBase):
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
+            self._verify_order(obj)
 
             identifiers = [
                 {"type": identifier.typ, "value": identifier.value}
                 for identifier in obj.identifiers
             ]
+
             order_ca = await self._client.order_create(identifiers)
 
             order = models.Order.from_obj(account, obj, self._supported_challenges)

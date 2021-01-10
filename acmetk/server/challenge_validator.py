@@ -3,6 +3,8 @@ import contextlib
 import ipaddress
 import itertools
 import logging
+import random
+import string
 import typing
 
 import acme.messages
@@ -118,7 +120,25 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
             identifier,
         )
 
-        resolved_ips = await self.query_records(identifier)
+        """Wildcard validation …
+        Resolve some names
+        """
+        if challenge.authorization.wildcard:
+            identifier = identifier[2:]
+            r = dict()
+            names = ["www", "mail", "smtp", "gitlab"]
+            rnames = [
+                "".join([random.choice(string.ascii_lowercase) for j in range(i)])
+                for i in range(6)
+            ]
+            names.extend(rnames)
+            for i in names:
+                r[i] = await self.query_records(f"{i}.{identifier}")
+            resolved_ips = set(r.values())
+            for i in r.values():
+                resolved_ips &= i
+        else:
+            resolved_ips = await self.query_records(identifier)
 
         actual_ip = request["actual_ip"]
         if actual_ip not in resolved_ips:
@@ -151,7 +171,9 @@ class DummyValidator(ChallengeValidator):
 
         :param challenge: The challenge to be validated
         """
+        identifier = challenge.authorization.identifier.value
         logger.debug(
-            f"(not) validating challenge {challenge.challenge_id}, type {challenge.type}"
+            f"(not) validating challenge {challenge.challenge_id}, type {challenge.type} identifier {identifier}"
         )
+
         # await asyncio.sleep(1)

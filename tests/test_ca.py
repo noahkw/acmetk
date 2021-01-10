@@ -49,6 +49,10 @@ class TestAcme:
         elif alg_and_bits[0] == "EC":
             return acmetk.util.generate_ec_key(path, alg_and_bits[1])
 
+    @property
+    def names(self):
+        return self.config_sec["names"]
+
     def setUp(self) -> None:
         """Sets up our test object with the necessary properties for testing using a client"""
         self._config = load_config("../debug.yml")
@@ -69,10 +73,10 @@ class TestAcme:
         client_cert_key = self._make_key(client_cert_key_path, self.CERT_KEY_ALG_BITS)
 
         csr = acmetk.util.generate_csr(
-            self.config_sec["names"][0],
+            self.names[0],
             client_cert_key,
             csr_path,
-            names=self.config_sec["names"],
+            names=self.names,
         )
 
         self.client_data = ClientData(client_account_key_path, csr, csr_path)
@@ -566,6 +570,45 @@ class TestAcmetinyECCA(TestAcmetinyEC, TestCA, unittest.IsolatedAsyncioTestCase)
 
 class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     pass
+
+
+class TestCertBotBadNameCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
+    @property
+    def names(self):
+        return ["{invalid}"]
+
+    async def test_run(self):
+        await super().test_run()
+
+
+class TestCertBotWCCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
+    @property
+    def names(self):
+        return ["*.test.de"]
+
+    async def test_run(self):
+        await self._run("certificates")
+
+        await self._run(f"register --agree-tos  -m {self.contact}")
+
+        arg = " --domain ".join(self.domains)
+        authhook = "\t" + "\n\t".join(
+            map(
+                lambda s: f"CERTBOT_{s}=$CERTBOT_{s}",
+                [
+                    "DOMAIN",
+                    "VALIDATION",
+                    "TOKEN",
+                    "REMAINING_CHALLENGES",
+                    "ALL_DOMAINS",
+                ],
+            )
+        )
+        await self._run(
+            f"certonly {self.key_args} --manual "
+            f'--manual-auth-hook "echo \\"{authhook}\\"" '
+            f"--manual-cleanup-hook /bin/true --preferred-challenges dns --domain {arg}"
+        )
 
 
 class TestCertBotRSA2048EC256CA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
