@@ -6,6 +6,7 @@ import logging
 import re
 import types
 import typing
+import string
 import uuid
 from email.utils import parseaddr
 import cProfile
@@ -103,11 +104,15 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
     """The types of public keys that the server supports in a certificate signing request."""
 
     VALID_DOMAIN_RE = re.compile(
-        r"^(((?!-))(xn--|_{1,1})?[a-z0-9-]{0,61}[a-z0-9]"
-        r"{1,1}\.)*(xn--)?([a-z0-9][a-z0-9\-]{0,60}|[a-z0-9-]{1,30}\.[a-z]{2,})$"
+        r"^(((?!-))(xn--|_{1,1})?[a-z0-9-]{0,61}[a-z0-9]{1,1}\.)*"
+        r"(xn--)?([a-z0-9][a-z0-9\-]{0,60}|[a-z0-9-]{1,30}\.[a-z]{2,})$"
     )
-    """https://stackoverflow.com/questions/
-    10306690/what-is-a-regular-expression-which-will-match-a-valid-domain-name-without-a-subd"""
+
+    """using from https://stackoverflow.com/questions/
+    10306690/what-is-a-regular-expression-which-will-match-a-valid-domain-name-without-a-subd
+
+    better than nothing, but  accepts names ending with -
+    """
 
     subclasses = []
 
@@ -502,16 +507,45 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
 
             * :class:`acme.messages.Error` If the Order has invalid identifiers.
         """
-        r = set(
-            map(
-                lambda identifier: self.VALID_DOMAIN_RE.match(
-                    identifier.value.lstrip("*.")
+
+        try:
+            # idna decoding xn-- …
+            try:
+                list(
+                    map(
+                        lambda identifier: identifier.value.encode("ascii").decode(
+                            "idna"
+                        ),
+                        obj.identifiers,
+                    )
                 )
-                is not None,
-                obj.identifiers,
+            except UnicodeError:
+                raise ValueError
+
+            # regex
+            r = set(
+                map(
+                    lambda identifier: self.VALID_DOMAIN_RE.match(
+                        identifier.value.lstrip("*.")
+                    )
+                    is not None,
+                    obj.identifiers,
+                )
             )
-        )
-        if False in r:
+            if False in r:
+                raise ValueError
+
+            # ends with a letter
+            r = set(
+                map(
+                    lambda identifier: identifier.value[-1] in string.ascii_lowercase,
+                    obj.identifiers,
+                )
+            )
+            if False in r:
+                raise ValueError
+
+        except ValueError:
             raise acme.messages.Error.with_code(
                 "rejectedIdentifier", detail="The Order has invalid identifiers."
             )

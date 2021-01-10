@@ -47,29 +47,9 @@ class TestCertBotWCProxyLocalCA(
     def names(self):
         return ["*.test.de"]
 
-    async def test_run(self):
-        await self._run("certificates")
-
-        await self._run(f"register --agree-tos  -m {self.contact}")
-
-        arg = " --domain ".join(self.domains)
-        authhook = "\t" + "\n\t".join(
-            map(
-                lambda s: f"CERTBOT_{s}=$CERTBOT_{s}",
-                [
-                    "DOMAIN",
-                    "VALIDATION",
-                    "TOKEN",
-                    "REMAINING_CHALLENGES",
-                    "ALL_DOMAINS",
-                ],
-            )
-        )
-        await self._run(
-            f"certonly {self.key_args} --manual "
-            f'--manual-auth-hook "echo \\"{authhook}\\"" '
-            f"--manual-cleanup-hook /bin/true --preferred-challenges dns --domain {arg}"
-        )
+    async def test_subdomain_revocation(self):
+        "avoid Requesting a certificate for dns.*.test.de"
+        pass
 
 
 class TestOurClientProxyLocalCA(

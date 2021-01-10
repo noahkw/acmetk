@@ -297,15 +297,6 @@ class TestCertBot:
     def setUp(self) -> None:
         super().setUp()
 
-        with open(self.path / "certbot.ini", "wt") as f:
-            f.write(
-                f"""server = {self.DIRECTORY}
-config-dir = ./{self.path}/etc/letsencrypt
-work-dir = {self._config["certbot"]["workdir"]}/
-logs-dir = {self._config["certbot"]["workdir"]}/logs
-"""
-            )
-
         self._rmtree.extend(["archive", "renewal", "live"])
         self._rmtree.extend(["etc"])
 
@@ -323,8 +314,39 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
                 f"--key-type ecdsa --elliptic-curve secp{self.CERT_KEY_ALG_BITS[1]}r1"
             )
 
+    async def _register(self):
+        await self._run(f"register --no-eff-email --agree-tos  -m {self.contact}")
+
+    async def _certonly(self, *argv, names=None, preferred_challenges="dns"):
+        authhook = "\t" + "\n\t".join(
+            map(
+                lambda s: f"CERTBOT_{s}=$CERTBOT_{s}",
+                [
+                    "DOMAIN",
+                    "VALIDATION",
+                    "TOKEN",
+                    "REMAINING_CHALLENGES",
+                    "ALL_DOMAINS",
+                ],
+            )
+        )
+
+        domains = " --domain ".join(names or self.domains)
+        extra = " ".join(argv) if argv else ""
+        await self._run(
+            f"certonly {self.key_args} --manual "
+            f'--manual-auth-hook "echo \\"{authhook}\\"" '
+            f"--manual-cleanup-hook /bin/true --preferred-challenges {preferred_challenges} --domain {domains} {extra}"
+        )
+
     async def _run(self, cmd):
-        argv = shlex.split(f"--non-interactive -c {self.path}/certbot.ini " + cmd)
+        argv = shlex.split(
+            f"--non-interactive "
+            f"--work-dir {self._config['certbot']['workdir']} "
+            f"--logs-dir {self._config['certbot']['workdir']}/logs "
+            f"--config-dir ./{self.path}/etc/letsencrypt "
+            f"--server {self.DIRECTORY} " + cmd
+        )
         import certbot._internal.main as cbm
         import certbot.util
         import certbot._internal.log
@@ -350,32 +372,19 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
 
     async def test_run(self):
         await self._run("certificates")
-
-        await self._run(f"register --agree-tos  -m {self.contact}")
-
-        arg = " --domain ".join(self.domains)
-        await self._run(
-            f"certonly {self.key_args} --webroot --webroot-path {self.path} --domain {arg}"
-        )
+        await self._register()
+        await self._certonly()
 
     async def test_subdomain_revocation(self):
-        await self._run(f"register --agree-tos  -m {self.contact}")
+        await self._register()
 
-        arg = " --domain ".join(self.domains)
-        await self._run(f"certonly --webroot --webroot-path {self.path} --domain {arg}")
+        await self._certonly()
 
-        arg = " --domain ".join(map(lambda s: f"dns.{s}", self.domains))
-        await self._run(
-            f"certonly {self.key_args} "
-            f"--manual --manual-public-ip-logging-ok --preferred-challenges=dns --manual-auth-hook "
-            f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
+        await self._certonly(
+            "--expand", names=list(map(lambda s: f"dns.{s}", self.domains))
         )
-
-        arg = " --domain ".join(map(lambda s: f"http.{s}", self.domains))
-        await self._run(
-            f"certonly {self.key_args} "
-            f"--manual --manual-public-ip-logging-ok --preferred-challenges=http --manual-auth-hook "
-            f'"echo $CERTBOT_VALIDATION" --manual-cleanup-hook /bin/true --domain {arg} --expand'
+        await self._certonly(
+            "--expand", names=list(map(lambda s: f"http.{s}", self.domains))
         )
 
         for j in ["", "dns.", "http."]:
@@ -387,32 +396,26 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
                 log.exception(e)
 
     async def test_skey_revocation(self):
-        await self._run(f"register --agree-tos  -m {self.contact}")
+        await self._register()
 
-        arg = " --domain ".join(self.domains)
-        await self._run(
-            f"certonly {self.key_args} --webroot --webroot-path {self.path} --domain {arg}"
-        )
+        await self._certonly()
 
+        domain = self.domains[0].lstrip("*.")
         await self._run(
-            f"revoke --cert-path {self.path}/etc/letsencrypt/live/{self.domains[0]}/cert.pem "
-            f"--key-path {self.path}/etc/letsencrypt/live/{self.domains[0]}/privkey.pem"
+            f"revoke --cert-path {self.path}/etc/letsencrypt/live/{domain}/cert.pem "
+            f"--key-path {self.path}/etc/letsencrypt/live/{domain}/privkey.pem"
         )
 
     async def test_renewal(self):
-        await self._run(f"register --agree-tos  -m {self.contact}")
-
-        arg = " --domain ".join(self.domains)
-        await self._run(
-            f"certonly {self.key_args} --webroot --webroot-path {self.path} --domain {arg}"
-        )
+        await self._register()
+        await self._certonly()
 
         await self._run(
             f"renew --no-random-sleep-on-renew --webroot --webroot-path {self.path}"
         )
 
     async def test_register(self):
-        await self._run(f"register --agree-tos  -m {self.contact}")
+        await self._register()
 
     async def test_unregister(self):
         try:
@@ -421,6 +424,17 @@ logs-dir = {self._config["certbot"]["workdir"]}/logs
             pass
         await self.test_register()
         await self._run("unregister --agree-tos")
+
+    async def test_bad_identifier(self):
+        await self._register()
+        for i in ["{invalid}", "xn--test.de", "test.de-", "test.11"]:
+            with self.assertRaisesRegex(
+                acme.messages.Error,
+                r"urn:ietf:params:acme:error:rejectedIdentifier :: "
+                r"The server will not issue certificates for the identifier :: "
+                r"The Order has invalid identifiers.",
+            ):
+                await self._certonly(names=[i])
 
 
 class TestOurClient:
@@ -572,43 +586,17 @@ class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     pass
 
 
-class TestCertBotBadNameCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
-    @property
-    def names(self):
-        return ["{invalid}"]
-
-    async def test_run(self):
-        await super().test_run()
-
-
 class TestCertBotWCCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     @property
     def names(self):
         return ["*.test.de"]
 
+    async def test_subdomain_revocation(self):
+        "avoid Requesting a certificate for dns.*.test.de"
+        pass
+
     async def test_run(self):
-        await self._run("certificates")
-
-        await self._run(f"register --agree-tos  -m {self.contact}")
-
-        arg = " --domain ".join(self.domains)
-        authhook = "\t" + "\n\t".join(
-            map(
-                lambda s: f"CERTBOT_{s}=$CERTBOT_{s}",
-                [
-                    "DOMAIN",
-                    "VALIDATION",
-                    "TOKEN",
-                    "REMAINING_CHALLENGES",
-                    "ALL_DOMAINS",
-                ],
-            )
-        )
-        await self._run(
-            f"certonly {self.key_args} --manual "
-            f'--manual-auth-hook "echo \\"{authhook}\\"" '
-            f"--manual-cleanup-hook /bin/true --preferred-challenges dns --domain {arg}"
-        )
+        await super().test_run()
 
 
 class TestCertBotRSA2048EC256CA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
