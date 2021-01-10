@@ -304,7 +304,7 @@ class AcmeClient:
         for authorization in authorizations:
             for challenge in authorization.challenges:
                 if ChallengeType(challenge.chall.typ) == chosen_challenge_type:
-                    challenges_to_complete.append((authorization, challenge))
+                    challenges_to_complete.append((authorization.identifier, challenge))
 
                     break
 
@@ -334,7 +334,7 @@ class AcmeClient:
         self,
         solver: ChallengeSolver,
         challenges: typing.List[
-            typing.Tuple[acme.messages.Authorization, acme.messages.ChallengeBody]
+            typing.Tuple[acme.messages.Identifier, acme.messages.ChallengeBody]
         ],
     ):
         """Cleans up after the challenges leveraging the given solver.
@@ -343,8 +343,8 @@ class AcmeClient:
         :param challenges: List of identifier, challenge tuples to clean up after."""
         await asyncio.gather(
             *[
-                solver.cleanup_challenge(self._private_key, authorization, challenge)
-                for authorization, challenge in challenges
+                solver.cleanup_challenge(self._private_key, identifier, challenge)
+                for identifier, challenge in challenges
             ]
         )
 
@@ -352,7 +352,7 @@ class AcmeClient:
         self,
         solver: ChallengeSolver,
         challenges: typing.List[
-            typing.Tuple[acme.messages.Authorization, acme.messages.ChallengeBody]
+            typing.Tuple[acme.messages.Identifier, acme.messages.ChallengeBody]
         ],
     ):
         """Attempts to complete the challenges leveraging the given solver.
@@ -364,8 +364,8 @@ class AcmeClient:
         # Complete the pending challenges
         await asyncio.gather(
             *[
-                solver.complete_challenge(self._private_key, authorization, challenge)
-                for (authorization, challenge) in challenges
+                solver.complete_challenge(self._private_key, identifier, challenge)
+                for (identifier, challenge) in challenges
             ]
         )
 

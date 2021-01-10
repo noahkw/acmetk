@@ -46,7 +46,7 @@ class ChallengeSolver(ConfigurableMixin, abc.ABC):
     async def complete_challenge(
         self,
         key: josepy.jwk.JWK,
-        authorization: acme.messages.Authorization,
+        identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
         """Complete the given challenge.
@@ -66,7 +66,7 @@ class ChallengeSolver(ConfigurableMixin, abc.ABC):
     async def cleanup_challenge(
         self,
         key: josepy.jwk.JWK,
-        authorization: acme.messages.Authorization,
+        identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
         """Performs cleanup for the given challenge.
@@ -80,7 +80,7 @@ class ChallengeSolver(ConfigurableMixin, abc.ABC):
         meaning it should silently return if there is nothing to clean up.
 
         :param key: The client's account key.
-        :param authorization: The authorization that is associated with the challenge.
+        :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to clean up after.
         """
         pass
@@ -97,7 +97,7 @@ class DummySolver(ChallengeSolver):
     async def complete_challenge(
         self,
         key: josepy.jwk.JWK,
-        authorization: acme.messages.Authorization,
+        identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
         """Does not complete the given challenge.
@@ -109,19 +109,15 @@ class DummySolver(ChallengeSolver):
         :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to be completed.
         """
-        name = authorization.identifier.value
-        if authorization.wildcard:
-            name = "*." + name
         logger.debug(
-            f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ},"
-            f" identifier {name}"
+            f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ}, identifier {identifier}"
         )
         # await asyncio.sleep(1)
 
     async def cleanup_challenge(
         self,
         key: josepy.jwk.JWK,
-        authorization: acme.messages.Authorization,
+        identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
         """Performs cleanup for the given challenge.
@@ -133,11 +129,8 @@ class DummySolver(ChallengeSolver):
         :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to clean up after.
         """
-        name = authorization.identifier.value
-        if authorization.wildcard:
-            name = "*." + name
         logger.debug(
-            f"(not) cleaning up after challenge {challenge.uri}, type {challenge.chall.typ} identifier {name}"
+            f"(not) cleaning up after challenge {challenge.uri}, type {challenge.chall.typ}"
         )
 
 
@@ -285,7 +278,7 @@ class InfobloxClient(ChallengeSolver):
     async def complete_challenge(
         self,
         key: josepy.jwk.JWK,
-        authorization: acme.messages.Authorization,
+        identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
         """Completes the given DNS-01 challenge.
@@ -295,17 +288,12 @@ class InfobloxClient(ChallengeSolver):
         to the remote CA's DNS.
 
         :param key: The client's account key.
-        :param authorization: The authorization that is associated with the challenge.
+        :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to be completed.
         :raises: :class:`~acmetk.client.exceptions.CouldNotCompleteChallenge`
             If the challenge completion attempt failed.
         """
-
-        name = challenge.chall.validation_domain_name(authorization.identifier.value)
-
-        if authorization.wildcard:
-            name = "*." + name
-
+        name = challenge.chall.validation_domain_name(identifier.value)
         text = challenge.chall.validation(key)
 
         await self.set_txt_record(name, text)
@@ -323,7 +311,7 @@ class InfobloxClient(ChallengeSolver):
     async def cleanup_challenge(
         self,
         key: josepy.jwk.JWK,
-        authorization: acme.messages.Authorization,
+        identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
     ):
         """Performs cleanup for the given challenge.
@@ -331,12 +319,10 @@ class InfobloxClient(ChallengeSolver):
         This method de-provisions the TXT record that was created to complete the given challenge.
 
         :param key: The client's account key.
-        :param authorization: The authorization that is associated with the challenge.
+        :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to clean up after.
         """
-        name = challenge.chall.validation_domain_name(authorization.identifier.value)
-        if authorization.wildcard:
-            name = "*." + name
+        name = challenge.chall.validation_domain_name(identifier.value)
         text = challenge.chall.validation(key)
 
         await self.delete_txt_record(name, text)
