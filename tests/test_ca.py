@@ -164,19 +164,12 @@ class TestAcmetinyEC(TestAcmetiny):
     CERT_KEY_ALG_BITS = ("EC", 256)
 
     async def _run_acmetiny(self, cmd):
-        import tests.acme_tiny_ec.acme_tiny as at
+        import tests.acme_tiny.acme_tiny_ec as at
 
         argv = shlex.split(cmd)
         log.info(shlex.join(argv))
         r = await self.loop.run_in_executor(None, at.main, argv)
         return r
-
-    async def test_run(self):
-        await self._run_acmetiny(
-            f"--directory-url {self.DIRECTORY} --disable-check --contact {self.contact} --account-key "
-            f"{self.client_data.key_path} --csr {self.client_data.csr_path} "
-            f"--acme-dir {self.path}/challenge"
-        )
 
 
 class TestDehydrated:
