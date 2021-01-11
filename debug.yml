@@ -48,6 +48,7 @@ tests:
       mail_suffixes: *mail_suffixes
       subnets: *subnets
       require_eab: true
+      allow_wildcard: true
   LocalCADeployment:
     names:
       - 'localhost'
@@ -61,6 +62,7 @@ tests:
       private_key: '/app/certs/root.key'
       mail_suffixes: *mail_suffixes
       use_forwarded_header: true
+      allow_wildcard: true
     client:
       directory: 'https://127.0.0.1/directory'
       contact:
@@ -78,6 +80,7 @@ tests:
       rsa_min_keysize: *rsa_min
       tos_url: *tos
       mail_suffixes: *mail_suffixes
+      allow_wildcard: true
       client:
         directory: 'http://localhost:8000/ca/directory'
         private_key: 'broker_client_account.key'
@@ -93,6 +96,7 @@ tests:
       db: *db_debug_ca
       rsa_min_keysize: *rsa_min
       tos_url: *tos
+      allow_wildcard: true
   BrokerLE:
     names:
       - 'acmenoah.luis.uni-hannover.de'
@@ -104,6 +108,7 @@ tests:
       rsa_min_keysize: *rsa_min
       tos_url: *tos
       mail_suffixes: *mail_suffixes
+      allow_wildcard: true
       client:
         directory: &le_staging 'https://acme-staging-v02.api.letsencrypt.org/directory'
         private_key: 'broker_client_account.key'
@@ -128,6 +133,7 @@ tests:
       rsa_min_keysize: *rsa_min
       tos_url: *tos
       mail_suffixes: *mail_suffixes
+      allow_wildcard: true
       client:
         directory: 'http://localhost:8000/ca/directory'
         private_key: 'proxy_client_account.key'
@@ -143,6 +149,7 @@ tests:
       db: *db_debug_ca
       rsa_min_keysize: *rsa_min
       tos_url: *tos
+      allow_wildcard: true
   ProxyLE:
     names:
       - 'acmenoah.luis.uni-hannover.de'
@@ -155,6 +162,7 @@ tests:
       rsa_min_keysize: *rsa_min
       tos_url: *tos
       mail_suffixes: *mail_suffixes
+      allow_wildcard: true
       client:
         directory: *le_staging
         private_key: 'proxy_client_account.key'

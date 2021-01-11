@@ -54,6 +54,13 @@ class TestCertBotWCProxyLocalCA(
     async def test_bad_identifier(self):
         await super().test_bad_identifier()
 
+    async def test_no_wc_run(self):
+        self.relay._allow_wildcard = False
+        with self.assertRaisesRegex(
+            acme.messages.Error, "The ACME server can not issue a wildcard certificate"
+        ):
+            await super().test_run()
+
 
 class TestOurClientProxyLocalCA(
     TestOurClientStress, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase

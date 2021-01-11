@@ -607,6 +607,13 @@ class TestCertBotWCCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
+    async def test_no_wc_run(self):
+        self.ca._allow_wildcard = False
+        with self.assertRaisesRegex(
+            acme.messages.Error, "The ACME server can not issue a wildcard certificate"
+        ):
+            await super().test_run()
+
 
 class TestCertBotRSA2048EC256CA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("RSA", 2048)

@@ -126,6 +126,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         subnets=None,
         use_forwarded_header=False,
         require_eab=False,
+        allow_wildcard=False,
         **kwargs,
     ):
         super().__init__()
@@ -147,6 +148,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         )
         self._use_forwarded_header = use_forwarded_header
         self._require_eab = require_eab
+        self._allow_wildcard = allow_wildcard
 
         self.app = web.Application(
             middlewares=[
@@ -498,7 +500,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                         detail=f"The contact email '{address}' is not supported.",
                     )
 
-    def _verify_order(self, obj: acme.messages.NewOrder):
+    def _verify_order(self, obj: acme.messages.NewOrder, wildcardonly=False):
         """Verify the identifiers in an Order
 
         Remove wildcards and validate with regex
@@ -509,6 +511,17 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         """
 
         try:
+            # wildcard
+            if self._allow_wildcard is False and True in set(
+                map(
+                    lambda identifier: identifier.value.startswith("*"),
+                    obj.identifiers,
+                )
+            ):
+                raise ValueError("The ACME server can not issue a wildcard certificate")
+            if wildcardonly:
+                return
+
             # idna decoding xn-- …
             try:
                 list(
@@ -1384,7 +1397,7 @@ class AcmeProxy(AcmeRelayBase):
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
-
+            self._verify_order(obj, wildcardonly=True)
             identifiers = [
                 {"type": identifier.typ, "value": identifier.value}
                 for identifier in obj.identifiers

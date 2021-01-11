@@ -72,6 +72,7 @@ class TestBroker(TestCA):
 
         self.runner = runner
         self.broker_client = broker_client
+        self.relay = broker
 
     async def asyncTearDown(self) -> None:
         await super().asyncTearDown()
@@ -123,6 +124,7 @@ class TestBrokerLocalCA(TestBroker):
 
         self.runner = runner
         self.broker_client = broker_client
+        self.relay = broker
 
 
 class TestAcmetinyBrokerLocalCA(
