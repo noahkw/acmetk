@@ -427,14 +427,23 @@ class TestCertBot:
 
     async def test_bad_identifier(self):
         await self._register()
-        for i in ["{invalid}", "xn--test.de", "test.de-", "test.11"]:
-            with self.assertRaisesRegex(
-                acme.messages.Error,
-                r"urn:ietf:params:acme:error:rejectedIdentifier :: "
-                r"The server will not issue certificates for the identifier :: "
-                r"The Order has invalid identifiers.",
-            ):
-                await self._certonly(names=[i])
+        for err, names in {
+            r"Domain name contains an invalid character": [
+                "the_test.de",
+                "{invalid}",
+                "test.-de",
+            ],
+            r"Domain name contains malformed punycode": ["xn--test.de"],
+            r"Domain name does not end with a valid public suffix \(TLD\)": ["test.11"],
+        }.items():
+            for i in names:
+                with self.assertRaisesRegex(
+                    acme.messages.Error,
+                    r"urn:ietf:params:acme:error:rejectedIdentifier :: "
+                    r"The server will not issue certificates for the identifier :: "
+                    + err,
+                ):
+                    await self._certonly(names=[i])
 
 
 class TestOurClient:

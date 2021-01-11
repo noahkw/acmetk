@@ -51,6 +51,9 @@ class TestCertBotWCProxyLocalCA(
         "avoid Requesting a certificate for dns.*.test.de"
         pass
 
+    async def test_bad_identifier(self):
+        await super().test_bad_identifier()
+
 
 class TestOurClientProxyLocalCA(
     TestOurClientStress, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase

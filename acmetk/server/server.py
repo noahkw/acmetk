@@ -520,7 +520,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                     )
                 )
             except UnicodeError:
-                raise ValueError
+                raise ValueError("Domain name contains malformed punycode")
 
             # regex
             r = set(
@@ -533,7 +533,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                 )
             )
             if False in r:
-                raise ValueError
+                raise ValueError("Domain name contains an invalid character")
 
             # ends with a letter
             r = set(
@@ -543,12 +543,12 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                 )
             )
             if False in r:
-                raise ValueError
+                raise ValueError(
+                    "Domain name does not end with a valid public suffix (TLD)"
+                )
 
-        except ValueError:
-            raise acme.messages.Error.with_code(
-                "rejectedIdentifier", detail="The Order has invalid identifiers."
-            )
+        except ValueError as e:
+            raise acme.messages.Error.with_code("rejectedIdentifier", detail=e.args[0])
 
     @routes.get("/directory", name="directory")
     async def directory(self, request):
