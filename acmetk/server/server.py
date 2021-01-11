@@ -1384,7 +1384,6 @@ class AcmeProxy(AcmeRelayBase):
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
-            self._verify_order(obj)
 
             identifiers = [
                 {"type": identifier.typ, "value": identifier.value}
