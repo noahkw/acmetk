@@ -41,7 +41,8 @@ class Account(Entity, Serializer):
     """
 
     __tablename__ = "accounts"
-    __serialize__ = __diff__ = frozenset(["status", "contact"])
+    __serialize__ = frozenset(["status", "contact"])
+    __diff__ = frozenset(["status", "contact", "kid"])
     __mapper_args__ = {
         "polymorphic_identity": "account",
     }
@@ -149,17 +150,20 @@ class Account(Entity, Serializer):
         :param obj: The registration message object.
         :return: The constructed account.
         """
+        return Account(
+            key=jwk,
+            kid=cls._jwk_kid(jwk),
+            status=AccountStatus.VALID,
+            contact=json.dumps(obj.contact),
+        )
+
+    @staticmethod
+    def _jwk_kid(jwk):
         pem = jwk.key.public_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PublicFormat.SubjectPublicKeyInfo,
         )
-
-        return Account(
-            key=jwk,
-            kid=hashlib.sha256(pem).hexdigest(),
-            status=AccountStatus.VALID,
-            contact=json.dumps(obj.contact),
-        )
+        return hashlib.sha256(pem).hexdigest()
 
     @property
     def account_of(self):

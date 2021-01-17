@@ -4,6 +4,7 @@ import typing
 
 import OpenSSL
 import acme.messages
+import acme.jws
 import josepy
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
@@ -233,3 +234,25 @@ class Order(acme.messages.Order):
 
     url: str = josepy.Field("url", omitempty=True)
     """The order's URL at the remote CA."""
+
+
+class KeyChange(josepy.JSONObjectWithFields):
+    account = josepy.Field("account")
+    oldKey = josepy.Field("oldKey", decoder=josepy.jwk.JWK.from_json)
+
+
+class SignedKeyChange(josepy.JSONObjectWithFields):
+    protected = josepy.Field("protected")
+    payload = josepy.Field("payload")
+    signature = josepy.Field("signature")
+
+    @classmethod
+    def from_data(cls, kc, key, alg, **kwargs):
+        data = acme.jws.JWS.sign(
+            kc.json_dumps().encode(), key=key, alg=alg, nonce=None, **kwargs
+        )
+
+        signature = josepy.b64.b64encode(data.signature.signature).decode()
+        payload = josepy.b64.b64encode(data.payload).decode()
+        protected = josepy.b64.b64encode(data.signature.protected.encode()).decode()
+        return cls(protected=protected, payload=payload, signature=signature)

@@ -88,7 +88,9 @@ class Order(Entity, Serializer):
     """The requested *notBefore* field in the certificate."""
     notAfter = Column(DateTime(timezone=True))
     """The requested *notAfter* field in the certificate."""
-    account_kid = Column(String, ForeignKey("accounts.kid"), nullable=False)
+    account_kid = Column(
+        String, ForeignKey("accounts.kid", onupdate="CASCADE"), nullable=False
+    )
     account = relationship(
         "Account", back_populates="orders", lazy="noload", foreign_keys=account_kid
     )

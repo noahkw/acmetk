@@ -475,6 +475,29 @@ class TestOurClient:
     async def test_run(self):
         await self._run_one(self.client, self.client_data.csr)
 
+    async def test_keychange(self):
+        await self.client.start()
+
+        with self.assertRaisesRegex(
+            acme.messages.Error, "The KeyChange object key already in use"
+        ):
+            await self.client.key_change(self.client_data.key_path)
+
+        kp = self.client_data.key_path.parent / "keychange.key"
+        self._make_key(kp, self.ACCOUNT_KEY_ALG_BITS)
+
+        await self.client.key_change(kp)
+        await self._run_one(self.client, self.client_data.csr)
+
+        await self.client.key_change(self.client_data.key_path)
+        await self._run_one(self.client, self.client_data.csr)
+
+        sk = self.client_data.key_path.parent / "keychange.key"
+        self._make_key(sk, ("RSA", 1024))
+        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
+            await self.client.key_change(sk)
+        self.assertBadKey(e, "_RSAPublicKey", "account", "1024")
+
 
 class TestOurClientStress(TestOurClient):
     async def test_run_stress(self):
@@ -576,6 +599,9 @@ class TestCertBotRSA2048EC256CA(TestCertBot, TestCA, unittest.IsolatedAsyncioTes
 class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_revoke(self):
         await super().test_revoke()
+
+    async def test_keychange(self):
+        await super().test_keychange()
 
 
 class TestOurClientEC256EC256CA(

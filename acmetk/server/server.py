@@ -501,6 +501,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
             "newNonce": url_for(request, "new-nonce"),
             "newOrder": url_for(request, "new-order"),
             "revokeCert": url_for(request, "revoke-cert"),
+            "keyChange": url_for(request, "key-change"),
             "meta": {},
         }
 
@@ -547,20 +548,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
             jwk = jws.signature.combined.jwk
             pub_key = jwk.key._wrapped
 
-            if isinstance(pub_key, self.SUPPORTED_ACCOUNT_KEYS):
-                try:
-                    self._match_keysize(pub_key, "account")
-                except ValueError as e:
-                    raise acme.messages.Error.with_code(
-                        "badPublicKey",
-                        detail=e.args[0],
-                    )
-            else:
-                raise acme.messages.Error.with_code(
-                    "badPublicKey",
-                    detail=f"At this moment, only the following keys are supported for accounts: "
-                    f"{', '.join([key_type.__name__ for key_type in self.SUPPORTED_ACCOUNT_KEYS])}.",
-                )
+            self._validate_account_key(pub_key)
 
             if account:
                 if account.status != models.AccountStatus.VALID:
@@ -601,6 +589,22 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                         status=201,
                         headers={"Location": url_for(request, "accounts", kid=kid)},
                     )
+
+    def _validate_account_key(self, pub_key):
+        if isinstance(pub_key, self.SUPPORTED_ACCOUNT_KEYS):
+            try:
+                self._match_keysize(pub_key, "account")
+            except ValueError as e:
+                raise acme.messages.Error.with_code(
+                    "badPublicKey",
+                    detail=e.args[0],
+                )
+        else:
+            raise acme.messages.Error.with_code(
+                "badPublicKey",
+                detail=f"At this moment, only the following keys are supported for accounts: "
+                f"{', '.join([key_type.__name__ for key_type in self.SUPPORTED_ACCOUNT_KEYS])}.",
+            )
 
     @routes.post("/accounts/{kid}", name="accounts")
     async def accounts(self, request):
@@ -927,6 +931,94 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
             await challenge.validate(session, request, validator)
 
             await session.commit()
+
+    @routes.post("/key-change", name="key-change")
+    async def keychange(self, request):
+        """7.3.5.  Account Key Rollover"""
+        async with self._session(request) as session:
+            jws, account = await self._verify_request(request, session)
+            payload = jws.payload.decode()
+            ijws = acme.jws.JWS.json_loads(payload)
+
+            """The inner JWS MUST meet the normal requirements …"""
+            sig = ijws.signature.combined
+            if sig.alg not in self.SUPPORTED_JWS_ALGORITHMS:
+                raise acme.messages.Error.with_code(
+                    "badSignatureAlgorithm",
+                    detail=f"Supported algorithms: {', '.join([str(alg) for alg in self.SUPPORTED_JWS_ALGORITHMS])}",
+                )
+
+            """, with the following differences:"""
+
+            if ijws.signature.combined.url != jws.signature.combined.url:
+                """ The inner JWS MUST have the same "url" header parameter as the outer JWS. """
+                raise acme.messages.Error.with_code(
+                    "malformed",
+                    detail="The inner JWS of the keychange url mismatches the outer JWS url.",
+                )
+
+            if ijws.signature.combined.nonce:
+                """The inner JWS MUST omit the "nonce" header parameter."""
+                raise acme.messages.Error.with_code(
+                    "malformed",
+                    detail="The inner JWS has a nonce.",
+                )
+
+            if ijws.signature.combined.jwk is None:
+                """The inner JWS MUST have a "jwk" header parameter, containing the public key of the new key pair."""
+                raise acme.messages.Error.with_code(
+                    "malformed",
+                    detail="The inner JWS of the keychange lacks a jwk.",
+                )
+
+            if not ijws.verify(sig.jwk):
+                """ 4.  Check that the inner JWS verifies using the key in its "jwk" field."""
+                raise acme.messages.Error.with_code("unauthorized")
+
+            kc = messages.KeyChange.json_loads(ijws.payload)
+
+            if kc.account != url_for(request, "accounts", kid=account.kid):
+                """7.  Check that the "account" field of the keyChange object contains
+                the URL for the account matching the old key (i.e., the "kid"
+                field in the outer JWS)."""
+                raise acme.messages.Error.with_code(
+                    "malformed", detail="The KeyChange object account mismatches"
+                )
+
+            if kc.oldKey != account.key:
+                """8.  Check that the "oldKey" field of the keyChange object is the same as the account key for the
+                account in question."""
+                raise acme.messages.Error.with_code(
+                    "malformed", detail="The KeyChange object oldKey mismatches"
+                )
+
+            inuse = await self._db.get_account(
+                session, kid=(kid := account._jwk_kid(sig.jwk))
+            )
+
+            if inuse:
+                """9. Check that no account exists whose account key is the same as the key in the "jwk" header
+                parameter of the inner JWS."""
+                raise acme.messages.Error.with_code(
+                    "malformed", detail="The KeyChange object key already in use"
+                )
+
+            """key size validation"""
+            self._validate_account_key(sig.jwk.key._wrapped)
+
+            account.kid = kid
+            account.key = ijws.signature.combined.jwk
+            await session.merge(account)
+            await session.flush()
+            await session.commit()
+
+            serialized = account.serialize(request)
+
+            return self._response(
+                request,
+                serialized,
+                headers={"Location": url_for(request, "accounts", kid=kid)},
+            )
 
     async def handle_order_finalize(self, request, kid: str, order_id: str):
         """Method that handles the actual finalization of an order.
