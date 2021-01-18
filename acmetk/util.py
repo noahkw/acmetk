@@ -1,3 +1,4 @@
+import os
 import re
 import typing
 from datetime import datetime, timedelta
@@ -55,6 +56,7 @@ def generate_rsa_key(path: Path, key_size=2048) -> rsa.RSAPrivateKey:
         encryption_algorithm=serialization.NoEncryption(),
     )
 
+    os.umask(0o177)
     with open(path, "wb") as pem_out:
         pem_out.write(pem)
 
@@ -77,6 +79,7 @@ def generate_ec_key(path: Path, key_size=256) -> ec.EllipticCurvePrivateKey:
         encryption_algorithm=serialization.NoEncryption(),
     )
 
+    os.umask(0o177)
     with open(path, "wb") as pem_out:
         pem_out.write(pem)
 
