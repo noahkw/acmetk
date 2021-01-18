@@ -16,7 +16,7 @@ from acmetk.server import (
     AcmeCA,
     ChallengeValidator,
 )
-from acmetk.util import generate_root_cert, generate_rsa_key
+from acmetk.util import generate_root_cert, generate_rsa_key, generate_ec_key
 
 logger = logging.getLogger(__name__)
 
@@ -110,12 +110,17 @@ def generate_keys(root_key_file):
 @main.command()
 @click.argument("account-key-file", type=click.Path())
 def generate_account_key(account_key_file):
-    """Generates an account key for the ACME client."""
-    click.echo(
-        f"Generating client key at {account_key_file}.\nMake sure to change its permissions,"
-        f" for example with: chmod 600 {account_key_file}"
-    )
+    """Generates an RSA account key for the ACME client."""
+    click.echo(f"Generating client key at {account_key_file}.")
     generate_rsa_key(account_key_file)
+
+
+@main.command()
+@click.argument("account-key-file", type=click.Path())
+def generate_account_key_ec(account_key_file):
+    """Generates an EC account key for the ACME client."""
+    click.echo(f"Generating client key at {account_key_file}.")
+    generate_ec_key(account_key_file)
 
 
 @main.command()
