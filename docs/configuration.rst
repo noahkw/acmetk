@@ -43,6 +43,7 @@ An ACME CA configuration file might look as follows:
         - '130.75.0.0/16'
       use_forwarded_header: true
       require_eab: true
+      allow_wildcard: false
 
 * hostname (optional): The hostname that the server should bind to. Required if the *path* option is omitted when starting the server from the CLI.
     May also be an IP.
@@ -84,6 +85,9 @@ An ACME CA configuration file might look as follows:
 * require_eab (optional): Whether to require an External Account Binding on account creation.
     Defaults to allowing account creation without EAB if not specified.
 
+* allow_wildcard (optional): Whether to allow wildcards in identifiers.
+    Defaults to prohibiting wildcards in identifiers if not specified.
+
 To run a CA that issues self-signed certificates, the private key
 and root certificate may be generated using the following command:
 
@@ -123,6 +127,7 @@ For a broker, the file might looks as follows:
         - '130.75.0.0/16'
       use_forwarded_header: true
       require_eab: true
+      allow_wildcard: false
       client:
         directory: 'https://acme-v02.api.letsencrypt.org/directory'
         private_key: 'broker_client.key'
@@ -139,8 +144,8 @@ For a broker, the file might looks as follows:
               - '1.1.1.1' # Cloudflare DNS
 
 Refer to section `ACME Certificate Authority`_ for the options *hostname*, *port*, *db*, *challenge_validator*,
-*rsa_min_keysize*, *ec_min_keysize*, *tos_url*, *mail_suffixes*, *subnets*, *use_forwarded_header*,
-and *require_eab*.
+*rsa_min_keysize*, *ec_min_keysize*, *tos_url*, *mail_suffixes*, *subnets*, *use_forwarded_header*, *require_eab*,
+and *allow_wildcard*.
 The *client* section inside the main *broker* section configures the internal
 :class:`~acmetk.client.AcmeClient` that is used to communicate with the actual CA.
 Refer to section `ACME Client`_ for a description of the possible options.
