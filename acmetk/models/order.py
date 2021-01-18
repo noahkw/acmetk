@@ -65,9 +65,7 @@ class Order(Entity, Serializer):
 
     _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
 
-    order_id = Column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
-    )
+    order_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     """The order's ID."""
     proxied_url = Column(String, nullable=True, unique=False)
     """The order's URL at the remote CA."""
