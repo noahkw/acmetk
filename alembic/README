@@ -1,1 +1,1 @@
-Generic single-database configuration.
+Always match the head revision with Database.ALEMBIC_REVISION
