@@ -125,6 +125,30 @@ class ExternalAccountBindingStore:
 
         return pending_eab.kid, pending_eab.hmac_key
 
+    def create_no_cert(self, request) -> typing.Tuple[str, str]:
+        """Creates an :class:`ExternalAccountBinding` request and stores it internally for verification at a later
+        point in time.
+
+        :param request: The request that must not necessarily contain a client certificate.
+        :return: The resulting pending EAB's :attr:`~ExternalAccountBinding.kid` and
+            :attr:`~ExternalAccountBinding.hmac_key`.
+        """
+        import random
+        import string
+
+        mail = (
+            "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
+            + "@beta.acmenoah.uni-hannover.de"
+        )
+        mail = mail.lower()
+
+        if not (pending_eab := self._pending.get(mail, None)) or pending_eab.expired():
+            pending_eab = self._pending[mail] = ExternalAccountBinding(
+                mail, url_for(request, "new-account")
+            )
+
+        return pending_eab.kid, pending_eab.hmac_key
+
     def verify(
         self,
         kid: str,
@@ -248,4 +272,13 @@ class AcmeEAB:
             return response
 
         kid, hmac_key = self._eab_store.create(request)
+        return {"kid": kid, "hmac_key": hmac_key}
+
+    @routes.get("/eab-no-cert", name="eab-no-cert")
+    @aiohttp_jinja2.template("eab.jinja2")
+    async def eab_no_cert(self, request):
+        """Handler that displays the user's external account binding credentials, i.e. their *kid* and *hmac_key*
+        regardless of whether they have a client certificate..
+        """
+        kid, hmac_key = self._eab_store.create_no_cert(request)
         return {"kid": kid, "hmac_key": hmac_key}
