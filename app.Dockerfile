@@ -10,7 +10,7 @@ VOLUME /var/log/supervisor
 
 WORKDIR /app
 
-RUN pip install -r requirements.txt \
+RUN pip install --use-feature=2020-resolver -r requirements.txt \
     && pip install . \
     && chmod 700 acmetk/main.py app_entrypoint.sh
 

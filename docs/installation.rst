@@ -73,7 +73,7 @@ points to the right binary.
    python -m venv venv
    source venv/bin/activate
    # Install the package into the virtual environment
-   pip install -r acme-broker/requirements.txt
+   pip install --use-feature=2020-resolver -r acme-broker/requirements.txt
    pip install acme-broker/.
    # Generate an account key for the internal ACME client
    python -m acmetk generate-account-key /etc/acmetk/broker_client_account.key
