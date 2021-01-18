@@ -65,9 +65,7 @@ class Order(Entity, Serializer):
 
     _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
 
-    order_id = Column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
-    )
+    order_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     """The order's ID."""
     proxied_url = Column(String, nullable=True, unique=False)
     """The order's URL at the remote CA."""
@@ -88,9 +86,11 @@ class Order(Entity, Serializer):
     """The requested *notBefore* field in the certificate."""
     notAfter = Column(DateTime(timezone=True))
     """The requested *notAfter* field in the certificate."""
-    account_kid = Column(String, ForeignKey("accounts.kid"), nullable=False)
+    account_id = Column(
+        UUID(as_uuid=True), ForeignKey("accounts.account_id"), nullable=False
+    )
     account = relationship(
-        "Account", back_populates="orders", lazy="noload", foreign_keys=account_kid
+        "Account", back_populates="orders", lazy="noload", foreign_keys=account_id
     )
     """The :class:`~acmetk.models.account.Account` that created the order."""
     certificate = relationship(

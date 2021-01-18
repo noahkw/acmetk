@@ -55,19 +55,7 @@ class AcmeClient:
 
         self._directory_url = directory_url
 
-        with open(private_key, "rb") as pem:
-            data = pem.read()
-            certs = acmetk.util.pem_split(data.decode())
-            if len(certs) != 1:
-                raise ValueError(f"Bad Private Key in file {private_key}")
-            if isinstance(certs[0], rsa.RSAPrivateKeyWithSerialization):
-                self._private_key = josepy.jwk.JWKRSA.load(data)
-                self._alg = josepy.jwa.RS256
-            elif isinstance(certs[0], ec.EllipticCurvePrivateKeyWithSerialization):
-                self._private_key = josepy.jwk.JWKEC.load(data)
-                self._alg = josepy.jwa.ES256
-            else:
-                raise ValueError(f"Bad Private Key in file {private_key}")
+        self._private_key, self._alg = self._open_key(private_key)
         # Filter empty strings
         self._contact = {k: v for k, v in contact.items() if len(v) > 0}
 
@@ -76,6 +64,22 @@ class AcmeClient:
         self._account = None
 
         self._challenge_solvers = dict()
+
+    def _open_key(self, private_key):
+        with open(private_key, "rb") as pem:
+            data = pem.read()
+            certs = acmetk.util.pem_split(data.decode())
+            if len(certs) != 1:
+                raise ValueError(f"Bad Private Key in file {private_key}")
+            if isinstance(certs[0], rsa.RSAPrivateKeyWithSerialization):
+                key = josepy.jwk.JWKRSA.load(data)
+                alg = josepy.jwa.RS256
+            elif isinstance(certs[0], ec.EllipticCurvePrivateKeyWithSerialization):
+                key = josepy.jwk.JWKEC.load(data)
+                alg = josepy.jwa.ES256
+            else:
+                raise ValueError(f"Bad Private Key in file {private_key}")
+            return key, alg
 
     async def close(self):
         """Closes the client's session.
@@ -105,7 +109,15 @@ class AcmeClient:
                 "Certificate retrieval will likely fail."
             )
 
-        await self.account_register(**self._contact)
+        if self._account:
+            try:
+                await self.account_lookup()
+            except acme.messages.Error as e:
+                if e.code != "accountDoesNotExist":
+                    raise
+                await self.account_register(**self._contact)
+        else:
+            await self.account_register(**self._contact)
 
     async def account_register(self, email: str = None, phone: str = None) -> None:
         """Registers an account with the CA.
@@ -449,6 +461,22 @@ class AcmeClient:
         resp, _ = await self._signed_request(cert_rev, self._directory["revokeCert"])
 
         return resp.status == 200
+
+    async def key_change(self, private_key):
+        key, alg = self._open_key(private_key)
+        key_change = messages.KeyChange(
+            account=self._account["kid"], oldKey=self._private_key.public_key()
+        )
+        signed_key_change = messages.SignedKeyChange.from_data(
+            key_change, key, alg, url=self._directory["keyChange"]
+        )
+        resp, data = await self._signed_request(
+            signed_key_change, self._directory["keyChange"]
+        )
+        data["kid"] = resp.headers["Location"]
+        self._account = messages.Account.from_json(data)
+        self._private_key = key
+        self._alg = alg
 
     def register_challenge_solver(
         self,

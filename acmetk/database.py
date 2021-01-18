@@ -126,7 +126,7 @@ class Database:
             await conn.run_sync(Base.metadata.create_all)
 
     @staticmethod
-    async def get_account(session, key=None, kid=None):
+    async def get_account(session, key=None, kid=None, account_id=None):
         statement = (
             select(Account)
             .options(
@@ -134,13 +134,10 @@ class Database:
                 .selectinload(Order.identifiers)
                 .selectinload(Identifier.authorization)
             )
-            .filter((Account.key == key) | (Account.kid == kid))
-            .join(Order, Account.kid == Order.account_kid, isouter=True)
-            .join(Identifier, Order.order_id == Identifier.order_id, isouter=True)
-            .join(
-                Authorization,
-                Identifier.identifier_id == Authorization.identifier_id,
-                isouter=True,
+            .filter(
+                (Account.key == key)
+                | (Account.kid == kid)
+                | (Account.account_id == account_id)
             )
         )
 
@@ -149,7 +146,7 @@ class Database:
         return result[0] if result else None
 
     @staticmethod
-    async def get_authz(session, kid, authz_id):
+    async def get_authz(session, account_id, authz_id):
         statement = (
             select(Authorization)
             .options(
@@ -160,8 +157,11 @@ class Database:
             )
             .join(Identifier, Authorization.identifier_id == Identifier.identifier_id)
             .join(Order, Identifier.order_id == Order.order_id)
-            .join(Account, Order.account_kid == Account.kid)
-            .filter((kid == Account.kid) & (Authorization.authorization_id == authz_id))
+            .join(Account, Order.account_id == Account.account_id)
+            .filter(
+                (account_id == Account.account_id)
+                & (Authorization.authorization_id == authz_id)
+            )
         )
         try:
             result = (await session.execute(statement)).first()
@@ -172,7 +172,7 @@ class Database:
         return result[0] if result else None
 
     @staticmethod
-    async def get_challenge(session, kid, challenge_id):
+    async def get_challenge(session, account_id, challenge_id):
         statement = (
             select(Challenge)
             .options(
@@ -192,8 +192,11 @@ class Database:
             )
             .join(Identifier, Authorization.identifier_id == Identifier.identifier_id)
             .join(Order, Identifier.order_id == Order.order_id)
-            .join(Account, Order.account_kid == Account.kid)
-            .filter((kid == Account.kid) & (Challenge.challenge_id == challenge_id))
+            .join(Account, Order.account_id == Account.account_id)
+            .filter(
+                (account_id == Account.account_id)
+                & (Challenge.challenge_id == challenge_id)
+            )
         )
         try:
             result = (await session.execute(statement)).first()
@@ -204,7 +207,7 @@ class Database:
         return result[0] if result else None
 
     @staticmethod
-    async def get_order(session, kid, order_id):
+    async def get_order(session, account_id, order_id):
         statement = (
             select(Order)
             .options(
@@ -212,8 +215,8 @@ class Database:
                 selectinload(Order.identifiers).selectinload(Identifier.authorization),
                 selectinload(Order.certificate),
             )
-            .join(Account, Order.account_kid == Account.kid)
-            .filter((kid == Account.kid) & (order_id == Order.order_id))
+            .join(Account, Order.account_id == Account.account_id)
+            .filter((account_id == Account.account_id) & (order_id == Order.order_id))
         )
         try:
             result = (await session.execute(statement)).first()
@@ -224,8 +227,10 @@ class Database:
         return result[0] if result else None
 
     @staticmethod
-    async def get_certificate(session, kid=None, certificate_id=None, certificate=None):
-        if kid and certificate_id:
+    async def get_certificate(
+        session, account_id=None, certificate_id=None, certificate=None
+    ):
+        if account_id and certificate_id:
             statement = (
                 select(Certificate)
                 .options(
@@ -234,9 +239,9 @@ class Database:
                     selectinload(Certificate.order).selectinload(Order.account),
                 )
                 .join(Order, Certificate.order_id == Order.order_id)
-                .join(Account, Order.account_kid == Account.kid)
+                .join(Account, Order.account_id == Account.account_id)
                 .filter(
-                    (kid == Account.kid)
+                    (account_id == Account.account_id)
                     & (Certificate.certificate_id == certificate_id)
                 )
             )
@@ -246,7 +251,7 @@ class Database:
                 .filter(Certificate.cert == certificate)
                 .options(selectinload(Certificate.order).selectinload(Order.account))
                 .join(Order, Certificate.order_id == Order.order_id)
-                .join(Account, Order.account_kid == Account.kid)
+                .join(Account, Order.account_id == Account.account_id)
             )
         else:
             raise ValueError(

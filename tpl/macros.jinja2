@@ -1,5 +1,5 @@
 {% macro account_url(obj, l=13) -%}
-<a href="{{ url_for('mgmt-account', account=obj.account_of.kid|string) }}">{{ shorten(obj.account_of.kid|string, l) }}</a>
+<a href="{{ url_for('mgmt-account', account=obj.account_of.account_id|string) }}">{{ shorten(obj.account_of.account_id|string, l) }}</a>
 {%- endmacro %}
 
 {% macro order_url(obj, l=13, name=None) -%}

@@ -174,7 +174,7 @@ class AcmeManagement:
     async def management_accounts(self, request):
         pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
-            q = select(sqlalchemy.func.count(Account.kid))
+            q = select(sqlalchemy.func.count(Account.account_id))
             async with pms.measure():
                 total = (await session.execute(q)).scalars().first()
 
@@ -201,7 +201,7 @@ class AcmeManagement:
                     selectinload(Account.orders),
                     selectinload(Account.changes).selectinload(Change.entity),
                 )
-                .filter(Account.kid == account)
+                .filter(Account.account_id == account)
             )
             async with pms.measure():
                 a = await session.execute(q)
