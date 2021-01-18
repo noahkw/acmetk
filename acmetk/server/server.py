@@ -1351,7 +1351,7 @@ class AcmeBroker(AcmeRelayBase):
                 finalized = await self._client.order_finalize(order_ca, order.csr)
                 await self._obtain_and_store_cert(order, finalized)
             except acme.messages.Error as e:
-                logger.info("Could not create order %s with remote CA: %s", order_id, e)
+                logger.exception("Could not create order %s with remote CA", order_id)
                 order.proxied_error = e
                 order.status = models.OrderStatus.INVALID
             except CouldNotCompleteChallenge as e:
@@ -1364,11 +1364,10 @@ class AcmeBroker(AcmeRelayBase):
                     e.args[0] if e.args else None
                 )
                 order.status = models.OrderStatus.INVALID
-            except AcmeClientException as e:
-                logger.info(
-                    "Could not complete a challenge associated with order %s due to a general client exception: %s",
+            except AcmeClientException:
+                logger.exception(
+                    "Could not complete a challenge associated with order %s due to a general client exception",
                     order_id,
-                    e,
                 )
                 order.status = models.OrderStatus.INVALID
 
@@ -1443,11 +1442,10 @@ class AcmeProxy(AcmeRelayBase):
                     e.args[0] if e.args else None
                 )
                 order.status = models.OrderStatus.INVALID
-            except AcmeClientException as e:
-                logger.info(
-                    "Could not complete a challenge associated with order %s due to a general client exception: %s",
+            except AcmeClientException:
+                logger.exception(
+                    "Could not complete a challenge associated with order %s due to a general client exception",
                     order_id,
-                    e,
                 )
                 order.status = models.OrderStatus.INVALID
 
