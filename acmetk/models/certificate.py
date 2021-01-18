@@ -84,9 +84,7 @@ class Certificate(Entity, Serializer):
     )
 
     _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
-    certificate_id = Column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, unique=True
-    )
+    certificate_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     """The certificate's ID."""
     status = Column("status", Enum(CertificateStatus), nullable=False)
     """The certificate's status."""
