@@ -1360,7 +1360,9 @@ class AcmeBroker(AcmeRelayBase):
                     e.challenge.uri,
                     order_id,
                 )
-                order.proxied_error = e.challenge.error
+                order.proxied_error = e.challenge.error or (
+                    e.args[0] if e.args else None
+                )
                 order.status = models.OrderStatus.INVALID
             except AcmeClientException as e:
                 logger.info(
@@ -1437,7 +1439,9 @@ class AcmeProxy(AcmeRelayBase):
                     e.challenge.uri,
                     order_id,
                 )
-                order.proxied_error = e.challenge.error
+                order.proxied_error = e.challenge.error or (
+                    e.args[0] if e.args else None
+                )
                 order.status = models.OrderStatus.INVALID
             except AcmeClientException as e:
                 logger.info(

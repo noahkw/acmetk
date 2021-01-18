@@ -121,12 +121,17 @@ class TestAcmetinyProxyLE(TestAcmetiny, TestProxyLE, unittest.IsolatedAsyncioTes
 
 
 class TestCertBotProxyLE(TestCertBot, TestProxyLE, unittest.IsolatedAsyncioTestCase):
-    pass
+    async def test_bad_identifier(self):
+        # Order is passed through to LE which returns different errors
+        pass
 
 
 class TestOurClientProxyLE(
     TestOurClientStress, TestProxyLE, unittest.IsolatedAsyncioTestCase
 ):
+    async def test_run(self):
+        await super().test_run()
+
     async def test_run_stress(self):
         # rate limits!
         pass

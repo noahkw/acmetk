@@ -299,6 +299,9 @@ class InfobloxClient(ChallengeSolver):
         try:
             await self.set_txt_record(name, text)
         except Exception as e:
+            logger.exception(
+                "Could not set TXT record to solve challenge: %s = %s", name, text
+            )
             raise CouldNotCompleteChallenge(challenge, repr(e))
 
         # Poll the DNS until the correct record is available
