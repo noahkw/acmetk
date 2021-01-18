@@ -2,12 +2,15 @@ import enum
 import hashlib
 import json
 import typing
+import uuid
+
 
 import acme.messages
 import josepy
 from cryptography.hazmat.primitives import serialization
 from sqlalchemy import Column, Enum, String, types, JSON, Integer, ForeignKey
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID
 
 from .base import Serializer, Entity
 from .order import OrderStatus
@@ -48,9 +51,19 @@ class Account(Entity, Serializer):
     }
 
     _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
+
+    account_id = Column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+        index=True,
+        unique=True,
+    )
+    """The account's permanent identifier"""
+
     key = Column(JWKType, index=True)
     """The account's public key."""
-    kid = Column(String, primary_key=True)
+    kid = Column(String, index=True, unique=True, nullable=False)
     """The account key's ID."""
     status = Column("status", Enum(AccountStatus))
     """The account's status."""
@@ -61,7 +74,7 @@ class Account(Entity, Serializer):
         cascade="all, delete",
         back_populates="account",
         lazy="noload",
-        foreign_keys="Order.account_kid",
+        foreign_keys="Order.account_id",
     )
     """List of orders (:class:`~acmetk.models.order.Order`) associated with the account."""
 

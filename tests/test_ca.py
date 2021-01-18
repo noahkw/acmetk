@@ -595,6 +595,11 @@ class TestCertBotRSA2048EC256CA(TestCertBot, TestCA, unittest.IsolatedAsyncioTes
     ACCOUNT_KEY_ALG_BITS = ("RSA", 2048)
     CERT_KEY_ALG_BITS = ("EC", 256)
 
+    async def test_skey_revocation(self):
+        # certbot 1.10.1 can do ec certificates but can not skey revoke them
+        with self.assertRaises(AssertionError):
+            await super().test_skey_revocation()
+
 
 class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestCase):
     async def test_revoke(self):

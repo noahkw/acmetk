@@ -38,7 +38,6 @@ class Authorization(Entity, Serializer):
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
-        nullable=False,
     )
     """The authorization's ID."""
     identifier_id = Column(
