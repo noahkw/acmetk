@@ -166,6 +166,27 @@ class Authorization(Entity, Serializer):
         ]
 
         d["identifier"] = self.identifier.serialize()
+
+        """
+        7.1.3.  Order Objects
+        An authorization
+        returned by the server for a wildcard domain name identifier MUST NOT
+        include the asterisk and full stop ("*.") prefix in the authorization
+        identifier value.  The returned authorization MUST include the
+        optional "wildcard" field, with a value of true.
+
+        7.1.4.  Authorization Objects
+        Wildcard domain names (with "*" as the first
+        label) MUST NOT be included in authorization objects.  If an
+        authorization object conveys authorization for the base domain of a
+        newOrder DNS identifier containing a wildcard domain name, then the
+        optional authorizations "wildcard" field MUST be present with a value
+        of true.
+        """
+        if self.wildcard:
+            labels = d["identifier"]["value"].split(".")
+            d["identifier"]["value"] = ".".join(labels[1:])
+
         return d
 
     @classmethod

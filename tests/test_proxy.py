@@ -40,6 +40,28 @@ class TestCertBotProxyLocalCA(
     pass
 
 
+class TestCertBotWCProxyLocalCA(
+    TestCertBot, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
+):
+    @property
+    def names(self):
+        return ["*.test.de"]
+
+    async def test_subdomain_revocation(self):
+        "avoid Requesting a certificate for dns.*.test.de"
+        pass
+
+    async def test_bad_identifier(self):
+        await super().test_bad_identifier()
+
+    async def test_no_wc_run(self):
+        self.relay._allow_wildcard = False
+        with self.assertRaisesRegex(
+            acme.messages.Error, "The ACME server can not issue a wildcard certificate"
+        ):
+            await super().test_run()
+
+
 class TestOurClientProxyLocalCA(
     TestOurClientStress, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
 ):
@@ -99,12 +121,17 @@ class TestAcmetinyProxyLE(TestAcmetiny, TestProxyLE, unittest.IsolatedAsyncioTes
 
 
 class TestCertBotProxyLE(TestCertBot, TestProxyLE, unittest.IsolatedAsyncioTestCase):
-    pass
+    async def test_bad_identifier(self):
+        # Order is passed through to LE which returns different errors
+        pass
 
 
 class TestOurClientProxyLE(
     TestOurClientStress, TestProxyLE, unittest.IsolatedAsyncioTestCase
 ):
+    async def test_run(self):
+        await super().test_run()
+
     async def test_run_stress(self):
         # rate limits!
         pass

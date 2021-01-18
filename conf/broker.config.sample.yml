@@ -17,6 +17,7 @@ broker:
     - '130.75.0.0/16' # Uni Hannover IP range
   use_forwarded_header: false
   require_eab: false
+  allow_wildcard: true
   client:
     directory: 'https://acme-v02.api.letsencrypt.org/directory' # Let's Encrypt directory
     private_key: '/etc/acme_server/broker_client_account.key'
