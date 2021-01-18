@@ -946,15 +946,15 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
             await session.commit()
 
     @routes.post("/key-change", name="key-change")
-    async def keychange(self, request):
+    async def key_change(self, request):
         """7.3.5.  Account Key Rollover"""
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             payload = jws.payload.decode()
-            ijws = acme.jws.JWS.json_loads(payload)
+            inner_jws = acme.jws.JWS.json_loads(payload)
 
             """The inner JWS MUST meet the normal requirements …"""
-            sig = ijws.signature.combined
+            sig = inner_jws.signature.combined
             if sig.alg not in self.SUPPORTED_JWS_ALGORITHMS:
                 raise acme.messages.Error.with_code(
                     "badSignatureAlgorithm",
@@ -963,34 +963,34 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
 
             """, with the following differences:"""
 
-            if ijws.signature.combined.url != jws.signature.combined.url:
+            if inner_jws.signature.combined.url != jws.signature.combined.url:
                 """ The inner JWS MUST have the same "url" header parameter as the outer JWS. """
                 raise acme.messages.Error.with_code(
                     "malformed",
                     detail="The inner JWS of the keychange url mismatches the outer JWS url.",
                 )
 
-            if ijws.signature.combined.nonce:
+            if inner_jws.signature.combined.nonce:
                 """The inner JWS MUST omit the "nonce" header parameter."""
                 raise acme.messages.Error.with_code(
                     "malformed",
                     detail="The inner JWS has a nonce.",
                 )
 
-            if ijws.signature.combined.jwk is None:
+            if inner_jws.signature.combined.jwk is None:
                 """The inner JWS MUST have a "jwk" header parameter, containing the public key of the new key pair."""
                 raise acme.messages.Error.with_code(
                     "malformed",
                     detail="The inner JWS of the keychange lacks a jwk.",
                 )
 
-            if not ijws.verify(sig.jwk):
+            if not inner_jws.verify(sig.jwk):
                 """ 4.  Check that the inner JWS verifies using the key in its "jwk" field."""
                 raise acme.messages.Error.with_code("unauthorized")
 
-            kc = messages.KeyChange.json_loads(ijws.payload)
+            key_change = messages.KeyChange.json_loads(inner_jws.payload)
 
-            if kc.account != url_for(
+            if key_change.account != url_for(
                 request, "accounts", account_id=str(account.account_id)
             ):
                 """7.  Check that the "account" field of the keyChange object contains
@@ -1000,18 +1000,17 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                     "malformed", detail="The KeyChange object account mismatches"
                 )
 
-            if kc.oldKey != account.key:
+            if key_change.oldKey != account.key:
                 """8.  Check that the "oldKey" field of the keyChange object is the same as the account key for the
                 account in question."""
                 raise acme.messages.Error.with_code(
                     "malformed", detail="The KeyChange object oldKey mismatches"
                 )
 
-            inuse = await self._db.get_account(
-                session, kid=(kid := account._jwk_kid(sig.jwk))
-            )
+            kid = account._jwk_kid(sig.jwk)
+            in_use = await self._db.get_account(session, kid=kid)
 
-            if inuse:
+            if in_use:
                 """9. Check that no account exists whose account key is the same as the key in the "jwk" header
                 parameter of the inner JWS."""
                 raise acme.messages.Error.with_code(
@@ -1022,9 +1021,8 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
             self._validate_account_key(sig.jwk.key._wrapped)
 
             account.kid = kid
-            account.key = ijws.signature.combined.jwk
+            account.key = inner_jws.signature.combined.jwk
             await session.merge(account)
-            await session.flush()
             await session.commit()
 
             serialized = account.serialize(request)

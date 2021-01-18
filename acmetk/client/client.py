@@ -464,18 +464,19 @@ class AcmeClient:
 
     async def key_change(self, private_key):
         key, alg = self._open_key(private_key)
-        kc = messages.KeyChange(
+        key_change = messages.KeyChange(
             account=self._account["kid"], oldKey=self._private_key.public_key()
         )
-        skc = messages.SignedKeyChange.from_data(
-            kc, key, alg, url=self._directory["keyChange"]
+        signed_key_change = messages.SignedKeyChange.from_data(
+            key_change, key, alg, url=self._directory["keyChange"]
         )
-        resp, data = await self._signed_request(skc, self._directory["keyChange"])
+        resp, data = await self._signed_request(
+            signed_key_change, self._directory["keyChange"]
+        )
         data["kid"] = resp.headers["Location"]
         self._account = messages.Account.from_json(data)
         self._private_key = key
         self._alg = alg
-        return
 
     def register_challenge_solver(
         self,
