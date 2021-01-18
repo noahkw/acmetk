@@ -24,7 +24,7 @@ from .pagination import paginate
 
 
 class AcmeManagement:
-    @routes.get("/mgmt/", name="mgmt-index")
+    @routes.get("/mgmt", name="mgmt-index")
     @aiohttp_jinja2.template("index.jinja2")
     async def management_index(self, request):
         import datetime
