@@ -311,7 +311,7 @@ class InfobloxClient(ChallengeSolver):
             )
         except asyncio.TimeoutError:
             raise CouldNotCompleteChallenge(
-                challenge, "Could not complete challenge due to a DNS polling timeout"
+                challenge, acme.messages.Error(typ="infoblox", title="error", detail="Could not complete challenge due to a DNS polling timeout")
             )
 
     async def cleanup_challenge(
