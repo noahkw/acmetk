@@ -17,7 +17,7 @@
 </tr>
 <tr>
     <td>Fingerprint</td>
-    <td>{{ account_url(account, l=32) }}</td>
+    <td><a href="{{ url_for('mgmt-account', account=account.account_id|string) }}">{{ shorten(account.kid|string, 64) }}</a></td>
 </tr>
 <tr>
 <td>Key</td>
