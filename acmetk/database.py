@@ -72,6 +72,8 @@ def versioned_session(session):
                     return v.authorization
                 elif isinstance(v, acme.messages.Status):
                     return v.name
+                elif isinstance(v, acme.messages.Error):
+                    return v.json_dumps()
                 else:
                     raise TypeError(type(v))
 

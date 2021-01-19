@@ -302,7 +302,7 @@ class InfobloxClient(ChallengeSolver):
             logger.exception(
                 "Could not set TXT record to solve challenge: %s = %s", name, text
             )
-            raise CouldNotCompleteChallenge(challenge, repr(e))
+            raise CouldNotCompleteChallenge(challenge, acme.messages.Error(typ="infoblox", title="error", detail=str(e)))
 
         # Poll the DNS until the correct record is available
         try:
