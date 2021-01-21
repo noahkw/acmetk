@@ -76,7 +76,7 @@ points to the right binary.
    pip install --use-feature=2020-resolver -r acme-broker/requirements.txt
    pip install acme-broker/.
    # Generate an account key for the internal ACME client
-   python -m acmetk generate-account-key /etc/acmetk/broker_client_account.key
+   python -m acmetk generate-account-key -k rsa /etc/acmetk/broker_client_account.key
 
 Copy the template config file :code:`conf/broker.config.sample.yml` and the systemd unit file
 :code:`conf/broker.service` and edit them according to your use case.
@@ -230,7 +230,7 @@ Generate an account key for the internal ACME client:
 .. code-block:: bash
 
    sudo docker-compose run --entrypoint="" app python -m acmetk \
-      generate-account-key /etc/acme_server/proxy_client_account.key
+      generate-account-key -k rsa /etc/acme_server/proxy_client_account.key
 
 Initialize the db's tables as the *acme_admin* user and start the proxy as a daemon:
 
