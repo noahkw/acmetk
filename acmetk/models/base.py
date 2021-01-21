@@ -67,6 +67,12 @@ class Change(Base):
     data = Column(JSON, nullable=False)
 
 
+class alembic_version(Base):
+    __tablename__ = "alembic_version"
+
+    version_num = Column(String(32), nullable=False, primary_key=True)
+
+
 class AcmeErrorType(TypeDecorator):
     impl = JSON
 

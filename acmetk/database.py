@@ -96,6 +96,8 @@ def versioned_session(session):
 
 
 class Database:
+    ALEMBIC_REVISION = "da620267c2f6"
+
     def __init__(self, connection_string, pool_size=5, **kwargs):
         # asyncpg typeinfo_tree slows down for custom types - including enums when using the pg jit
         # https://github.com/MagicStack/asyncpg/issues/530
@@ -114,6 +116,11 @@ class Database:
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
+        async with self.session() as session:
+            session.add(models.base.alembic_version(version_num=self.ALEMBIC_REVISION))
+            await session.flush()
+            await session.commit()
+
     async def drop(self):
         """Drops all of the database's tables."""
         async with self.engine.begin() as conn:
@@ -121,9 +128,8 @@ class Database:
 
     async def _recreate(self):
         """Drops, then recreates all of the database's tables."""
-        async with self.engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-            await conn.run_sync(Base.metadata.create_all)
+        await self.drop()
+        await self.begin()
 
     @staticmethod
     async def get_account(session, key=None, kid=None, account_id=None):
