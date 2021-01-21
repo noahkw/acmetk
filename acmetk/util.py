@@ -13,6 +13,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.x509 import NameOID
 
+KEY_FILE_MODE = 0o600
+
 
 def generate_csr(
     CN: str, private_key: rsa.RSAPrivateKey, path: Path, names: typing.List[str]
@@ -56,7 +58,8 @@ def generate_rsa_key(path: Path, key_size=2048) -> rsa.RSAPrivateKey:
         encryption_algorithm=serialization.NoEncryption(),
     )
 
-    os.umask(0o177)
+    path.touch(KEY_FILE_MODE) if not path.exists() else path.chmod(KEY_FILE_MODE)
+
     with open(path, "wb") as pem_out:
         pem_out.write(pem)
 
@@ -79,7 +82,8 @@ def generate_ec_key(path: Path, key_size=256) -> ec.EllipticCurvePrivateKey:
         encryption_algorithm=serialization.NoEncryption(),
     )
 
-    os.umask(0o177)
+    path.touch(KEY_FILE_MODE) if not path.exists() else path.chmod(KEY_FILE_MODE)
+
     with open(path, "wb") as pem_out:
         pem_out.write(pem)
 

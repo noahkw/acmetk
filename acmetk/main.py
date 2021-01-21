@@ -109,18 +109,21 @@ def generate_keys(root_key_file):
 
 @main.command()
 @click.argument("account-key-file", type=click.Path())
-def generate_account_key(account_key_file):
-    """Generates an RSA account key for the ACME client."""
-    click.echo(f"Generating client key at {account_key_file}.")
-    generate_rsa_key(account_key_file)
-
-
-@main.command()
-@click.argument("account-key-file", type=click.Path())
-def generate_account_key_ec(account_key_file):
-    """Generates an EC account key for the ACME client."""
-    click.echo(f"Generating client key at {account_key_file}.")
-    generate_ec_key(account_key_file)
+@click.option(
+    "--key-type",
+    "-k",
+    type=click.Choice(["rsa", "ec"], case_sensitive=False),
+    default="rsa",
+    show_default=True,
+)
+def generate_account_key(account_key_file, key_type):
+    """Generates an account key for the ACME client."""
+    click.echo(f"Generating client key of type {key_type} at {account_key_file}.")
+    account_key_file = Path(account_key_file)
+    if key_type == "rsa":
+        generate_rsa_key(account_key_file)
+    else:
+        generate_ec_key(account_key_file)
 
 
 @main.command()
