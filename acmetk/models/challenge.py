@@ -44,7 +44,8 @@ class Challenge(Entity, Serializer):
     """
 
     __tablename__ = "challenges"
-    __serialize__ = __diff__ = frozenset(["type", "validated", "token", "status"])
+    __serialize__ = frozenset(["type", "validated", "token", "status"])
+    __diff__ = frozenset(["type", "validated", "token", "status", "error"])
     __mapper_args__ = {
         "polymorphic_identity": "challenge",
     }

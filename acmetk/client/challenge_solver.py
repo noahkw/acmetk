@@ -302,7 +302,7 @@ class InfobloxClient(ChallengeSolver):
             logger.exception(
                 "Could not set TXT record to solve challenge: %s = %s", name, text
             )
-            raise CouldNotCompleteChallenge(challenge, repr(e))
+            raise CouldNotCompleteChallenge(challenge, acme.messages.Error(typ="infoblox", title="error", detail=str(e)))
 
         # Poll the DNS until the correct record is available
         try:
@@ -311,7 +311,7 @@ class InfobloxClient(ChallengeSolver):
             )
         except asyncio.TimeoutError:
             raise CouldNotCompleteChallenge(
-                challenge, "Could not complete challenge due to a DNS polling timeout"
+                challenge, acme.messages.Error(typ="infoblox", title="error", detail="Could not complete challenge due to a DNS polling timeout")
             )
 
     async def cleanup_challenge(
