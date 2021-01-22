@@ -360,6 +360,7 @@ class TestCertBot:
 
         logging.config.dictConfig(self._config["logging"])
 
+        log.info("certbot %s" % (" ".join(argv),))
         r = await self.loop.run_in_executor(None, cbm.main, argv)
         return r
 
@@ -446,7 +447,18 @@ class TestOurClient:
         r"(?P<alg>\S+) Keysize for (?P<action>\w+) has to be \d+ <= public_key.key_size=(?P<bits>\d+) <= \d+"
     )
 
-    def assertBadKey(self, e, alg, action, bits):
+    def assertBadKey(self, e, action, key_params=None):
+        if key_params:
+            alg, bits = key_params
+        else:
+            if action == "account":
+                alg, bits = self.ACCOUNT_KEY_ALG_BITS
+            else:
+                alg, bits = self.CERT_KEY_ALG_BITS
+
+        alg = {"RSA": "_RSAPublicKey", "EC": "_EllipticCurvePublicKey"}[alg]
+        bits = str(bits)
+
         m = e.expected_regex.match(str(e.exception)).groupdict()
         for k, v in {"alg": alg, "action": action, "bits": bits}.items():
             self.assertEqual(v, m[k])
@@ -480,7 +492,17 @@ class TestOurClient:
         await self.client.close()
 
     async def _run_one(self, client, csr):
-        await client.start()
+        try:
+            self.ca._match_keysize(
+                client._private_key.key._wrapped.public_key(), "account"
+            )
+        except ValueError:
+            with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
+                await client.start()
+            self.assertBadKey(e, "account")
+            return
+        else:
+            await client.start()
 
         domains = sorted(
             map(lambda x: x.lower(), acmetk.util.names_of(csr)),
@@ -489,14 +511,33 @@ class TestOurClient:
 
         ord = await client.order_create(domains)
         await client.authorizations_complete(ord)
-        finalized = await client.order_finalize(ord, csr)
-        return await client.certificate_get(finalized)
+
+        try:
+            self.ca._match_keysize(csr.public_key(), "csr")
+        except ValueError:
+            with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
+                await client.order_finalize(ord, csr)
+            self.assertBadKey(e, "csr")
+            return
+        else:
+            finalized = await client.order_finalize(ord, csr)
+            return await client.certificate_get(finalized)
 
     async def test_run(self):
         await self._run_one(self.client, self.client_data.csr)
 
     async def test_keychange(self):
-        await self.client.start()
+        try:
+            self.ca._match_keysize(
+                self.client._private_key.key._wrapped.public_key(), "account"
+            )
+        except ValueError:
+            with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
+                await self.client.start()
+            self.assertBadKey(e, "account")
+            return
+        else:
+            await self.client.start()
 
         with self.assertRaisesRegex(
             acme.messages.Error, "The KeyChange object key already in use"
@@ -513,10 +554,11 @@ class TestOurClient:
         await self._run_one(self.client, self.client_data.csr)
 
         sk = self.client_data.key_path.parent / "keychange.key"
-        self._make_key(sk, ("RSA", 1024))
+        KEY_PARAMS = ("RSA", 1024)
+        self._make_key(sk, KEY_PARAMS)
         with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
             await self.client.key_change(sk)
-        self.assertBadKey(e, "_RSAPublicKey", "account", "1024")
+        self.assertBadKey(e, "account", KEY_PARAMS)
 
 
 class TestOurClientStress(TestOurClient):
@@ -683,11 +725,15 @@ class TestOurClientEC256EC521CA(
     ACCOUNT_KEY_ALG_BITS = ("EC", 256)
     CERT_KEY_ALG_BITS = ("EC", 521)
 
-    async def test_run(self):
-        """"Let's Encrypt does not allow EC 521 Key Certificates due to lack of browser support"""
-        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
-            await super().test_run()
-        self.assertBadKey(e, "_EllipticCurvePublicKey", "csr", "521")
+    """"Let's Encrypt does not allow EC 521 Key Certificates due to lack of browser support"""
+
+    def test_validate_key(self):
+        self.ca._match_keysize(
+            self.client._private_key.key._wrapped.public_key(), "account"
+        )
+
+        with self.assertRaises(ValueError):
+            self.ca._match_keysize(self.client_data.csr.public_key(), "csr")
 
 
 class TestOurClientRSA1024RSA2048CA(
@@ -696,10 +742,13 @@ class TestOurClientRSA1024RSA2048CA(
     ACCOUNT_KEY_ALG_BITS = ("RSA", 1024)
     CERT_KEY_ALG_BITS = ("RSA", 2048)
 
-    async def test_run(self):
-        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
-            await super().test_run()
-        self.assertBadKey(e, "_RSAPublicKey", "account", "1024")
+    def test_validate_key(self):
+        with self.assertRaises(ValueError):
+            self.ca._match_keysize(
+                self.client._private_key.key._wrapped.public_key(), "account"
+            )
+
+        self.ca._match_keysize(self.client_data.csr.public_key(), "csr")
 
 
 class TestOurClientRSA2048RSA1024CA(
@@ -708,10 +757,13 @@ class TestOurClientRSA2048RSA1024CA(
     ACCOUNT_KEY_ALG_BITS = ("RSA", 2048)
     CERT_KEY_ALG_BITS = ("RSA", 1024)
 
-    async def test_run(self):
-        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
-            await super().test_run()
-        self.assertBadKey(e, "_RSAPublicKey", "csr", "1024")
+    def test_validate_key(self):
+        self.ca._match_keysize(
+            self.client._private_key.key._wrapped.public_key(), "account"
+        )
+
+        with self.assertRaises(ValueError):
+            self.ca._match_keysize(self.client_data.csr.public_key(), "csr")
 
 
 class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):
