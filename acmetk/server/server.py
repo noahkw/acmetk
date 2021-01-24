@@ -601,7 +601,11 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
 
         :return: The nonce inside the *Replay-Nonce* header.
         """
-        return self._response(request, status=204)
+        if request.method == "GET":
+            return self._response(request, status=204)
+        else:
+            "request.method == 'HEAD'"
+            return self._response(request, status=200)
 
     @routes.post("/new-account", name="new-account")
     async def new_account(self, request):
