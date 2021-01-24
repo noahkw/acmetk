@@ -163,17 +163,18 @@ class TestAcmetiny:
         )
 
 
-class TestAcmetinyEC(TestAcmetiny):
-    ACCOUNT_KEY_ALG_BITS = ("EC", 256)
-    CERT_KEY_ALG_BITS = ("EC", 256)
-
-    async def _run_acmetiny(self, cmd):
-        import tests.acme_tiny.acme_tiny_ec as at
-
-        argv = shlex.split(cmd)
-        log.info(shlex.join(argv))
-        r = await self.loop.run_in_executor(None, at.main, argv)
-        return r
+# disabled - ES signature format is asn1 not r || s
+# class TestAcmetinyEC(TestAcmetiny):
+#     ACCOUNT_KEY_ALG_BITS = ("EC", 256)
+#     CERT_KEY_ALG_BITS = ("EC", 256)
+#
+#     async def _run_acmetiny(self, cmd):
+#         import tests.acme_tiny.acme_tiny_ec as at
+#
+#         argv = shlex.split(cmd)
+#         log.info(shlex.join(argv))
+#         r = await self.loop.run_in_executor(None, at.main, argv)
+#         return r
 
 
 class TestDehydrated:
@@ -560,6 +561,17 @@ class TestOurClient:
             await self.client.key_change(sk)
         self.assertBadKey(e, "account", KEY_PARAMS)
 
+        self._make_key(sk, ("EC", 256))
+        await self.client.key_change(sk)
+
+        self._make_key(sk, ("EC", 384))
+        await self.client.key_change(sk)
+
+        self._make_key(sk, ("EC", 521))
+        await self.client.key_change(sk)
+
+        await self.client.key_change(self.client_data.key_path)
+
 
 class TestOurClientStress(TestOurClient):
     async def test_run_stress(self):
@@ -645,8 +657,8 @@ class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
     pass
 
 
-class TestAcmetinyECCA(TestAcmetinyEC, TestCA, unittest.IsolatedAsyncioTestCase):
-    pass
+# class TestAcmetinyECCA(TestAcmetinyEC, TestCA, unittest.IsolatedAsyncioTestCase):
+#    pass
 
 
 class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):

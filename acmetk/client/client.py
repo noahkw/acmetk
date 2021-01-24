@@ -76,7 +76,11 @@ class AcmeClient:
                 alg = josepy.jwa.RS256
             elif isinstance(certs[0], ec.EllipticCurvePrivateKeyWithSerialization):
                 key = josepy.jwk.JWKEC.load(data)
-                alg = josepy.jwa.ES256
+                alg = {
+                    521: josepy.jwa.ES512,
+                    256: josepy.jwa.ES256,
+                    384: josepy.jwa.ES384,
+                }[key.key._wrapped.key_size]
             else:
                 raise ValueError(f"Bad Private Key in file {private_key}")
             return key, alg
@@ -473,8 +477,8 @@ class AcmeClient:
         resp, data = await self._signed_request(
             signed_key_change, self._directory["keyChange"]
         )
-        data["kid"] = resp.headers["Location"]
-        self._account = messages.Account.from_json(data)
+        #        data["kid"] = resp.headers["Location"]
+        #        self._account = messages.Account.from_json(data)
         self._private_key = key
         self._alg = alg
 
