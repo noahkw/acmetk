@@ -21,9 +21,9 @@
 {% endif %}
 <tr  class="{{ zebra }}">
     <td>{{ time(c.timestamp, fmt='%H:%M:%S %Z') }}</td>
-    <td>{{ c.remote_host }}</td>
+    <td>-- REDACTED --</td>
     <td>{{ account_url(account) }}</td>
-    <td>{{ account.contact }}</td>
+    <td>-- REDACTED --</td>
     <td>{{ account.status.name }}</td>
 </tr>
 {% endfor %}

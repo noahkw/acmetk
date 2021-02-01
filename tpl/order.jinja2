@@ -6,7 +6,11 @@
 <table>
     <tr>
         <td>Account:</td>
+<<<<<<< HEAD
         <td>{{ account_url(order.account) }}</td>
+=======
+        <td><a href="{{ account_url(order.account) }}">{{ '-- REDACTED --' if '@' in order.account.contact else order.account.kid }}</a></td>
+>>>>>>> 3246b73 (Templates: remove IPs/emails for beta test)
     </tr>
     <tr>
         <td>Status:</td>

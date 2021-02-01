@@ -54,13 +54,13 @@
 {% macro change(c) %}
 {% if c.op == 'add' %}
 <li>
-    + {{ c.path }} = {{ c.value }}
+    + {{ c.path }} = {% if 'contact' == c.path %} -- REDACTED -- {% else %} {{ c.value }} {% endif %}
 </li>
 {% elif c.op == 'test' %}
 <li>
-    = {{ c.path }} == {{ c.value }}
+    = {{ c.path }} == {% if 'contact' == c.path %} -- REDACTED -- {% else %} {{ c.value }} {% endif %}
 {% elif c.op == 'replace' %}
-    => {{ c.value }}
+    => {% if 'contact' == c.path %} -- REDACTED -- {% else %} {{ c.value }} {% endif %}
 </li>
 {% else %}
     {{ c.op }}
