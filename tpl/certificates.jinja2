@@ -20,7 +20,7 @@
 {% endif %}
 <tr class="{{ zebra }}">
 <td>{{ time(c.changes[0].timestamp, fmt='%H:%M:%S %Z') }}</td>
-<td>{{ c.changes[0].remote_host }}</td>
+<td>-- REDACTED --</td>
 <td>{{ account_url(c) }}</td>
 <td><a href="{{ url_for('mgmt-certificate', certificate=c.certificate_id|string) }}">{{ shorten(c.certificate_id|string, l=13) }}</a></td>
 <td>{{ c.order.identifiers|map(attribute='value')|join(' ') }}</td>

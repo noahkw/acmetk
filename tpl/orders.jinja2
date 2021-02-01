@@ -22,7 +22,7 @@
 
 <tr class="{{ zebra }}">
     <td>{{ time(c.timestamp, fmt='%H:%M:%S %Z') }}</td>
-    <td>{{ o.changes|map(attribute="remote_host")|unique|join(' ') }}</td>
+    <td>-- REDACTED --</td>
     <td>{{ account_url(o, l=13) }}</td>
     <td>{{ order_url(o) }}</td>
     <td>{{ o.identifiers|map(attribute='value')|join(' ') }}</td>
