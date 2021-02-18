@@ -36,4 +36,4 @@ repos:
     rev: 3.8.4
     hooks:
       - id: flake8
-        exclude: ^docs/|^alembic/(versions/.*\.py|env\.py)|
+        exclude: ^docs/|^alembic/(versions/.*\.py|env\.py)
