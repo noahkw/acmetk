@@ -223,7 +223,7 @@ The *client* block inside the respective app's surrounding configuration block m
     Usually, this will be Let's Encrypt or a similar ACME CA that issues free Domain Validation certificates.
 
 * private_key (required): The RSA private key in PEM format that is used to sign requests sent to the CA.
-    May be generated with :code:`python -m acmetk generate-keys`.
+    May be generated with :code:`python -m acmetk generate-account-key`.
 
 * challenge_solver (required): Contains the configuration for the plugin that completes challenges.
     Refer to `Challenge Solver Plugins`_ for a list of possible options.
