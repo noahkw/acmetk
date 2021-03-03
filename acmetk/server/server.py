@@ -25,7 +25,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
 from acmetk import models
-from acmetk.client import CouldNotCompleteChallenge, AcmeClientException
+from acmetk.client import CouldNotCompleteChallenge, AcmeClientException, AcmeClient
 from acmetk.database import Database
 from acmetk.models import messages
 from acmetk.server import ChallengeValidator
@@ -1312,16 +1312,17 @@ class AcmeRelayBase(AcmeServerBase):
 
     def __init__(self, *, client, **kwargs):
         super().__init__(**kwargs)
-        self._client = client
+        self._client: AcmeClient = client
 
     @classmethod
     async def create_app(
-        cls, config: typing.Dict[str, typing.Any], **kwargs
+        cls, config: typing.Dict[str, typing.Any], *, client: AcmeClient, **kwargs
     ) -> "AcmeRelayBase":
         """A factory that also creates and initializes the database and session objects,
         reading the necessary arguments from the passed config dict.
 
         :param config: A dictionary holding the configuration. See :doc:`configuration` for supported options.
+        :param client: The internal started :class:`AcmeClient` instance
         :return: The server instance
         """
         db = Database(config["db"])
@@ -1330,6 +1331,7 @@ class AcmeRelayBase(AcmeServerBase):
 
         instance = cls(
             **config,
+            client=client,
             **kwargs,
         )
         instance._db = db
