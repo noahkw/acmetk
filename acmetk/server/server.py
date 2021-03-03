@@ -1,3 +1,4 @@
+import abc
 import asyncio
 import functools
 import ipaddress
@@ -67,7 +68,7 @@ class AcmeResponse(web.Response):
         )
 
 
-class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
+class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
     """Base class for an ACME compliant server.
 
     Implementations must set the :attr:`config_name` attribute, so that the CLI script knows which
@@ -996,6 +997,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         )
 
     @routes.post("/certificate/{id}", name="certificate")
+    @abc.abstractmethod
     async def certificate(self, request):
         """Handler that queries the given certificate.
 
@@ -1004,7 +1006,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         :raises: :class:`aiohttp.web.HTTPNotFound` If the certificate does not exist.
         :return: The certificate's full chain in PEM format.
         """
-        raise NotImplementedError
+        pass
 
     async def _handle_challenge_validate(self, request, account_id, challenge_id):
         logger.debug("Validating challenge %s", challenge_id)
@@ -1117,6 +1119,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
                 },
             )
 
+    @abc.abstractmethod
     async def handle_order_finalize(self, request, account_id: str, order_id: str):
         """Method that handles the actual finalization of an order.
 
@@ -1135,7 +1138,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin):
         :param account_id: The account's id
         :param order_id: The order's id
         """
-        raise NotImplementedError
+        pass
 
     @middleware
     async def host_ip_middleware(self, request, handler):
