@@ -66,19 +66,3 @@
     {{ c.op }}
 {% endif %}
 {% endmacro %}
-
-{% macro change(c) %}
-{% if c.op == 'add' %}
-<li>
-    + {{ c.path }} = {{ c.value }}
-</li>
-{% elif c.op == 'test' %}
-<li>
-    = {{ c.path }} == {{ c.value }}
-{% elif c.op == 'replace' %}
-    => {{ c.value }}
-</li>
-{% else %}
-    {{ c.op }}
-{% endif %}
-{% endmacro %}

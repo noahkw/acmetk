@@ -6,7 +6,7 @@
 <table>
     <tr>
         <td>Account:</td>
-        <td><a href="{{ url_for('mgmt-account', account=order.account.kid|string) }}">{{ order.account.contact if '@' in order.account.contact else order.account.kid }}</a></td>
+        <td>{{ account_url(order.account) }}</td>
     </tr>
     <tr>
         <td>Status:</td>
