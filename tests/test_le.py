@@ -105,9 +105,10 @@ class TestLE(TestAcme, unittest.IsolatedAsyncioTestCase):
         self._make_key(kp, ("EC", 521))
         with self.assertRaisesRegex(
             acme.messages.Error,
-            "(ECDSA curve P-521 not allowed|EC public key has incorrect padding)",
+            "(ECDSA curve P-521 not allowed)",
         ) as e:
             await self.client.key_change(kp)
+        print(e.exception)
 
 
 # disabled - ES signature format is asn1 not r || s
