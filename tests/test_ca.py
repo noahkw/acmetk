@@ -702,6 +702,96 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
     async def test_keychange(self):
         await super().test_keychange()
 
+    async def no_test_mock_keychange(self):
+
+        keys = []
+        for alg, abits in {"EC": (256, 521)}.items():
+            for bits in abits:
+                self._make_key(
+                    kp := self.client_data.key_path.parent
+                    / f"keychange-{alg}-{bits}.key",
+                    (alg, bits),
+                )
+                keys.append(kp)
+
+        await self.client.start()
+        for i in range(25):
+            for kp in keys:
+                try:
+                    await self.client.key_change(kp)
+                except acme.messages.Error:
+                    import unittest.mock
+
+                    self.client._make_request = m = unittest.mock.AsyncMock()
+                    m.return_value = (0, 0)
+
+                    await self.client.key_change(kp)
+
+                    data = m.call_args[0][0]
+                    jws = acme.jws.JWS.json_loads(data)
+                    payload = jws.payload.decode()
+
+                    inner_jws = acme.jws.JWS.json_loads(payload)
+                    sig = inner_jws.signature.combined
+                    self.assertTrue(inner_jws.verify(sig.jwk))
+                    break
+
+    async def no_test_invalid_p521(self):
+        r = {True: 0, False: 0}
+        for i in range(100):
+            try:
+                self._test_invalid_p521()
+            except Exception as e:
+                print(e)
+                r[False] += 1
+            else:
+                r[True] += 1
+        print(r)
+        self.assertEqual(r[True], 100)
+
+    def _test_invalid_p521(self):
+        from acme import jws
+        import josepy
+        import math
+
+        self._make_key(
+            kp := self.client_data.key_path.parent / "keychange-invalid-p521.key",
+            ("EC", 521),
+        )
+        key = josepy.jwk.JWKEC.load(open(kp, "rb").read())
+
+        if (
+            math.ceil(key.key._wrapped.public_key().public_numbers().x.bit_length() / 8)
+            != 66
+        ):
+            print(key)
+        alg = josepy.jwa.ES512
+        key_change = acmetk.models.messages.KeyChange(
+            account="billythekid", oldKey=self.client._private_key.public_key()
+        )
+        signed_key_change = acmetk.models.messages.SignedKeyChange.from_data(
+            key_change, key, alg, url="http://localhost/keychange"
+        )
+
+        obj = signed_key_change
+
+        # sign
+        jobj = obj.json_dumps(indent=2).encode()
+        kwargs = {"nonce": acme.jose.b64decode("nonc"), "url": "http://localhost/test"}
+        kwargs["kid"] = "billythekid"
+
+        data = jws.JWS.sign(
+            jobj, key=self.client._private_key, alg=self.client._alg, **kwargs
+        ).json_dumps(indent=2)
+
+        # verify
+        jws = acme.jws.JWS.json_loads(data)
+        payload = jws.payload.decode()
+
+        inner_jws = acme.jws.JWS.json_loads(payload)
+        sig = inner_jws.signature.combined
+        self.assertTrue(inner_jws.verify(sig.jwk))
+
 
 class TestOurClientEC256EC256CA(
     TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
