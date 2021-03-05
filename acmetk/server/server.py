@@ -353,7 +353,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
                 * The URL inside the JWS' signature is not equal to the actual request URL
                 * The signature was created using an algorithm that the server does not support, \
                     see :attr:`SUPPORTED_JWS_ALGORITHMS`
-                * The client supplied a bad nonce in the JWS signature
+                * The client supplied a bad nonce in the JWS' protected header
                 * The JWS does not have *either* a JWK *or* a kid
                 * The JWS' signature is invalid
                 * There is a mismatch between the URL's kid and the JWS' kid
@@ -1408,9 +1408,17 @@ class AcmeRelayBase(AcmeServerBase):
 
         return self._response(request, status=200)
 
-    async def _obtain_and_store_cert(
+    async def obtain_and_store_cert(
         self, order: models.Order, order_ca: acme.messages.Order
     ):
+        """Method that obtains the certificate for the given order from the remote CA and stores it.
+
+        This method should be called after the finalization of the order has been completed
+        in :meth:`~AcmeServerBase.handle_order_finalize`.
+
+        :param order: The relay's order
+        :param order_ca: The remote CA's order object
+        """
         full_chain = await self._client.certificate_get(order_ca)
         certs = pem_split(full_chain)
 
@@ -1466,7 +1474,7 @@ class AcmeBroker(AcmeRelayBase):
                 order_ca = await self._client.order_create(list(names_of(order.csr)))
                 await self._client.authorizations_complete(order_ca)
                 finalized = await self._client.order_finalize(order_ca, order.csr)
-                await self._obtain_and_store_cert(order, finalized)
+                await self.obtain_and_store_cert(order, finalized)
             except acme.messages.Error as e:
                 logger.exception("Could not create order %s with remote CA", order_id)
                 order.proxied_error = e
@@ -1652,6 +1660,6 @@ class AcmeProxy(AcmeRelayBase):
             order = await self._db.get_order(session, account_id, order_id)
 
             order_ca = await self._client.order_get(order.proxied_url)
-            await self._obtain_and_store_cert(order, order_ca)
+            await self.obtain_and_store_cert(order, order_ca)
 
             await session.commit()
