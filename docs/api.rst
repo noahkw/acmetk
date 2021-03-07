@@ -8,6 +8,8 @@ ACME Client
     :members:
     :inherited-members:
 
+    .. automethod:: __init__
+
 Challenge Solvers
 -----------------
 
@@ -20,6 +22,15 @@ Exceptions
 
 .. automodule:: acmetk.client.exceptions
     :members:
+
+External Account Binding Credentials
+------------------------------------
+
+.. autoclass:: acmetk.client.ExternalAccountBindingCredentials
+    :members:
+    :inherited-members:
+
+    .. automethod:: __init__
 
 ACME Servers
 ############

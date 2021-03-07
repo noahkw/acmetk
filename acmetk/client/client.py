@@ -34,13 +34,27 @@ def is_invalid(obj):
 
 
 class ExternalAccountBindingCredentials:
+    """Stores external account binding credentials to later create a binding JWS using
+    :class:`~acme.messages.ExternalAccountBinding`.
+    """
+
     def __init__(self, kid: str, hmac_key: str):
-        self.valid = kid and hmac_key
+        """Creates an :class:`ExternalAccountBindingCredentials` instance.
+
+        :param kid: The external account binding's key identifier
+        :param hmac_key: The external account binding's symmetric encryption key
+        """
         self.kid = kid
         self.hmac_key = hmac_key
 
-    def create_eab(self, public_key, directory):
-        if self.valid:
+    def create_eab(self, public_key: josepy.jwk.JWK, directory: dict) -> dict:
+        """Creates an external account binding from the stored credentials.
+
+        :param public_key: The account's public key
+        :param directory: The ACME server's directory
+        :return: The JWS representing the external account binding
+        """
+        if self.kid and self.hmac_key:
             return acme.messages.ExternalAccountBinding.from_data(
                 public_key, self.kid, self.hmac_key, directory
             )
@@ -151,9 +165,9 @@ class AcmeClient:
             except acme.messages.Error as e:
                 if e.code != "accountDoesNotExist":
                     raise
-                await self.account_register(**self._contact)
+                await self.account_register()
         else:
-            await self.account_register(**self._contact)
+            await self.account_register()
 
     async def account_register(
         self,
@@ -183,11 +197,11 @@ class AcmeClient:
             if kid and hmac_key
             else self._eab_credentials
         )
-        if eab_credentials.valid:
+        try:
             external_account_binding = eab_credentials.create_eab(
                 self._private_key.public_key(), self._directory
             )
-        else:
+        except ValueError:
             external_account_binding = None
             logger.warning(
                 "The external account binding credentials are invalid, "
@@ -195,8 +209,8 @@ class AcmeClient:
             )
 
         reg = acme.messages.Registration.from_data(
-            email=email,
-            phone=phone,
+            email=email or self._contact.get("email"),
+            phone=phone or self._contact.get("phone"),
             terms_of_service_agreed=True,
             external_account_binding=external_account_binding,
         )

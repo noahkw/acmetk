@@ -1,4 +1,4 @@
-from .client import AcmeClient
+from .client import AcmeClient, ExternalAccountBindingCredentials
 from .challenge_solver import InfobloxClient, DummySolver, ChallengeSolver
 from .exceptions import CouldNotCompleteChallenge, AcmeClientException
 
@@ -9,4 +9,5 @@ __all__ = [
     "CouldNotCompleteChallenge",
     "ChallengeSolver",
     "AcmeClientException",
+    "ExternalAccountBindingCredentials",
 ]
