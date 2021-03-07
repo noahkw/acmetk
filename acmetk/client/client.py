@@ -34,11 +34,29 @@ def is_invalid(obj):
 
 
 @dataclass
-class ExternalAccountBinding:
-    """Store kid & hmac_key"""
+class ExternalAccountBindingCredentials:
+    """Stores external account binding credentials to later create a binding JWS using
+    :class:`~acme.messages.ExternalAccountBinding`.
+    """
 
     kid: str
+    """The external account binding's key identifier"""
     hmac_key: str
+    """The external account binding's symmetric encryption key"""
+
+    def create_eab(self, public_key: josepy.jwk.JWK, directory: dict) -> dict:
+        """Creates an external account binding from the stored credentials.
+
+        :param public_key: The account's public key
+        :param directory: The ACME server's directory
+        :return: The JWS representing the external account binding
+        """
+        if self.kid and self.hmac_key:
+            return acme.messages.ExternalAccountBinding.from_data(
+                public_key, self.kid, self.hmac_key, directory
+            )
+        else:
+            raise ValueError("Must specify both kid and hmac_key")
 
 
 class AcmeClient:
@@ -56,8 +74,20 @@ class AcmeClient:
         private_key,
         contact=None,
         server_cert: Path = None,
-        eab: ExternalAccountBinding = None,
+        kid: str = None,
+        hmac_key: str = None,
     ):
+        """Creates an :class:`AcmeClient` instance.
+
+        :param directory_url: The ACME server's directory
+        :param private_key: Path of the private key to use to register the ACME account. Must be a PEM-encoded RSA
+            or EC key file.
+        :param contact: :class:`dict` containing the contact info to supply on registration. May contain a key *phone*
+            and a key *email*.
+        :param server_cert: Path of the server certificate to add to the SSL context
+        :param kid: The external account binding's key identifier to be used on registration
+        :param hmac_key: The external account binding's symmetric encryption key to be used on registration
+        """
         self._ssl_context = ssl.create_default_context()
 
         if server_cert:
@@ -79,18 +109,24 @@ class AcmeClient:
         self._account = None
 
         self._challenge_solvers = dict()
-        self._eab = eab
+        self.eab_credentials = (kid, hmac_key)
 
     @property
-    def eab(self):
-        return self._eab
+    def eab_credentials(self) -> ExternalAccountBindingCredentials:
+        """Returns the client's currently stored external account binding credentials to be used on registration."""
+        return self._eab_credentials
 
-    @eab.setter
-    def eab(self, v):
-        if isinstance(v, tuple) and len(v) == 2:
-            self._eab = ExternalAccountBinding(v[0], v[1])
-        elif v is None:
-            self._eab = None
+    @eab_credentials.setter
+    def eab_credentials(self, credentials: typing.Tuple[str]):
+        """Sets the client's stored external account binding credentials
+
+        :param credentials: The kid and hmac_key
+        :raises: :class:`ValueError` If the tuple does not contain exactly the kid and hmac_key.
+        """
+        if isinstance(credentials, tuple) and len(credentials) == 2:
+            self._eab_credentials = ExternalAccountBindingCredentials(*credentials)
+        else:
+            raise ValueError("A tuple containing the kid and hmac_key is required")
 
     def _open_key(self, private_key):
         with open(private_key, "rb") as pem:
@@ -125,7 +161,6 @@ class AcmeClient:
         It is advised to register at least one :class:`ChallengeSolver`
         using :meth:`register_challenge_solver` before starting the client.
         """
-        eab = None
         async with self._session.get(
             self._directory_url, ssl=self._ssl_context
         ) as resp:
@@ -137,26 +172,22 @@ class AcmeClient:
                 "Certificate retrieval will likely fail."
             )
 
-        if self._eab:
-            eab = acme.messages.ExternalAccountBinding.from_data(
-                self._private_key.public_key(),
-                self._eab.kid,
-                self._eab.hmac_key,
-                self._directory,
-            )
-
         if self._account:
             try:
                 await self.account_lookup()
             except acme.messages.Error as e:
                 if e.code != "accountDoesNotExist":
                     raise
-                await self.account_register(**self._contact, eab=eab)
+                await self.account_register()
         else:
-            await self.account_register(**self._contact, eab=eab)
+            await self.account_register()
 
     async def account_register(
-        self, email: str = None, phone: str = None, eab: dict = None
+        self,
+        email: str = None,
+        phone: str = None,
+        kid: str = None,
+        hmac_key: str = None,
     ) -> None:
         """Registers an account with the CA.
 
@@ -169,15 +200,33 @@ class AcmeClient:
 
         :param email: The contact email
         :param phone: The contact phone number
-        :param eab: the json encoded JWS ExternalAccountBinding
-        :raises: :class:`acme.messages.Error` If the server rejects any of the contact information or the private
-            key.
+        :param kid: The external account binding's key identifier
+        :param hmac_key: The external account binding's symmetric encryption key
+        :raises: :class:`acme.messages.Error` If the server rejects any of the contact information, the private
+            key, or the external account binding.
         """
+        eab_credentials = (
+            ExternalAccountBindingCredentials(kid, hmac_key)
+            if kid and hmac_key
+            else self.eab_credentials
+        )
+
+        try:
+            external_account_binding = eab_credentials.create_eab(
+                self._private_key.public_key(), self._directory
+            )
+        except ValueError:
+            external_account_binding = None
+            logger.warning(
+                "The external account binding credentials are invalid, "
+                "i.e. the kid or the hmac_key was not supplied. Trying without EAB."
+            )
+
         reg = acme.messages.Registration.from_data(
-            email=email,
-            phone=phone,
+            email=email or self._contact.get("email"),
+            phone=phone or self._contact.get("phone"),
             terms_of_service_agreed=True,
-            external_account_binding=eab,
+            external_account_binding=external_account_binding,
         )
 
         resp, account_obj = await self._signed_request(
