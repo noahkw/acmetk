@@ -26,11 +26,9 @@ Exceptions
 External Account Binding Credentials
 ------------------------------------
 
-.. autoclass:: acmetk.client.ExternalAccountBindingCredentials
+.. autoclass:: acmetk.client.client.ExternalAccountBindingCredentials
     :members:
     :inherited-members:
-
-    .. automethod:: __init__
 
 ACME Servers
 ############
