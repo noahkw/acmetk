@@ -7,7 +7,7 @@ import josepy
 import yarl
 from cryptography.hazmat.primitives.asymmetric import rsa
 from acmetk.server.external_account_binding import ExternalAccountBindingStore
-from tests.test_ca import TestCertBotCA
+from tests.test_ca import TestCertBotCA, TestOurClientCA
 
 
 def load_test_cert():
@@ -39,7 +39,21 @@ class TestEAB(unittest.TestCase):
         print(signature)
 
 
-class TestCertbotCA_EAB(TestCertBotCA):
+class TestClientEAB:
+    def get_eab(self):
+        URL = yarl.URL("http://localhost:8000/eab")
+        request = Mock(
+            headers={"X-SSL-CERT": load_test_cert()},
+            url=URL,
+            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
+        )
+        kid, hmac_key = self.ca._eab_store.create(request)
+
+        self.log.debug("kid: %s, hmac_key: %s", kid, hmac_key)
+        return kid, hmac_key
+
+
+class TestCertbotCA_EAB(TestCertBotCA, TestClientEAB):
     @property
     def config_sec(self):
         return self._config["tests"]["LocalCA_EAB"]
@@ -48,13 +62,7 @@ class TestCertbotCA_EAB(TestCertBotCA):
         super().setUp()
 
     async def test_register(self):
-        URL = yarl.URL("http://localhost:8000/eab")
-        request = Mock(
-            headers={"X-SSL-CERT": load_test_cert()},
-            url=URL,
-            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
-        )
-        kid, hmac_key = self.ca._eab_store.create(request)
+        kid, hmac_key = self.get_eab()
 
         self.log.debug("kid: %s, hmac_key: %s", kid, hmac_key)
         await self._run(
@@ -74,4 +82,40 @@ class TestCertbotCA_EAB(TestCertBotCA):
         pass
 
     async def test_unregister(self):
+        pass
+
+
+class TestOurClientCA_EAB(TestOurClientCA, TestClientEAB):
+    @property
+    def config_sec(self):
+        return self._config["tests"]["LocalCA_EAB"]
+
+    def setUp(self) -> None:
+        super().setUp()
+
+    async def test_register_eab(self):
+        kid, hmac_key = self.get_eab()
+        client = self._make_client(self.client_data.key_path, kid, kid, hmac_key)
+        await client.start()
+        await client.close()
+
+    async def test_run_stress(self):
+        pass
+
+    async def test_revoke(self):
+        pass
+
+    async def test_account_update(self):
+        pass
+
+    async def test_email_validation(self):
+        pass
+
+    async def test_unregister(self):
+        pass
+
+    async def test_keychange(self):
+        pass
+
+    async def test_run(self):
         pass

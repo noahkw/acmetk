@@ -459,12 +459,14 @@ class TestOurClient:
             key=lambda s: s[::-1],
         )
 
-    def _make_client(self, key_path, email):
+    def _make_client(self, key_path, email, kid=None, hmac_key=None):
         client = AcmeClient(
             directory_url=self.DIRECTORY,
             private_key=key_path,
             contact={"email": email},
             server_cert=self.config_sec.get("client", {}).get("server_cert", None),
+            kid=kid,
+            hmac_key=hmac_key,
         )
 
         client.register_challenge_solver(DummySolver())

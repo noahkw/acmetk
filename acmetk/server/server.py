@@ -830,6 +830,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
             authz_url = challenge.authorization.url(request)
             await session.commit()
 
+        # TODO: only validate if PROCESSING
         asyncio.ensure_future(
             self._handle_challenge_validate(request, account_id, challenge_id)
         )
