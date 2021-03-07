@@ -70,10 +70,10 @@ class AcmeClient:
     def __init__(
         self,
         *,
-        directory_url,
-        private_key,
-        contact=None,
-        server_cert: Path = None,
+        directory_url: str,
+        private_key: str,
+        contact: typing.Dict[str, str] = None,
+        server_cert: str = None,
         kid: str = None,
         hmac_key: str = None,
     ):
@@ -113,7 +113,17 @@ class AcmeClient:
 
     @property
     def eab_credentials(self) -> ExternalAccountBindingCredentials:
-        """Returns the client's currently stored external account binding credentials to be used on registration."""
+        """The client's currently stored external account binding credentials
+
+        Getter:
+            Returns the client's currently stored external account binding credentials to be used on registration.
+        Setter:
+            Sets the client's stored external account binding credentials
+
+            :param credentials: The kid and hmac_key
+            :raises: :class:`ValueError` If the tuple does not contain exactly the kid and hmac_key.
+        """
+
         return self._eab_credentials
 
     @eab_credentials.setter
