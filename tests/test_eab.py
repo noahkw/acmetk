@@ -1,3 +1,4 @@
+import datetime
 import json
 import urllib.parse
 import unittest
@@ -5,15 +6,51 @@ from unittest.mock import Mock
 
 import josepy
 import yarl
+
+import acme.messages
+
 from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography import x509
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+
 from acmetk.server.external_account_binding import ExternalAccountBindingStore
 from tests.test_ca import TestCertBotCA, TestOurClientCA
 
 
-def load_test_cert():
-    with open("../eab_test_cert.pem") as f:
-        data = f.read()
+def generate_x509_client_cert(email):
 
+    key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    subject = issuer = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, "DE"),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, "Niedersachsen"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, "Hannover"),
+            x509.NameAttribute(
+                NameOID.ORGANIZATION_NAME, "Leibniz Universitaet Hannover"
+            ),
+            x509.NameAttribute(NameOID.COMMON_NAME, "ACME Toolkit"),
+        ]
+    )
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=2))
+        .add_extension(
+            x509.SubjectAlternativeName([x509.RFC822Name(email)]),
+            critical=False,
+        )
+        .sign(key, hashes.SHA256())
+    )
+    data = cert.public_bytes(serialization.Encoding.PEM)
     return urllib.parse.quote(data)
 
 
@@ -25,7 +62,7 @@ class TestEAB(unittest.TestCase):
     def test_create(self):
         URL = yarl.URL("http://localhost/eab")
         request = Mock(
-            headers={"X-SSL-CERT": load_test_cert()},
+            headers={"X-SSL-CERT": generate_x509_client_cert()},
             url=URL,
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
@@ -39,21 +76,7 @@ class TestEAB(unittest.TestCase):
         print(signature)
 
 
-class TestClientEAB:
-    def get_eab(self):
-        URL = yarl.URL("http://localhost:8000/eab")
-        request = Mock(
-            headers={"X-SSL-CERT": load_test_cert()},
-            url=URL,
-            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
-        )
-        kid, hmac_key = self.ca._eab_store.create(request)
-
-        self.log.debug("kid: %s, hmac_key: %s", kid, hmac_key)
-        return kid, hmac_key
-
-
-class TestCertbotCA_EAB(TestCertBotCA, TestClientEAB):
+class TestCertbotCA_EAB(TestCertBotCA):
     @property
     def config_sec(self):
         return self._config["tests"]["LocalCA_EAB"]
@@ -62,7 +85,15 @@ class TestCertbotCA_EAB(TestCertBotCA, TestClientEAB):
         super().setUp()
 
     async def test_register(self):
-        kid, hmac_key = self.get_eab()
+        URL = yarl.URL("http://localhost:8000/eab")
+        request = Mock(
+            headers={
+                "X-SSL-CERT": generate_x509_client_cert(self.client._contact["email"])
+            },
+            url=URL,
+            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
+        )
+        kid, hmac_key = self.ca._eab_store.create(request)
 
         self.log.debug("kid: %s, hmac_key: %s", kid, hmac_key)
         await self._run(
@@ -85,37 +116,33 @@ class TestCertbotCA_EAB(TestCertBotCA, TestClientEAB):
         pass
 
 
-class TestOurClientCA_EAB(TestOurClientCA, TestClientEAB):
+class TestOurClientCA_EAB(TestOurClientCA):
     @property
     def config_sec(self):
         return self._config["tests"]["LocalCA_EAB"]
 
-    def setUp(self) -> None:
+    def setUp(self):
         super().setUp()
 
-    async def test_register_eab(self):
-        kid, hmac_key = self.get_eab()
-        client = self._make_client(self.client_data.key_path, kid, kid, hmac_key)
-        await client.start()
-        await client.close()
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
 
-    async def test_run_stress(self):
-        pass
+        request = Mock(
+            headers={
+                "X-SSL-CERT": generate_x509_client_cert(self.client._contact["email"])
+            },
+            url=yarl.URL("http://localhost:8000/eab"),
+            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
+        )
+        self.client.eab = self.eab = self.ca._eab_store.create(request)
+        self.log.debug("kid: %s, hmac_key: %s", self.eab[0], self.eab[1])
 
-    async def test_revoke(self):
-        pass
+    async def test_register(self):
+        self.client.eab = None
+        with self.assertRaisesRegex(
+            acme.messages.Error, "urn:ietf:params:acme:error:externalAccountRequired"
+        ):
+            await self.client.start()
 
-    async def test_account_update(self):
-        pass
-
-    async def test_email_validation(self):
-        pass
-
-    async def test_unregister(self):
-        pass
-
-    async def test_keychange(self):
-        pass
-
-    async def test_run(self):
-        pass
+        self.client.eab = self.eab
+        await self.client.start()

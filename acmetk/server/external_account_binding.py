@@ -116,8 +116,6 @@ class ExternalAccountBindingStore:
 
             mail = mails.pop()
 
-        mail = mail.lower()
-
         if not (pending_eab := self._pending.get(mail, None)) or pending_eab.expired():
             pending_eab = self._pending[mail] = ExternalAccountBinding(
                 mail, url_for(request, "new-account")
@@ -136,7 +134,7 @@ class ExternalAccountBindingStore:
         :param jws: The EAB request JWS.
         :return: True iff verification was successful.
         """
-        if not (pending := self._pending.get(kid.lower(), None)):
+        if not (pending := self._pending.get(kid, None)):
             return False
 
         if pending.expired():
