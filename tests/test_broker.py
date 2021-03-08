@@ -74,6 +74,10 @@ class TestBroker(TestCA):
         self.broker_client = broker_client
         self.relay = broker
 
+    @property
+    def ca(self):
+        return self.relay
+
     async def asyncTearDown(self) -> None:
         await super().asyncTearDown()
         await self.broker_client.close()

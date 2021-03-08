@@ -53,12 +53,12 @@ async def paginate(session, request, query, by="limit", total=-1, pms=None):
     page_size = int(request.query.get("pagesize", 25))
     if not (0 < page_size < 100):
         raise web.HTTPBadRequest(body=f"page_size ({page_size}) must be > 0 and < 100")
-    page_count = math.ceil(total / page_size)
 
-    if page_count < 1:
-        raise web.HTTPBadRequest(body="There are 0 entries.")
+    page_count = max(math.ceil(total / page_size), 1)
+    # min page_count is 1
 
     page = int(request.query.get("page", page_count))
+    # min page is 1
 
     if not (0 < page <= page_count):
         raise web.HTTPBadRequest(
@@ -68,7 +68,7 @@ async def paginate(session, request, query, by="limit", total=-1, pms=None):
     if by != "limit":
         # BETWEEN on indexed values is way faster …
         begin = (page - 1) * page_size
-        end = page * page_size
+        end = max(page * page_size - 1, 0)
         q = query.filter(by.between(begin, end))
     else:
         begin = (page_count - page) * page_size
@@ -81,6 +81,7 @@ async def paginate(session, request, query, by="limit", total=-1, pms=None):
         else:
             r = await session.execute(q)
         items = r.scalars().all()
+        assert len(items) <= page_size
 
     except Exception as e:
         print(e)

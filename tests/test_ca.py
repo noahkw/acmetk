@@ -163,17 +163,18 @@ class TestAcmetiny:
         )
 
 
-class TestAcmetinyEC(TestAcmetiny):
-    ACCOUNT_KEY_ALG_BITS = ("EC", 256)
-    CERT_KEY_ALG_BITS = ("EC", 256)
-
-    async def _run_acmetiny(self, cmd):
-        import tests.acme_tiny.acme_tiny_ec as at
-
-        argv = shlex.split(cmd)
-        log.info(shlex.join(argv))
-        r = await self.loop.run_in_executor(None, at.main, argv)
-        return r
+# disabled - ES signature format is asn1 not r || s
+# class TestAcmetinyEC(TestAcmetiny):
+#     ACCOUNT_KEY_ALG_BITS = ("EC", 256)
+#     CERT_KEY_ALG_BITS = ("EC", 256)
+#
+#     async def _run_acmetiny(self, cmd):
+#         import tests.acme_tiny.acme_tiny_ec as at
+#
+#         argv = shlex.split(cmd)
+#         log.info(shlex.join(argv))
+#         r = await self.loop.run_in_executor(None, at.main, argv)
+#         return r
 
 
 class TestDehydrated:
@@ -360,6 +361,7 @@ class TestCertBot:
 
         logging.config.dictConfig(self._config["logging"])
 
+        log.info("certbot %s" % (" ".join(argv),))
         r = await self.loop.run_in_executor(None, cbm.main, argv)
         return r
 
@@ -446,7 +448,18 @@ class TestOurClient:
         r"(?P<alg>\S+) Keysize for (?P<action>\w+) has to be \d+ <= public_key.key_size=(?P<bits>\d+) <= \d+"
     )
 
-    def assertBadKey(self, e, alg, action, bits):
+    def assertBadKey(self, e, action, key_params=None):
+        if key_params:
+            alg, bits = key_params
+        else:
+            if action == "account":
+                alg, bits = self.ACCOUNT_KEY_ALG_BITS
+            else:
+                alg, bits = self.CERT_KEY_ALG_BITS
+
+        alg = {"RSA": "_RSAPublicKey", "EC": "_EllipticCurvePublicKey"}[alg]
+        bits = str(bits)
+
         m = e.expected_regex.match(str(e.exception)).groupdict()
         for k, v in {"alg": alg, "action": action, "bits": bits}.items():
             self.assertEqual(v, m[k])
@@ -480,7 +493,17 @@ class TestOurClient:
         await self.client.close()
 
     async def _run_one(self, client, csr):
-        await client.start()
+        try:
+            self.ca._match_keysize(
+                client._private_key.key._wrapped.public_key(), "account"
+            )
+        except ValueError:
+            with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
+                await client.start()
+            self.assertBadKey(e, "account")
+            return
+        else:
+            await client.start()
 
         domains = sorted(
             map(lambda x: x.lower(), acmetk.util.names_of(csr)),
@@ -489,14 +512,33 @@ class TestOurClient:
 
         ord = await client.order_create(domains)
         await client.authorizations_complete(ord)
-        finalized = await client.order_finalize(ord, csr)
-        return await client.certificate_get(finalized)
+
+        try:
+            self.ca._match_keysize(csr.public_key(), "csr")
+        except ValueError:
+            with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
+                await client.order_finalize(ord, csr)
+            self.assertBadKey(e, "csr")
+            return
+        else:
+            finalized = await client.order_finalize(ord, csr)
+            return await client.certificate_get(finalized)
 
     async def test_run(self):
         await self._run_one(self.client, self.client_data.csr)
 
     async def test_keychange(self):
-        await self.client.start()
+        try:
+            self.ca._match_keysize(
+                self.client._private_key.key._wrapped.public_key(), "account"
+            )
+        except ValueError:
+            with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
+                await self.client.start()
+            self.assertBadKey(e, "account")
+            return
+        else:
+            await self.client.start()
 
         with self.assertRaisesRegex(
             acme.messages.Error, "The KeyChange object key already in use"
@@ -513,10 +555,22 @@ class TestOurClient:
         await self._run_one(self.client, self.client_data.csr)
 
         sk = self.client_data.key_path.parent / "keychange.key"
-        self._make_key(sk, ("RSA", 1024))
+        KEY_PARAMS = ("RSA", 1024)
+        self._make_key(sk, KEY_PARAMS)
         with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
             await self.client.key_change(sk)
-        self.assertBadKey(e, "_RSAPublicKey", "account", "1024")
+        self.assertBadKey(e, "account", KEY_PARAMS)
+
+        self._make_key(sk, ("EC", 256))
+        await self.client.key_change(sk)
+
+        self._make_key(sk, ("EC", 384))
+        await self.client.key_change(sk)
+
+        self._make_key(sk, ("EC", 521))
+        await self.client.key_change(sk)
+
+        await self.client.key_change(self.client_data.key_path)
 
 
 class TestOurClientStress(TestOurClient):
@@ -603,8 +657,8 @@ class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
     pass
 
 
-class TestAcmetinyECCA(TestAcmetinyEC, TestCA, unittest.IsolatedAsyncioTestCase):
-    pass
+# class TestAcmetinyECCA(TestAcmetinyEC, TestCA, unittest.IsolatedAsyncioTestCase):
+#    pass
 
 
 class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
@@ -648,6 +702,96 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
     async def test_keychange(self):
         await super().test_keychange()
 
+    async def no_test_mock_keychange(self):
+
+        keys = []
+        for alg, abits in {"EC": (256, 521)}.items():
+            for bits in abits:
+                self._make_key(
+                    kp := self.client_data.key_path.parent
+                    / f"keychange-{alg}-{bits}.key",
+                    (alg, bits),
+                )
+                keys.append(kp)
+
+        await self.client.start()
+        for i in range(25):
+            for kp in keys:
+                try:
+                    await self.client.key_change(kp)
+                except acme.messages.Error:
+                    import unittest.mock
+
+                    self.client._make_request = m = unittest.mock.AsyncMock()
+                    m.return_value = (0, 0)
+
+                    await self.client.key_change(kp)
+
+                    data = m.call_args[0][0]
+                    jws = acme.jws.JWS.json_loads(data)
+                    payload = jws.payload.decode()
+
+                    inner_jws = acme.jws.JWS.json_loads(payload)
+                    sig = inner_jws.signature.combined
+                    self.assertTrue(inner_jws.verify(sig.jwk))
+                    break
+
+    async def no_test_invalid_p521(self):
+        r = {True: 0, False: 0}
+        for i in range(100):
+            try:
+                self._test_invalid_p521()
+            except Exception as e:
+                print(e)
+                r[False] += 1
+            else:
+                r[True] += 1
+        print(r)
+        self.assertEqual(r[True], 100)
+
+    def _test_invalid_p521(self):
+        from acme import jws
+        import josepy
+        import math
+
+        self._make_key(
+            kp := self.client_data.key_path.parent / "keychange-invalid-p521.key",
+            ("EC", 521),
+        )
+        key = josepy.jwk.JWKEC.load(open(kp, "rb").read())
+
+        if (
+            math.ceil(key.key._wrapped.public_key().public_numbers().x.bit_length() / 8)
+            != 66
+        ):
+            print(key)
+        alg = josepy.jwa.ES512
+        key_change = acmetk.models.messages.KeyChange(
+            account="billythekid", oldKey=self.client._private_key.public_key()
+        )
+        signed_key_change = acmetk.models.messages.SignedKeyChange.from_data(
+            key_change, key, alg, url="http://localhost/keychange"
+        )
+
+        obj = signed_key_change
+
+        # sign
+        jobj = obj.json_dumps(indent=2).encode()
+        kwargs = {"nonce": acme.jose.b64decode("nonc"), "url": "http://localhost/test"}
+        kwargs["kid"] = "billythekid"
+
+        data = jws.JWS.sign(
+            jobj, key=self.client._private_key, alg=self.client._alg, **kwargs
+        ).json_dumps(indent=2)
+
+        # verify
+        jws = acme.jws.JWS.json_loads(data)
+        payload = jws.payload.decode()
+
+        inner_jws = acme.jws.JWS.json_loads(payload)
+        sig = inner_jws.signature.combined
+        self.assertTrue(inner_jws.verify(sig.jwk))
+
 
 class TestOurClientEC256EC256CA(
     TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
@@ -683,11 +827,15 @@ class TestOurClientEC256EC521CA(
     ACCOUNT_KEY_ALG_BITS = ("EC", 256)
     CERT_KEY_ALG_BITS = ("EC", 521)
 
-    async def test_run(self):
-        """"Let's Encrypt does not allow EC 521 Key Certificates due to lack of browser support"""
-        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
-            await super().test_run()
-        self.assertBadKey(e, "_EllipticCurvePublicKey", "csr", "521")
+    """"Let's Encrypt does not allow EC 521 Key Certificates due to lack of browser support"""
+
+    def test_validate_key(self):
+        self.ca._match_keysize(
+            self.client._private_key.key._wrapped.public_key(), "account"
+        )
+
+        with self.assertRaises(ValueError):
+            self.ca._match_keysize(self.client_data.csr.public_key(), "csr")
 
 
 class TestOurClientRSA1024RSA2048CA(
@@ -696,10 +844,13 @@ class TestOurClientRSA1024RSA2048CA(
     ACCOUNT_KEY_ALG_BITS = ("RSA", 1024)
     CERT_KEY_ALG_BITS = ("RSA", 2048)
 
-    async def test_run(self):
-        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
-            await super().test_run()
-        self.assertBadKey(e, "_RSAPublicKey", "account", "1024")
+    def test_validate_key(self):
+        with self.assertRaises(ValueError):
+            self.ca._match_keysize(
+                self.client._private_key.key._wrapped.public_key(), "account"
+            )
+
+        self.ca._match_keysize(self.client_data.csr.public_key(), "csr")
 
 
 class TestOurClientRSA2048RSA1024CA(
@@ -708,10 +859,13 @@ class TestOurClientRSA2048RSA1024CA(
     ACCOUNT_KEY_ALG_BITS = ("RSA", 2048)
     CERT_KEY_ALG_BITS = ("RSA", 1024)
 
-    async def test_run(self):
-        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
-            await super().test_run()
-        self.assertBadKey(e, "_RSAPublicKey", "csr", "1024")
+    def test_validate_key(self):
+        self.ca._match_keysize(
+            self.client._private_key.key._wrapped.public_key(), "account"
+        )
+
+        with self.assertRaises(ValueError):
+            self.ca._match_keysize(self.client_data.csr.public_key(), "csr")
 
 
 class TestDehydratedCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCase):

@@ -83,7 +83,7 @@ class TestOurClientEC521EC521ProxyLocalCA(
     async def test_run(self):
         with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
             await super().test_run()
-        self.assertBadKey(e, "_EllipticCurvePublicKey", "csr", "521")
+        self.assertBadKey(e, "csr")
 
 
 class TestOurClientRSA1024EC384ProxyLocalCA(
@@ -92,22 +92,12 @@ class TestOurClientRSA1024EC384ProxyLocalCA(
     ACCOUNT_KEY_ALG_BITS = ("RSA", 1024)
     CERT_KEY_ALG_BITS = ("EC", 521)
 
-    async def test_run(self):
-        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
-            await super().test_run()
-        self.assertBadKey(e, "_RSAPublicKey", "account", "1024")
-
 
 class TestOurClientRSA2048RSA1024ProxyLocalCA(
     TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
 ):
     ACCOUNT_KEY_ALG_BITS = ("RSA", 2048)
     CERT_KEY_ALG_BITS = ("RSA", 1024)
-
-    async def test_run(self):
-        with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
-            await super().test_run()
-        self.assertBadKey(e, "_RSAPublicKey", "csr", "1024")
 
 
 class TestProxyLE(TestProxy, TestBrokerLE):
