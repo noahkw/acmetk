@@ -8,11 +8,10 @@ from sqlalchemy import (
     String,
     ForeignKey,
     DateTime,
-    JSON,
     TypeDecorator,
     MetaData,
 )
-from sqlalchemy.dialects.postgresql import INET
+from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import relationship
@@ -64,7 +63,7 @@ class Change(Base):
     _entity = Column(Integer, ForeignKey("entities.entity"), nullable=False, index=True)
     timestamp = Column(DateTime(timezone=True), nullable=False, index=True)
     remote_host = Column(INET, index=True)
-    data = Column(JSON, nullable=False)
+    data = Column(JSONB, nullable=False)
 
 
 class alembic_version(Base):
@@ -74,7 +73,7 @@ class alembic_version(Base):
 
 
 class AcmeErrorType(TypeDecorator):
-    impl = JSON
+    impl = JSONB
 
     def process_bind_param(self, value, dialect):
         if value:

@@ -98,7 +98,7 @@ def versioned_session(session):
 
 
 class Database:
-    ALEMBIC_REVISION = "da620267c2f6"
+    ALEMBIC_REVISION = "24004ca7a5ea"
 
     def __init__(self, connection_string, pool_size=5, **kwargs):
         # asyncpg typeinfo_tree slows down for custom types - including enums when using the pg jit
@@ -108,6 +108,7 @@ class Database:
             connection_string,
             pool_size=pool_size,
             connect_args={"server_settings": {"jit": "off"}},
+            #            echo=True,
             **kwargs
         )
 

@@ -98,9 +98,7 @@ class AcmeManagement:
                 )(value=value)
                 v = v.replace('"', ".")
                 f.append(
-                    sqlalchemy.cast(
-                        Change.data, sqlalchemy.dialects.postgresql.JSONB
-                    ).op("@@")(
+                    Change.data.op("@@")(
                         sqlalchemy.text(
                             f"'$[*].value like_regex \"{v[1:-1]}\"'::jsonpath"
                         )
@@ -108,15 +106,15 @@ class AcmeManagement:
                 )
 
                 # This text() construct doesn't define a bound parameter named 'n'
-                #                f.append(sqlalchemy.cast(Change.data, sqlalchemy.dialects.postgresql.JSONB).op('@@')(
+                #                f.append(Change.data.op('@@')(
                 #                   sqlalchemy.text('\'$[*].value like_regex \"\:n\"\'::jsonpath').bindparams(n=value)))
 
                 # the server expects 0 arguments for this query, 1 was passed
-                #                f.append(sqlalchemy.cast(Change.data, sqlalchemy.dialects.postgresql.JSONB).op('@@')(
+                #                f.append(Change.data.op('@@')(
                 #                    sqlalchemy.text('\'$[*].value like_regex ":n"\'::jsonpath').params(n=value)))
 
                 # the resultset is incomplete
-                #                f.append(sqlalchemy.cast(Change.data, sqlalchemy.dialects.postgresql.JSONB).op('@@')(
+                #                f.append(Change.data.op('@@')(
                 #                    sqlalchemy.text('\'$[*].value like_regex \"\:n\"\'::jsonpath').params(n=value)))
 
                 # remote host ipaddress cidr query
