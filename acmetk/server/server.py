@@ -605,6 +605,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
         if request.method == "GET":
             return self._response(request, status=204)
         else:
+            "request.method == 'HEAD'"
             return self._response(request, status=200)
 
     @routes.post("/new-account", name="new-account")
