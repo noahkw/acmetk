@@ -20,9 +20,8 @@ logger = logging.getLogger(__name__)
 class ChallengeSolver(ConfigurableMixin, abc.ABC):
     """An abstract base class for challenge solver clients.
 
-    All challenge solver implementations must implement the method :func:`complete_challenge`
-    that provisions the resources that are needed to complete the given challenge and delays execution until
-    the server may check for completion.
+    All challenge solver implementations must implement the methods :meth:`complete_challenge` and
+    :func:`cleanup_challenge`.
     Implementations must also set the :attr:`config_name` attribute, so that the CLI script knows which
     configuration option corresponds to which challenge solver class.
     """

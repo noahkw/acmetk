@@ -1470,6 +1470,7 @@ class AcmeBroker(AcmeRelayBase):
         logger.debug("Finalizing order %s", order_id)
 
         async with self._session(request) as session:
+            # TODO: no _validate_order?
             order = await self._db.get_order(session, account_id, order_id)
 
             try:

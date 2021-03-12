@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import logging.config
+import subprocess
 from pathlib import Path
 
 import aiohttp_jinja2
@@ -261,7 +262,8 @@ def db():
 @db.command()
 def migrate():
     """Migrates the database."""
-    raise click.UsageError("Migrations have not been implemented yet.")
+    click.echo("running migrations")
+    subprocess.run(["alembic", "upgrade", "head"])
 
 
 @db.command()
