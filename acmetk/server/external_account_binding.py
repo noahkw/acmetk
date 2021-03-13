@@ -54,10 +54,7 @@ class ExternalAccountBinding:
 
         :return: True iff the EAB has expired.
         """
-        if datetime.datetime.now() - self.when > self.EXPIRES_AFTER:
-            return True
-
-        return False
+        return datetime.datetime.now() - self.when > self.EXPIRES_AFTER
 
     def _eab(self, key_json):
         decoded_hmac_key = josepy.b64.b64decode(self.hmac_key)

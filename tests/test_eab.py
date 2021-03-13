@@ -113,6 +113,9 @@ class TestCertbotCA_EAB(TestCertBotCA):
     async def test_unregister(self):
         pass
 
+    async def test_bad_identifier(self):
+        pass
+
 
 class TestOurClientCA_EAB(TestOurClientCA):
     @property
@@ -148,3 +151,24 @@ class TestOurClientCA_EAB(TestOurClientCA):
 
         self.client.eab_credentials = self.eab_credentials
         await self.client.start()
+
+    async def test_expired(self):
+        self.client.eab_credentials = self.eab_credentials
+        # Change the EAB's created timestamp to expire it
+        list(self.ca._eab_store._pending.values())[0].when -= datetime.timedelta(
+            hours=3, minutes=1
+        )
+
+        with self.assertRaisesRegex(
+            acme.messages.Error, "urn:ietf:params:acme:error:unauthorized"
+        ):
+            await self.client.start()
+
+    async def test_account_update(self):
+        pass
+
+    async def test_keychange(self):
+        pass
+
+    async def test_run_stress(self):
+        pass
