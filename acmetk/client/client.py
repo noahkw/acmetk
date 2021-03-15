@@ -3,7 +3,6 @@ import logging
 import ssl
 import typing
 from dataclasses import dataclass
-from pathlib import Path
 
 import acme.messages
 import josepy
@@ -231,10 +230,11 @@ class AcmeClient:
             )
         except ValueError:
             external_account_binding = None
-            logger.warning(
-                "The external account binding credentials are invalid, "
-                "i.e. the kid or the hmac_key was not supplied. Trying without EAB."
-            )
+            if self.eab_credentials.kid or self.eab_credentials.hmac_key:
+                logger.warning(
+                    "The external account binding credentials are invalid, "
+                    "i.e. the kid or the hmac_key was not supplied. Trying without EAB."
+                )
 
         reg = acme.messages.Registration.from_data(
             email=email or self._contact.get("email"),

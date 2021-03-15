@@ -652,6 +652,15 @@ class TestOurClientStress(TestOurClient):
         with self.assertRaises(acme.messages.Error):
             await self.client.order_create(self.domains)
 
+    async def test_register_twice(self):
+        await self.client.start()
+        kid = self.client._account["kid"]
+
+        self.client._account = None
+        await self.client.account_register()
+
+        self.assertEqual(kid, self.client._account["kid"])
+
 
 class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
     pass
@@ -696,6 +705,9 @@ class TestCertBotRSA2048EC256CA(TestCertBot, TestCA, unittest.IsolatedAsyncioTes
 
 
 class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestCase):
+    async def test_register_twice(self):
+        await super().test_register_twice()
+
     async def test_revoke(self):
         await super().test_revoke()
 
