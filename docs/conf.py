@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath(".."))
 # -- Variables ---------------------------------------------------------------
 
 rst_prolog = """
-.. |GIT_URL| replace:: https://gitlab.uni-hannover.de/ma-woehler/acme-broker.git
+.. |GIT_URL| replace:: https://github.com/noahkw/acmetk.git
 """
 
 # -- Project information -----------------------------------------------------

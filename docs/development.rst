@@ -16,7 +16,7 @@ To run any of these, the *acmetk* package first needs to be installed:
     :substitutions:
 
     git clone |GIT_URL|
-    cd acme-broker/
+    cd acmetk/
     pip install .
 
 Furthermore, a PostgreSQL instance needs to be running locally.
@@ -182,7 +182,7 @@ Set up your development environment:
 
     # Clone the repo
     git clone |GIT_URL|
-    cd acme-broker/
+    cd acmetk/
     # Create a virtual environment
     python -m venv venv
     source venv/bin/activate

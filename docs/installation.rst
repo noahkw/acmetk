@@ -73,8 +73,8 @@ points to the right binary.
    python -m venv venv
    source venv/bin/activate
    # Install the package into the virtual environment
-   pip install --use-feature=2020-resolver -r acme-broker/requirements.txt
-   pip install acme-broker/.
+   pip install --use-feature=2020-resolver -r acmetk/requirements.txt
+   pip install acmetk/.
    # Generate an account key for the internal ACME client
    python -m acmetk generate-account-key -k rsa /etc/acmetk/broker_client_account.key
 
@@ -114,9 +114,9 @@ Copy the modified :code:`nginx.conf` as well as the broker site config file:
 .. code-block:: bash
 
    cd /srv/acmetk
-   sudo cp acme-broker/conf/nginx.conf /etc/openresty/nginx.conf
+   sudo cp acmetk/conf/nginx.conf /etc/openresty/nginx.conf
    sudo mkdir /etc/openresty/conf.d
-   sudo cp acme-broker/conf/broker_site.conf /etc/openresty/conf.d/
+   sudo cp acmetk/conf/broker_site.conf /etc/openresty/conf.d/
 
 Now set the *use_forwarded_header* option to *true* in the broker's configuration file.
 
@@ -155,7 +155,7 @@ Then restart the other services.
 
 .. code-block:: bash
 
-   sudo cp acme-broker/conf/broker_bootstrap.service /etc/systemd/system
+   sudo cp acmetk/conf/broker_bootstrap.service /etc/systemd/system
    sudo systemctl enable broker_bootstrap.service
    sudo systemctl start broker_bootstrap.service
    sudo systemctl restart broker.service
@@ -190,7 +190,7 @@ Build the :code:`acme/app` and :code:`acme/reverse_proxy` images locally:
 
 .. code-block:: bash
 
-   cd acme-broker/
+   cd acmetk/
    pwd # Should return the directory that the repo was cloned to
    sudo docker build -t acme/app -f app.Dockerfile .
    sudo docker build -t acme/reverse_proxy -f reverse_proxy.Dockerfile .
