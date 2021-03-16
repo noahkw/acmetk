@@ -30,9 +30,6 @@ meta = MetaData(
 Base = declarative_base(metadata=meta)
 
 
-Base = declarative_base()
-
-
 def __repr__(self):
     attrs = [
         attr

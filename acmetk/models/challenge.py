@@ -75,7 +75,7 @@ class Challenge(Entity, Serializer):
     """The token that is used during the challenge validation process.
     See `8.1.  Key Authorizations <https://tools.ietf.org/html/rfc8555#section-8.1>`_"""
     error = Column(AcmeErrorType, nullable=True)
-    """The error that occured while validating the challenge."""
+    """The error that occurred while validating the challenge."""
 
     def url(self, request) -> str:
         """Returns the challenge's URL.

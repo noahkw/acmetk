@@ -393,7 +393,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
             raise acme.messages.Error.with_code("malformed")
 
         if key_auth:
-            # check whether key was supplied - josepy.errors.Error: No key found
+            # check whether key was supplied - josepy.errors.Error: No key found - malformed
             if not jws.verify(sig.jwk):
                 raise acme.messages.Error.with_code("unauthorized")
             else:
