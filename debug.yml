@@ -18,7 +18,7 @@ tests:
     names: &localca_names
       - 'localca.test.de'
       - 'localca2.test.de'
-    ca:
+    ca: &localca_ca
       hostname: &host '127.0.0.1'
       port: &port 8000
       db: &db_debug_ca 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:55432/acme-ca'
@@ -32,11 +32,25 @@ tests:
         - '10.0.0.0/8'
         - '172.16.0.0/12'
         - '192.168.0.0/16'
-    client:
+      allow_wildcard: false
+    client: &localca_client
       directory: 'http://localhost:8000/directory'
       contact:
         # phone: ''
         email: 'woehler+testclient@luis.uni-hannover.de'
+  LocalCA_WC:
+    names:
+      - '*.test.de'
+    ca:
+      hostname: *host
+      port: *port
+      db: *db_debug_ca
+      rsa_min_keysize: *rsa_min
+      tos_url: *tos
+      mail_suffixes: *mail_suffixes
+      subnets: *subnets
+      allow_wildcard: true
+    client: *localca_client
   LocalCA_EAB:
     names: *localca_names
     ca:

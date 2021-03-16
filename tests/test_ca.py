@@ -575,7 +575,20 @@ class TestOurClient:
 
     async def test_certificate_content_type(self):
         client = self.client
+
+        try:
+            self.ca._match_keysize(
+                client._private_key.key._wrapped.public_key(), "account"
+            )
+        except ValueError:
+            return
+
         csr = self.client_data.csr
+
+        try:
+            self.ca._match_keysize(csr.public_key(), "csr")
+        except ValueError:
+            return
 
         await client.start()
 
@@ -703,14 +716,15 @@ class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
 
 class TestCertBotWCCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     @property
-    def names(self):
-        return ["*.test.de"]
+    def config_sec(self):
+        return self._config["tests"]["LocalCA_WC"]
 
     async def test_subdomain_revocation(self):
         "avoid Requesting a certificate for dns.*.test.de"
         pass
 
     async def test_run(self):
+        self.assertTrue(self.ca._allow_wildcard)
         await super().test_run()
 
     async def test_no_wc_run(self):
