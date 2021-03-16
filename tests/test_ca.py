@@ -5,6 +5,7 @@ import logging.config
 import shlex
 import shutil
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import acme.messages
@@ -572,6 +573,32 @@ class TestOurClient:
 
         await self.client.key_change(self.client_data.key_path)
 
+    async def test_certificate_content_type(self):
+        client = self.client
+        csr = self.client_data.csr
+
+        await client.start()
+
+        domains = sorted(
+            map(lambda x: x.lower(), acmetk.util.names_of(csr)),
+            key=lambda s: s[::-1],
+        )
+
+        ord = await client.order_create(domains)
+        await client.authorizations_complete(ord)
+        finalized = await client.order_finalize(ord, csr)
+
+        with unittest.mock.patch("aiohttp.ClientSession.post") as m:
+            with self.assertRaisesRegex(
+                TypeError,
+                "'<=' not supported between instances of 'int' and 'AsyncMock'",
+            ):
+                await client.certificate_get(finalized)
+            args, kwargs = m.call_args.args, m.call_args.kwargs
+
+        r = await client._session.post(*args, **kwargs)
+        self.assertEqual(r.content_type, "application/pem-certificate-chain")
+
 
 class TestOurClientStress(TestOurClient):
     async def test_run_stress(self):
@@ -732,7 +759,6 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
                 try:
                     await self.client.key_change(kp)
                 except acme.messages.Error:
-                    import unittest.mock
 
                     self.client._make_request = m = unittest.mock.AsyncMock()
                     m.return_value = (0, 0)

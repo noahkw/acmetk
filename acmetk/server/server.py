@@ -1370,7 +1370,9 @@ class AcmeRelayBase(AcmeServerBase):
 
             return self._response(
                 request,
-                text=certificate.full_chain,
+                body=certificate.full_chain.encode(),
+                links=None,
+                content_type="application/pem-certificate-chain",
             )
 
     # @routes.post("/revoke-cert", name="revoke-cert")
