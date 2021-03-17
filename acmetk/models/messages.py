@@ -3,8 +3,8 @@ import json
 import typing
 
 import OpenSSL
-import acme.messages
 import acme.jws
+import acme.messages
 import josepy
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization

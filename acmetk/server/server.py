@@ -1,17 +1,17 @@
 import abc
 import asyncio
+import cProfile
 import functools
 import ipaddress
 import json
 import logging
+import pstats
 import re
+import string
 import types
 import typing
-import string
 import uuid
 from email.utils import parseaddr
-import cProfile
-import pstats
 
 import acme.jws
 import acme.messages
@@ -25,6 +25,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
+import acmetk.util
 from acmetk import models
 from acmetk.client import CouldNotCompleteChallenge, AcmeClientException, AcmeClient
 from acmetk.database import Database
@@ -33,15 +34,6 @@ from acmetk.server import ChallengeValidator
 from acmetk.server.external_account_binding import AcmeEAB
 from acmetk.server.management import AcmeManagement
 from acmetk.server.routes import routes
-from acmetk.util import (
-    url_for,
-    generate_cert_from_csr,
-    names_of,
-    forwarded_url,
-    pem_split,
-    ConfigurableMixin,
-    next_url,
-)
 from acmetk.version import __version__
 
 logger = logging.getLogger(__name__)
@@ -69,7 +61,7 @@ class AcmeResponse(web.Response):
         )
 
 
-class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
+class AcmeServerBase(AcmeEAB, AcmeManagement, acmetk.util.ConfigurableMixin, abc.ABC):
     """Base class for an ACME compliant server.
 
     Implementations must set the :attr:`config_name` attribute, so that the CLI script knows which
@@ -306,7 +298,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
 
         return AcmeResponse(
             self._issue_nonce(),
-            url_for(request, "directory"),
+            acmetk.util.url_for(request, "directory"),
             *args,
             **kwargs,
             text=text,
@@ -380,7 +372,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
 
         sig = jws.signature.combined
 
-        if sig.url != str(forwarded_url(request)):
+        if sig.url != str(acmetk.util.forwarded_url(request)):
             raise acme.messages.Error.with_code("unauthorized")
 
         if sig.alg not in self.SUPPORTED_JWS_ALGORITHMS:
@@ -405,11 +397,16 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
         elif sig.kid:
             account_id = yarl.URL(sig.kid).name
 
-            if url_for(request, "accounts", account_id=account_id) != sig.kid:
+            if (
+                acmetk.util.url_for(request, "accounts", account_id=account_id)
+                != sig.kid
+            ):
                 """Bug in the dehydrated client, accepted by boulder, so we accept it too.
                 Dehydrated puts .../new-account/{kid} into the request signature, instead of
                 .../accounts/{kid}."""
-                kid_new_account_route = yarl.URL(url_for(request, "new-account"))
+                kid_new_account_route = yarl.URL(
+                    acmetk.util.url_for(request, "new-account")
+                )
                 kid_new_account_route = kid_new_account_route.with_path(
                     kid_new_account_route.path + "/" + account_id
                 )
@@ -583,11 +580,11 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
         :return: The directory object.
         """
         directory = {
-            "newAccount": url_for(request, "new-account"),
-            "newNonce": url_for(request, "new-nonce"),
-            "newOrder": url_for(request, "new-order"),
-            "revokeCert": url_for(request, "revoke-cert"),
-            "keyChange": url_for(request, "key-change"),
+            "newAccount": acmetk.util.url_for(request, "new-account"),
+            "newNonce": acmetk.util.url_for(request, "new-nonce"),
+            "newOrder": acmetk.util.url_for(request, "new-order"),
+            "revokeCert": acmetk.util.url_for(request, "revoke-cert"),
+            "keyChange": acmetk.util.url_for(request, "key-change"),
             "meta": {},
         }
 
@@ -648,7 +645,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
                         request,
                         account.serialize(request),
                         headers={
-                            "Location": url_for(
+                            "Location": acmetk.util.url_for(
                                 request, "accounts", account_id=str(account.account_id)
                             )
                         },
@@ -680,7 +677,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
                         serialized,
                         status=201,
                         headers={
-                            "Location": url_for(
+                            "Location": acmetk.util.url_for(
                                 request, "accounts", account_id=str(account_id)
                             )
                         },
@@ -767,7 +764,9 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
             request,
             serialized,
             status=201,
-            headers={"Location": url_for(request, "order", id=str(order_id))},
+            headers={
+                "Location": acmetk.util.url_for(request, "order", id=str(order_id))
+            },
         )
 
     @routes.post("/authz/{id}", name="authz")
@@ -933,7 +932,9 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
                         if order.status == models.OrderStatus.PENDING
                     ]
                 },
-                links=[f'<{next_url(account.orders_url(request), cursor)}>; rel="next"']
+                links=[
+                    f'<{acmetk.util.next_url(account.orders_url(request), cursor)}>; rel="next"'
+                ]
                 if more_orders
                 else [],
             )
@@ -1029,7 +1030,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
         return self._response(
             request,
             serialized,
-            headers={"Location": url_for(request, "order", id=order_id)},
+            headers={"Location": acmetk.util.url_for(request, "order", id=order_id)},
         )
 
     @routes.post("/certificate/{id}", name="certificate")
@@ -1108,7 +1109,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
 
             key_change = messages.KeyChange.json_loads(inner_jws.payload)
 
-            if key_change.account != url_for(
+            if key_change.account != acmetk.util.url_for(
                 request, "accounts", account_id=str(account.account_id)
             ):
                 """7.  Check that the "account" field of the keyChange object contains
@@ -1149,7 +1150,7 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
                 request,
                 serialized,
                 headers={
-                    "Location": url_for(
+                    "Location": acmetk.util.url_for(
                         request, "accounts", account_id=str(account.account_id)
                     )
                 },
@@ -1308,7 +1309,9 @@ class AcmeCA(AcmeServerBase):
         async with self._session(request) as session:
             order = await self._db.get_order(session, account_id, order_id)
 
-            cert = generate_cert_from_csr(order.csr, self._cert, self._private_key)
+            cert = acmetk.util.generate_cert_from_csr(
+                order.csr, self._cert, self._private_key
+            )
             order.certificate = models.Certificate(
                 status=models.CertificateStatus.VALID, cert=cert
             )
@@ -1456,7 +1459,7 @@ class AcmeRelayBase(AcmeServerBase):
         :param order_ca: The remote CA's order object
         """
         full_chain = await self._client.certificate_get(order_ca)
-        certs = pem_split(full_chain)
+        certs = acmetk.util.pem_split(full_chain)
 
         if len(certs) < 2:
             logger.info(
@@ -1508,7 +1511,9 @@ class AcmeBroker(AcmeRelayBase):
             order = await self._db.get_order(session, account_id, order_id)
 
             try:
-                order_ca = await self._client.order_create(list(names_of(order.csr)))
+                order_ca = await self._client.order_create(
+                    list(acmetk.util.names_of(order.csr))
+                )
                 await self._client.authorizations_complete(order_ca)
                 finalized = await self._client.order_finalize(order_ca, order.csr)
                 await self.obtain_and_store_cert(order, finalized)
@@ -1583,7 +1588,9 @@ class AcmeProxy(AcmeRelayBase):
             request,
             serialized,
             status=201,
-            headers={"Location": url_for(request, "order", id=str(order_id))},
+            headers={
+                "Location": acmetk.util.url_for(request, "order", id=str(order_id))
+            },
         )
 
     async def _complete_challenges(self, request, account_id, order_id):
@@ -1676,7 +1683,7 @@ class AcmeProxy(AcmeRelayBase):
         return self._response(
             request,
             serialized,
-            headers={"Location": url_for(request, "order", id=order_id)},
+            headers={"Location": acmetk.util.url_for(request, "order", id=order_id)},
         )
 
     async def handle_order_finalize(self, request, account_id: str, order_id: str):

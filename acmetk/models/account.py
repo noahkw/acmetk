@@ -4,13 +4,12 @@ import json
 import typing
 import uuid
 
-
 import acme.messages
 import josepy
 from cryptography.hazmat.primitives import serialization
 from sqlalchemy import Column, Enum, String, types, JSON, Integer, ForeignKey
-from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 
 from .base import Serializer, Entity
 from .order import OrderStatus

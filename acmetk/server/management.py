@@ -3,10 +3,10 @@ import collections
 import aiohttp_jinja2
 import cryptography
 import sqlalchemy
+import sqlalchemy.dialects.postgresql
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, selectin_polymorphic, defer
 from sqlalchemy.sql import text
-import sqlalchemy.dialects.postgresql
 
 from acmetk.models import (
     Change,
