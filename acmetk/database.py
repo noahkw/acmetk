@@ -1,4 +1,5 @@
 import datetime
+import uuid
 
 import acme
 from aiohttp import web
@@ -153,6 +154,26 @@ class Database:
         result = (await session.execute(statement)).first()
 
         return result[0] if result else None
+
+    @staticmethod
+    async def get_orders_list(
+        session, account_id: uuid.UUID, limit: int, cursor: int = 0
+    ):
+        if cursor < 0:
+            raise ValueError("Cursor must be >= 0")
+
+        statement = (
+            select(Order)
+            .filter(Order.account_id == account_id)
+            .offset(cursor * limit)
+            .limit(
+                limit + 1
+            )  # read one more row to know whether there are more to be queried later
+        )
+
+        result = (await session.execute(statement)).all()
+
+        return [r for (r,) in result]
 
     @staticmethod
     async def get_authz(session, account_id, authz_id):

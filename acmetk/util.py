@@ -1,12 +1,12 @@
-import os
+import cProfile
+import inspect
 import re
 import typing
 from datetime import datetime, timedelta
-from time import perf_counter
 from pathlib import Path
-import inspect
-import cProfile
+from time import perf_counter
 
+import yarl
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
@@ -118,6 +118,16 @@ def url_for(request, path: str, **kwargs) -> str:
             str(request.app.router[path].url_for(**kwargs))
         )
     )
+
+
+def next_url(url: str, current_cursor: int) -> str:
+    """Returns the URL's cursor query given its current value
+
+    :param url: The URL whose cursor is to be incremented.
+    :type current_cursor: The cursor's current value.
+    :return: The URL with its cursor query value incremented.
+    """
+    return str(yarl.URL(url) % {"cursor": current_cursor + 1})
 
 
 def generate_cert_from_csr(

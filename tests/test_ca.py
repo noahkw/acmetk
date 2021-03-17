@@ -661,6 +661,20 @@ class TestOurClientStress(TestOurClient):
 
         self.assertEqual(kid, self.client._account["kid"])
 
+    async def test_get_orders_list_chunked(self):
+        await self.client.start()
+
+        N_orders = 21
+
+        await asyncio.gather(
+            *[
+                self.client.order_create(self.config_sec["names"])
+                for _ in range(N_orders)
+            ]
+        )
+        orders = await self.client.orders_get()
+        self.assertEqual(N_orders, len(set(orders)))
+
 
 class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
     pass
@@ -705,6 +719,9 @@ class TestCertBotRSA2048EC256CA(TestCertBot, TestCA, unittest.IsolatedAsyncioTes
 
 
 class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestCase):
+    async def test_get_orders_list_chunked(self):
+        await super().test_get_orders_list_chunked()
+
     async def test_register_twice(self):
         await super().test_register_twice()
 

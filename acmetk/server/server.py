@@ -40,6 +40,7 @@ from acmetk.util import (
     forwarded_url,
     pem_split,
     ConfigurableMixin,
+    next_url,
 )
 from acmetk.version import __version__
 
@@ -77,6 +78,9 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
 
     config_name: str
     """The string that maps to the server implementation inside configuration files."""
+
+    ORDERS_LIST_CHUNK_LEN = 10
+    """Number of order links to include per request."""
 
     SUPPORTED_JWS_ALGORITHMS = (
         josepy.jwa.RS256,
@@ -892,18 +896,47 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, ConfigurableMixin, abc.ABC):
 
     @routes.post("/orders/{id}", name="orders")
     async def orders(self, request):
-        """Handler that retrieves the account's orders list.
+        """Handler that retrieves the account's chunked orders list.
 
         `7.1.2.1.  Orders List <https://tools.ietf.org/html/rfc8555#section-7.1.2.1>`_
 
-        :return: An object with key *orders* that holds the account's orders list.
+        :return: An object with key *orders* that holds a chunk of the account's orders list.
         """
         async with self._session(request) as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
             )
+            try:
+                cursor = int(request.query.get("cursor", 0))
+                orders = await self._db.get_orders_list(
+                    session, account.account_id, self.ORDERS_LIST_CHUNK_LEN, cursor
+                )
+            except ValueError:
+                raise web.HTTPBadRequest(text="Cursor must be an integer >= 0.")
 
-            return self._response(request, {"orders": account.orders_list(request)})
+            if len(orders) == 0:
+                raise web.HTTPNotFound(
+                    text="No orders found. Try a lower cursor value or create some orders first."
+                )
+
+            """The next two lines ensure that the extra order we query to see if there more orders is not returned
+            to the client. If there are no more orders after the current cursor, then return all of them."""
+            more_orders = len(orders) == (self.ORDERS_LIST_CHUNK_LEN + 1)
+            orders = orders[:-1] if more_orders else orders
+
+            return self._response(
+                request,
+                {
+                    "orders": [
+                        order.url(request)
+                        for order in orders
+                        if order.status == models.OrderStatus.PENDING
+                    ]
+                },
+                links=[f'<{next_url(account.orders_url(request), cursor)}>; rel="next"']
+                if more_orders
+                else [],
+            )
 
     async def _validate_order(
         self, request, session
