@@ -5,6 +5,7 @@ import logging.config
 import shlex
 import shutil
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import acme.messages
@@ -572,6 +573,45 @@ class TestOurClient:
 
         await self.client.key_change(self.client_data.key_path)
 
+    async def test_certificate_content_type(self):
+        client = self.client
+
+        try:
+            self.ca._match_keysize(
+                client._private_key.key._wrapped.public_key(), "account"
+            )
+        except ValueError:
+            return
+
+        csr = self.client_data.csr
+
+        try:
+            self.ca._match_keysize(csr.public_key(), "csr")
+        except ValueError:
+            return
+
+        await client.start()
+
+        domains = sorted(
+            map(lambda x: x.lower(), acmetk.util.names_of(csr)),
+            key=lambda s: s[::-1],
+        )
+
+        ord = await client.order_create(domains)
+        await client.authorizations_complete(ord)
+        finalized = await client.order_finalize(ord, csr)
+
+        with unittest.mock.patch("aiohttp.ClientSession.post") as m:
+            with self.assertRaisesRegex(
+                TypeError,
+                "'<=' not supported between instances of 'int' and 'AsyncMock'",
+            ):
+                await client.certificate_get(finalized)
+            args, kwargs = m.call_args.args, m.call_args.kwargs
+
+        r = await client._session.post(*args, **kwargs)
+        self.assertEqual(r.content_type, "application/pem-certificate-chain")
+
 
 class TestOurClientStress(TestOurClient):
     async def test_run_stress(self):
@@ -690,14 +730,15 @@ class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
 
 class TestCertBotWCCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
     @property
-    def names(self):
-        return ["*.test.de"]
+    def config_sec(self):
+        return self._config["tests"]["LocalCA_WC"]
 
     async def test_subdomain_revocation(self):
         "avoid Requesting a certificate for dns.*.test.de"
         pass
 
     async def test_run(self):
+        self.assertTrue(self.ca._allow_wildcard)
         await super().test_run()
 
     async def test_no_wc_run(self):
@@ -749,7 +790,6 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
                 try:
                     await self.client.key_change(kp)
                 except acme.messages.Error:
-                    import unittest.mock
 
                     self.client._make_request = m = unittest.mock.AsyncMock()
                     m.return_value = (0, 0)

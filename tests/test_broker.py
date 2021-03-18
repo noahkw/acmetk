@@ -178,6 +178,9 @@ class TestOurClientBrokerLocalCA(
     async def test_unregister(self):
         await super().test_unregister()
 
+    async def test_certificate_content_type(self):
+        await super().test_certificate_content_type()
+
 
 class TestDehydratedCA(
     TestDehydrated, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase
