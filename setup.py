@@ -15,7 +15,7 @@ setuptools.setup(
     description="An ACME Broker for Automated Certificate Acquisition in University Environments",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://gitlab.uni-hannover.de/ma-woehler/acme-broker/",
+    url="https://github.com/noahkw/acmetk",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
