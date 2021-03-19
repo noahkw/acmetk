@@ -11,6 +11,7 @@ import yaml
 
 from acmetk.client import AcmeClient, ChallengeSolver
 from acmetk.database import Database
+from acmetk.plugin_base import PluginRegistry
 from acmetk.server import (
     AcmeServerBase,
     AcmeRelayBase,
@@ -22,9 +23,10 @@ from acmetk.util import generate_root_cert, generate_rsa_key, generate_ec_key
 logger = logging.getLogger(__name__)
 
 
-server_apps = AcmeServerBase.config_mapping()
-challenge_solvers = ChallengeSolver.config_mapping()
-challenge_validators = ChallengeValidator.config_mapping()
+PluginRegistry.load_plugins(r"./plugins")
+server_app_registry = PluginRegistry.get_registry(AcmeServerBase)
+challenge_solver_registry = PluginRegistry.get_registry(ChallengeSolver)
+challenge_validator_registry = PluginRegistry.get_registry(ChallengeValidator)
 
 PATH_OR_HOST_AND_PORT_MSG = (
     "Must specify either the path of the unix socket or the hostname + port."
@@ -44,13 +46,12 @@ def load_config(config_file):
 async def create_challenge_solver(config):
     challenge_solver_name = list(config.keys())[0]
 
-    if challenge_solver_name not in (solver_names := challenge_solvers.keys()):
-        raise click.UsageError(
-            f"The challenge solver plugin {challenge_solver_name} does not exist. Valid options: "
-            f"{', '.join([solver for solver in solver_names])}."
+    try:
+        challenge_solver_class = challenge_solver_registry.get_plugin(
+            challenge_solver_name
         )
-
-    challenge_solver_class = challenge_solvers[challenge_solver_name]
+    except ValueError as e:
+        raise click.UsageError(*e.args)
 
     if type((kwargs := config[challenge_solver_name])) is not dict:
         kwargs = {}
@@ -62,13 +63,12 @@ async def create_challenge_solver(config):
 
 
 async def create_challenge_validator(challenge_validator_name):
-    if challenge_validator_name not in (validator_names := challenge_validators.keys()):
-        raise click.UsageError(
-            f"The challenge solver plugin {challenge_validator_name} does not exist. Valid options: "
-            f"{', '.join([solver for solver in validator_names])}."
+    try:
+        challenge_validator_class = challenge_validator_registry.get_plugin(
+            challenge_validator_name
         )
-
-    challenge_validator_class = challenge_validators[challenge_validator_name]
+    except ValueError as e:
+        raise click.UsageError(*e.args)
 
     return challenge_validator_class()
 
@@ -83,9 +83,9 @@ def main(ctx):
 def plugins():
     """Lists the available plugins and their respective config strings."""
     for plugins in [
-        ("Server apps", server_apps),
-        ("Challenge solvers", challenge_solvers),
-        ("Challenge validators", challenge_validators),
+        ("Server apps", server_app_registry.config_mapping()),
+        ("Challenge solvers", challenge_solver_registry.config_mapping()),
+        ("Challenge validators", challenge_validator_registry.config_mapping()),
     ]:
         click.echo(
             f"{plugins[0]}: {', '.join([f'{app.__name__} ({config_name})' for config_name, app in plugins[1].items()])}"
@@ -137,18 +137,14 @@ def run(config_file, bootstrap_port, path):
     Starts the app in bootstrap mode if the bootstrap port is set via --bootstrap-port."""
     config = load_config(config_file)
 
-    app_config_name = list(config.keys())[0]
-
-    if app_config_name not in (app_names := server_apps.keys()):
-        raise click.UsageError(
-            f"Cannot run app '{app_config_name}'. Valid options: "
-            f"{', '.join([app for app in app_names])}. "
-            f"Please check your config file '{config_file}' and rename the main section accordingly."
-        )
-
     loop = asyncio.get_event_loop()
 
-    app_class = server_apps[app_config_name]
+    app_config_name = list(config.keys())[0]
+
+    try:
+        app_class = server_app_registry.get_plugin(app_config_name)
+    except ValueError as e:
+        raise click.UsageError(*e.args)
 
     if bootstrap_port:
         if app_class is AcmeCA:

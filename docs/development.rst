@@ -233,8 +233,10 @@ Challenge Solver
 
 :class:`~acmetk.client.challenge_solver.ChallengeSolver` is the interface that challenge solver
 plugins must implement.
-Subclasses must also set the :attr:`~acmetk.client.challenge_solver.ChallengeSolver.config_name`
-which corresponds to the :code:`challenge_solver` child section name in client config file.
+Implementations must also be registered with the plugin registry via
+:meth:`acmetk.server.PluginRegistry.register_plugin`, so that the CLI script knows which
+configuration option corresponds to which challenge solver class.
+A template for a challenge solver plugin can be found in :code:`acmetk/plugins/template_solver.py`.
 
 :meth:`~acmetk.client.challenge_solver.ChallengeSolver.connect` may be overridden if the plugin
 needs to connect to some resource before being able to challenge completion requests.
@@ -267,8 +269,10 @@ Challenge Validator
 
 :class:`~acmetk.server.challenge_validator.ChallengeValidator` is the interface that challenge
 validator plugins must implement.
-Subclasses must also set the :attr:`~acmetk.server.challenge_validator.ChallengeValidator.config_name`
-which corresponds to the string that :code:`challenge_validator` is set to in the server config section.
+Implementations must also be registered with the plugin registry via
+:meth:`acmetk.server.PluginRegistry.register_plugin`, so that the CLI script knows which
+configuration option corresponds to which challenge validator class.
+A template for a challenge validator plugin can be found in :code:`acmetk/plugins/template_validator.py`
 
 :meth:`~acmetk.server.challenge_validator.ChallengeValidator.validate_challenge` must be
 overridden by all plugin implementations.

@@ -87,6 +87,12 @@ External Account Binding
 .. autoclass:: acmetk.server.external_account_binding.AcmeEAB
     :members:
 
+Plugin Registry
+---------------
+
+.. autoclass:: acmetk.plugin_base.PluginRegistry
+    :members:
+
 Models
 ######
 

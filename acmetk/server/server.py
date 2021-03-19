@@ -35,6 +35,7 @@ from acmetk.server.external_account_binding import AcmeEAB
 from acmetk.server.management import AcmeManagement
 from acmetk.server.routes import routes
 from acmetk.version import __version__
+from acmetk.plugin_base import PluginRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -61,15 +62,12 @@ class AcmeResponse(web.Response):
         )
 
 
-class AcmeServerBase(AcmeEAB, AcmeManagement, acmetk.util.ConfigurableMixin, abc.ABC):
+class AcmeServerBase(AcmeEAB, AcmeManagement, abc.ABC):
     """Base class for an ACME compliant server.
 
-    Implementations must set the :attr:`config_name` attribute, so that the CLI script knows which
-    configuration option corresponds to which server class.
+    Implementations must also be registered with the plugin registry via :meth:`PluginRegistry.register_plugin`,
+    so that the CLI script knows which configuration option corresponds to which server class.
     """
-
-    config_name: str
-    """The string that maps to the server implementation inside configuration files."""
 
     ORDERS_LIST_CHUNK_LEN = 10
     """Number of order links to include per request."""
@@ -110,8 +108,6 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, acmetk.util.ConfigurableMixin, abc
 
     better than nothing, but  accepts names ending with -
     """
-
-    subclasses = []
 
     def __init__(
         self,
@@ -1263,10 +1259,9 @@ class AcmeServerBase(AcmeEAB, AcmeManagement, acmetk.util.ConfigurableMixin, abc
             return response
 
 
+@PluginRegistry.register_plugin("ca")
 class AcmeCA(AcmeServerBase):
     """ACME compliant Certificate Authority."""
-
-    config_name = "ca"
 
     def __init__(self, *, cert, private_key, **kwargs):
         super().__init__(**kwargs)
@@ -1479,6 +1474,7 @@ class AcmeRelayBase(AcmeServerBase):
             order.status = models.OrderStatus.VALID
 
 
+@PluginRegistry.register_plugin("broker")
 class AcmeBroker(AcmeRelayBase):
     """Server that relays requests to a remote CA employing a "broker" model.
 
@@ -1487,8 +1483,6 @@ class AcmeBroker(AcmeRelayBase):
     cannot be shown to the end user transparently. If that is a concern, then
     the :class:`AcmeProxy` class should be used instead.
     """
-
-    config_name = "broker"
 
     async def handle_order_finalize(self, request, account_id: str, order_id: str):
         """Method that handles the actual finalization of an order.
@@ -1543,14 +1537,13 @@ class AcmeBroker(AcmeRelayBase):
             await session.commit()
 
 
+@PluginRegistry.register_plugin("proxy")
 class AcmeProxy(AcmeRelayBase):
     """Server that relays requests to a remote CA employing a "proxy" model.
 
     Orders are relayed to the remote CA transparently, which allows for
     the possibility to show errors to the end user as they occur at the remote CA.
     """
-
-    config_name = "proxy"
 
     # @routes.post("/new-order", name="new-order")
     async def new_order(self, request):

@@ -12,7 +12,7 @@ import acme.messages
 import dns.asyncresolver
 
 from acmetk.models import ChallengeType, Challenge
-from acmetk.util import ConfigurableMixin
+from acmetk.plugin_base import PluginRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -32,22 +32,17 @@ class CouldNotValidateChallenge(Exception):
         )
 
 
-class ChallengeValidator(ConfigurableMixin, abc.ABC):
+class ChallengeValidator(abc.ABC):
     """An abstract base class for challenge validator clients.
 
     All challenge validator implementations must implement the method :func:`validate_challenge`
     that validates the given challenge.
-    Implementations must also set the :attr:`config_name` attribute, so that the CLI script knows which
-    configuration option corresponds to which challenge validator class.
+    Implementations must also be registered with the plugin registry via :meth:`PluginRegistry.register_plugin`,
+    so that the CLI script knows which configuration option corresponds to which challenge validator class.
     """
-
-    config_name: str
-    """The string that maps to the validator implementation inside configuration files."""
 
     SUPPORTED_CHALLENGES: typing.Iterable[ChallengeType]
     """The types of challenges that the challenge validator implementation supports."""
-
-    subclasses = []
 
     @abc.abstractmethod
     async def validate_challenge(self, challenge: Challenge, **kwargs):
@@ -62,6 +57,7 @@ class ChallengeValidator(ConfigurableMixin, abc.ABC):
         pass
 
 
+@PluginRegistry.register_plugin("requestipdns")
 class RequestIPDNSChallengeValidator(ChallengeValidator):
     """Validator for the Request IP DNS challenge.
 
@@ -70,8 +66,6 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
     authorization's identifier resolves to the IP that the validation
     request is being made from by checking for a A/AAAA record.
     """
-
-    config_name = "requestipdns"
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
     """The types of challenges that the validator supports."""
@@ -154,10 +148,9 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
             )
 
 
+@PluginRegistry.register_plugin("dummy")
 class DummyValidator(ChallengeValidator):
     """Does not do any validation and reports every challenge as valid."""
-
-    config_name = "dummy"
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
     """The types of challenges that the validator supports."""

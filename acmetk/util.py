@@ -274,33 +274,6 @@ def pem_split(
     ]
 
 
-class ConfigurableMixin:
-    """Mixin that configurable base classes should inherit from.
-
-    Each configurable base class must have its own :attr:`subclasses`
-    attribute, which is used to track the actual configurable implementations.
-    Each configurable implementation must set the attribute :attr:`config_name`
-    which is used as the key in the :func:`config_mapping`.
-    """
-
-    subclasses: typing.Optional[list]
-
-    def __init_subclass__(cls, **kwargs):
-        super().__init_subclass__(**kwargs)
-        if getattr(cls, "config_name", None):
-            cls.subclasses.append(cls)
-
-    @classmethod
-    def config_mapping(cls) -> typing.Dict[str, typing.Type["ConfigurableMixin"]]:
-        """Class method that maps :attr:`config_name` attributes to the actual class object.
-
-        :return: Mapping from config names to the actual class objects.
-        """
-        return {
-            configurable.config_name: configurable for configurable in cls.subclasses
-        }
-
-
 class PerformanceMeasure:
     def __init__(self, profile_, init=True):
         if init:

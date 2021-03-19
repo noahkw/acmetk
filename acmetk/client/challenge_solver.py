@@ -12,27 +12,22 @@ from infoblox_client import connector, objects
 
 from acmetk.client.exceptions import CouldNotCompleteChallenge
 from acmetk.models import ChallengeType
-from acmetk.util import ConfigurableMixin
+from acmetk.plugin_base import PluginRegistry
 
 logger = logging.getLogger(__name__)
 
 
-class ChallengeSolver(ConfigurableMixin, abc.ABC):
+class ChallengeSolver(abc.ABC):
     """An abstract base class for challenge solver clients.
 
     All challenge solver implementations must implement the methods :meth:`complete_challenge` and
     :func:`cleanup_challenge`.
-    Implementations must also set the :attr:`config_name` attribute, so that the CLI script knows which
-    configuration option corresponds to which challenge solver class.
+    Implementations must also be registered with the plugin registry via :meth:`PluginRegistry.register_plugin`,
+    so that the CLI script knows which configuration option corresponds to which challenge solver class.
     """
-
-    config_name: str
-    """The string that maps to the solver implementation inside configuration files."""
 
     SUPPORTED_CHALLENGES: typing.Iterable[ChallengeType]
     """The types of challenges that the challenge solver implementation supports."""
-
-    subclasses = []
 
     async def connect(self):
         """Handles connecting the solver implementation to its remote API.
@@ -85,10 +80,9 @@ class ChallengeSolver(ConfigurableMixin, abc.ABC):
         pass
 
 
+@PluginRegistry.register_plugin("dummy")
 class DummySolver(ChallengeSolver):
     """Dummy challenge solver that does not actually complete any challenges."""
-
-    config_name = "dummy"
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
     """The types of challenges that the solver supports."""
@@ -133,14 +127,13 @@ class DummySolver(ChallengeSolver):
         )
 
 
+@PluginRegistry.register_plugin("infoblox")
 class InfobloxClient(ChallengeSolver):
     """InfoBlox DNS-01 challenge solver.
 
     This challenge solver connects to an InfoBlox API to provision
     DNS TXT records in order to complete the ACME DNS-01 challenge type.
     """
-
-    config_name = "infoblox"
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01])
     """The types of challenges that the solver supports."""
