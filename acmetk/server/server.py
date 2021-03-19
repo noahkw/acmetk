@@ -65,8 +65,9 @@ class AcmeResponse(web.Response):
 class AcmeServerBase(AcmeEAB, AcmeManagement, abc.ABC):
     """Base class for an ACME compliant server.
 
-    Implementations must also be registered with the plugin registry via :meth:`PluginRegistry.register_plugin`,
-    so that the CLI script knows which configuration option corresponds to which server class.
+    Implementations must also be registered with the plugin registry via
+    :meth:`~acmetk.plugin_base.PluginRegistry.register_plugin`, so that the CLI script knows which configuration
+    option corresponds to which server class.
     """
 
     ORDERS_LIST_CHUNK_LEN = 10

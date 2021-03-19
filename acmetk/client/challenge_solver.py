@@ -22,8 +22,9 @@ class ChallengeSolver(abc.ABC):
 
     All challenge solver implementations must implement the methods :meth:`complete_challenge` and
     :func:`cleanup_challenge`.
-    Implementations must also be registered with the plugin registry via :meth:`PluginRegistry.register_plugin`,
-    so that the CLI script knows which configuration option corresponds to which challenge solver class.
+    Implementations must also be registered with the plugin registry via
+    :meth:`~acmetk.plugin_base.PluginRegistry.register_plugin`, so that the CLI script knows which configuration
+    option corresponds to which challenge solver class.
     """
 
     SUPPORTED_CHALLENGES: typing.Iterable[ChallengeType]

@@ -37,8 +37,9 @@ class ChallengeValidator(abc.ABC):
 
     All challenge validator implementations must implement the method :func:`validate_challenge`
     that validates the given challenge.
-    Implementations must also be registered with the plugin registry via :meth:`PluginRegistry.register_plugin`,
-    so that the CLI script knows which configuration option corresponds to which challenge validator class.
+    Implementations must also be registered with the plugin registry via
+    :meth:`~acmetk.plugin_base.PluginRegistry.register_plugin`, so that the CLI script knows which configuration
+    option corresponds to which challenge validator class.
     """
 
     SUPPORTED_CHALLENGES: typing.Iterable[ChallengeType]
