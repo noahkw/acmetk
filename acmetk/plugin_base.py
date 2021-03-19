@@ -1,6 +1,9 @@
 import importlib
+import logging
 import typing
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 
 class PluginRegistry:
@@ -20,8 +23,29 @@ class PluginRegistry:
 
         :param path: The path to load plugins from.
         """
-        for module in Path(path).iterdir():
-            importlib.import_module(f"{module.parent.stem}.{module.stem}")
+        project_base = "acmetk"
+        path_ = Path(path)
+        try:
+            cls._load_plugins_from_path(path_)
+        except FileNotFoundError:
+            try:
+                cls._load_plugins_from_path(
+                    path_.parent.parent / project_base / path_.stem
+                )
+            except FileNotFoundError:
+                logger.warning(
+                    "Could not find the plugins directory in ./%s/%s or ./%s",
+                    project_base,
+                    path,
+                    path,
+                )
+
+    @classmethod
+    def _load_plugins_from_path(cls, path: Path):
+        for module in path.iterdir():
+            module_qualified = f"{module.parent.stem}.{module.stem}"
+            logger.debug("Loading plugin from module %s", module_qualified)
+            importlib.import_module(module_qualified, __name__)
 
     @classmethod
     def get_registry(cls, plugin_parent_cls: type) -> "PluginRegistry":

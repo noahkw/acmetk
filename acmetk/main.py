@@ -2,6 +2,7 @@ import asyncio
 import logging
 import logging.config
 import subprocess
+import sys
 from pathlib import Path
 
 import aiohttp_jinja2
@@ -22,8 +23,9 @@ from acmetk.util import generate_root_cert, generate_rsa_key, generate_ec_key
 
 logger = logging.getLogger(__name__)
 
+sys.path.append(r"./acmetk")
 
-PluginRegistry.load_plugins(r"./plugins")
+PluginRegistry.load_plugins(r"plugins")
 server_app_registry = PluginRegistry.get_registry(AcmeServerBase)
 challenge_solver_registry = PluginRegistry.get_registry(ChallengeSolver)
 challenge_validator_registry = PluginRegistry.get_registry(ChallengeValidator)
