@@ -10,7 +10,7 @@ RUN apt-get update \
     && echo "deb http://openresty.org/package/debian $codename openresty" \
         | tee /etc/apt/sources.list.d/openresty.list \
     && apt-get update \
-    && apt-get install -y openresty supervisor luarocks \
+    && apt-get install -y openresty luarocks \
     && luarocks install lua-resty-auto-ssl \
     && mkdir /etc/resty-auto-ssl \
     && chown www-data: /etc/resty-auto-ssl \
