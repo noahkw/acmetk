@@ -140,7 +140,7 @@ class ExternalAccountBindingStore:
         return pending.verify(jws)
 
 
-class AcmeEAB:
+class AcmeEABMixin:
     """Mixin for an :class:`~acmetk.server.AcmeServerBase` implementation that provides external account
     binding creation and verification.
 
@@ -154,8 +154,8 @@ class AcmeEAB:
     verifying it.
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self._eab_store = ExternalAccountBindingStore()
 
     def verify_eab(

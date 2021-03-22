@@ -23,7 +23,7 @@ from acmetk.util import PerformanceMeasurementSystem
 from .pagination import paginate
 
 
-class AcmeManagement:
+class AcmeManagementMixin:
     @routes.get("/mgmt", name="mgmt-index")
     @aiohttp_jinja2.template("index.jinja2")
     async def management_index(self, request):

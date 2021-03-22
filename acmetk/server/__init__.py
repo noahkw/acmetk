@@ -8,7 +8,7 @@ from .server import AcmeCA, AcmeBroker, AcmeProxy, AcmeServerBase, AcmeRelayBase
 from .external_account_binding import (
     ExternalAccountBindingStore,
     ExternalAccountBinding,
-    AcmeEAB,
+    AcmeEABMixin,
 )
 
 
@@ -24,5 +24,5 @@ __all__ = [
     "CouldNotValidateChallenge",
     "ExternalAccountBindingStore",
     "ExternalAccountBinding",
-    "AcmeEAB",
+    "AcmeEABMixin",
 ]

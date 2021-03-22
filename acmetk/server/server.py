@@ -31,8 +31,8 @@ from acmetk.client import CouldNotCompleteChallenge, AcmeClientException, AcmeCl
 from acmetk.database import Database
 from acmetk.models import messages
 from acmetk.server import ChallengeValidator
-from acmetk.server.external_account_binding import AcmeEAB
-from acmetk.server.management import AcmeManagement
+from acmetk.server.external_account_binding import AcmeEABMixin
+from acmetk.server.management import AcmeManagementMixin
 from acmetk.server.routes import routes
 from acmetk.version import __version__
 from acmetk.plugin_base import PluginRegistry
@@ -62,7 +62,7 @@ class AcmeResponse(web.Response):
         )
 
 
-class AcmeServerBase(AcmeEAB, AcmeManagement, abc.ABC):
+class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
     """Base class for an ACME compliant server.
 
     Implementations must also be registered with the plugin registry via
