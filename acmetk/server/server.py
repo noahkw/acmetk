@@ -446,9 +446,13 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             jws, account = await self._verify_request(request, session)
         except acme.messages.Error:
             data = await request.text()
-            jws = acme.jws.JWS.json_loads(
-                data
-            )  # TODO: raise acme error on deserialization error
+
+            try:
+                jws = acme.jws.JWS.json_loads(data)
+            except josepy.errors.DeserializationError:
+                raise acme.messages.Error.with_code(
+                    "malformed", detail="The request does not contain a valid JWS."
+                )
             account = None
 
         try:

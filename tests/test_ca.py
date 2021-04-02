@@ -725,7 +725,11 @@ class TestAcmetinyCA(TestAcmetiny, TestCA, unittest.IsolatedAsyncioTestCase):
 
 
 class TestCertBotCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
-    pass
+    async def test_skey_revocation(self):
+        await super().test_skey_revocation()
+
+    async def test_subdomain_revocation(self):
+        await super().test_subdomain_revocation()
 
 
 class TestCertBotWCCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
