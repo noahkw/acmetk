@@ -1,4 +1,4 @@
-name: CI to GHCR
+name: Docker
 
 on:
   push:
