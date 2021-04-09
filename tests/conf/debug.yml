@@ -184,12 +184,10 @@ tests:
           email: 'woehler+testproxyclient@luis.uni-hannover.de'
         challenge_solver:
           lexicon:
-            provider_name: infoblox
+            provider_name: fakeprovider
             provider_options:
-              auth_user: koetter
-              auth_psw: test
-              ib_host: ipam.uni-hannover.de
-              ib_view: Intern
+              auth_user: user
+              auth_psw: password
 
     client:
       directory: 'http://localhost:8000/broker/directory'
