@@ -89,6 +89,26 @@ class TestBrokerLocalCA(TestBroker):
     def config_sec(self):
         return self._config["tests"]["BrokerLocalCA"]
 
+    def create_challenge_solver(self, config):
+        challenge_solver_name = list(config.keys())[0]
+
+        try:
+            from acmetk.client import ChallengeSolver
+            from acmetk.plugin_base import PluginRegistry
+
+            challenge_solver_registry = PluginRegistry.get_registry(ChallengeSolver)
+            challenge_solver_class = challenge_solver_registry.get_plugin(
+                challenge_solver_name
+            )
+        except ValueError as e:
+            raise e
+
+        if type((kwargs := config[challenge_solver_name])) is not dict:
+            kwargs = {}
+
+        challenge_solver = challenge_solver_class(**kwargs)
+        return challenge_solver
+
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
         ca = await AcmeCA.create_app(self.config_sec["ca"])
@@ -102,11 +122,18 @@ class TestBrokerLocalCA(TestBroker):
             contact=self.config_sec["broker"]["client"]["contact"],
         )
 
-        broker_client.register_challenge_solver(DummySolver())
+        if "challenge_solver" in self.config_sec["broker"]["client"]:
+            solver = self.create_challenge_solver(
+                self.config_sec["broker"]["client"]["challenge_solver"]
+            )
+            broker_client.register_challenge_solver(solver)
+        else:
+            broker_client.register_challenge_solver(DummySolver())
 
         broker = await self._cls.create_app(
             self.config_sec["broker"], client=broker_client
         )
+
         broker.register_challenge_validator(DummyValidator())
 
         await broker._db._recreate()
