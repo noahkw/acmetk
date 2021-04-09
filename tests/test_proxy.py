@@ -1,5 +1,7 @@
 import logging
 import unittest
+import importlib
+from unittest import mock
 import acme.messages
 
 from acmetk import AcmeProxy
@@ -71,6 +73,97 @@ class TestOurClientProxyLocalCA(
 class TestOurClientProxyLocalCALexicon(
     TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
 ):
+    from lexicon.providers.base import Provider as BaseProvider
+
+    class FakeProvider(BaseProvider):
+        """
+        Fake provider to simulate the provider resolution from configuration,
+        and to have execution traces when lexicon client is invoked
+        """
+
+        def _authenticate(self):
+            print("Authenticate action")
+
+        def _create_record(self, rtype, name, content):
+            return {
+                "action": "create",
+                "domain": self.domain,
+                "type": rtype,
+                "name": name,
+                "content": content,
+            }
+
+        def _list_records(self, rtype=None, name=None, content=None):
+            return {
+                "action": "list",
+                "domain": self.domain,
+                "type": rtype,
+                "name": name,
+                "content": content,
+            }
+
+        def _update_record(self, identifier, rtype=None, name=None, content=None):
+            return {
+                "action": "update",
+                "domain": self.domain,
+                "identifier": identifier,
+                "type": rtype,
+                "name": name,
+                "content": content,
+            }
+
+        def _delete_record(self, identifier=None, rtype=None, name=None, content=None):
+            return {
+                "action": "delete",
+                "domain": self.domain,
+                "identifier": identifier,
+                "type": rtype,
+                "name": name,
+                "content": content,
+            }
+
+        def _request(self, action="GET", url="/", data=None, query_params=None):
+            # Not use for tests
+            pass
+
+    async def asyncSetUp(self) -> None:
+        original_import = importlib.import_module
+        self.mocks = []
+        m = mock.patch("importlib.import_module")
+
+        def return_import(module_name):
+            """
+            This will return a adhoc fakeprovider module if necessary,
+            or fallback to the normal return of importlib.import_module.
+            """
+            if module_name == "lexicon.providers.fakeprovider":
+                from types import ModuleType
+
+                module = ModuleType("lexicon.providers.fakeprovider")
+                setattr(
+                    module, "Provider", TestOurClientProxyLocalCALexicon.FakeProvider
+                )
+                return module
+            return original_import(module_name)
+
+        m.side_effect = return_import
+        self.mocks.append(m)
+
+        m = mock.patch(
+            "acmetk.plugins.lexicon_solver.LexiconChallengeSolver._query_until_completed"
+        )
+        self.mocks.append(m)
+
+        for m in self.mocks:
+            m.start()
+
+        await super().asyncSetUp()
+
+    async def asyncTearDown(self) -> None:
+        for m in self.mocks:
+            m.stop()
+        await super().asyncTearDown()
+
     @property
     def config_sec(self):
         return self._config["tests"]["ProxyLocalCALexicon"]
