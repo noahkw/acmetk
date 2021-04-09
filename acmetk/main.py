@@ -45,33 +45,23 @@ def load_config(config_file):
     return config
 
 
-async def create_challenge_solver(config):
+def create_challenge_solver(config):
     challenge_solver_name = list(config.keys())[0]
 
-    try:
-        challenge_solver_class = challenge_solver_registry.get_plugin(
-            challenge_solver_name
-        )
-    except ValueError as e:
-        raise click.UsageError(*e.args)
+    challenge_solver_class = challenge_solver_registry.get_plugin(challenge_solver_name)
 
     if type((kwargs := config[challenge_solver_name])) is not dict:
         kwargs = {}
 
     challenge_solver = challenge_solver_class(**kwargs)
-    await challenge_solver.connect()
 
     return challenge_solver
 
 
-async def create_challenge_validator(challenge_validator_name):
-    try:
-        challenge_validator_class = challenge_validator_registry.get_plugin(
-            challenge_validator_name
-        )
-    except ValueError as e:
-        raise click.UsageError(*e.args)
-
+def create_challenge_validator(challenge_validator_name):
+    challenge_validator_class = challenge_validator_registry.get_plugin(
+        challenge_validator_name
+    )
     return challenge_validator_class()
 
 
@@ -223,12 +213,18 @@ def _url_for(context, __route_name, **parts):
 async def run_relay(config, path, class_, config_name):
     config_section = config[config_name]
 
-    challenge_solver = await create_challenge_solver(
-        config_section["client"]["challenge_solver"]
-    )
-    challenge_validator = await create_challenge_validator(
-        config_section["challenge_validator"]
-    )
+    try:
+        challenge_solver = create_challenge_solver(
+            config_section["client"]["challenge_solver"]
+        )
+        await challenge_solver.connect()
+
+        challenge_validator = create_challenge_validator(
+            config_section["challenge_validator"]
+        )
+
+    except ValueError as e:
+        raise click.UsageError(*e.args)
 
     relay_client = AcmeClient(
         directory_url=config_section["client"]["directory"],
