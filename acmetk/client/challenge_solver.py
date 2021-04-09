@@ -128,12 +128,10 @@ class DummySolver(ChallengeSolver):
         )
 
 
-@PluginRegistry.register_plugin("infoblox")
-class InfobloxClient(ChallengeSolver):
-    """InfoBlox DNS-01 challenge solver.
+class DNSSolver(ChallengeSolver):
+    """Baseclass for DNS Challenge Solvers
 
-    This challenge solver connects to an InfoBlox API to provision
-    DNS TXT records in order to complete the ACME DNS-01 challenge type.
+    Provides the methods to query the TXT records and wait for the propagation to succeed
     """
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01])
@@ -148,6 +146,62 @@ class InfobloxClient(ChallengeSolver):
     DEFAULT_DNS_SERVERS = ["1.1.1.1", "8.8.8.8"]
     """The DNS servers to use if none are specified during initialization."""
 
+    def __init__(self, dns_servers=None):
+        self._loop = asyncio.get_event_loop()
+        self._resolvers = []
+
+        for nameserver in dns_servers or self.DEFAULT_DNS_SERVERS:
+            resolver = dns.asyncresolver.Resolver()
+            resolver.nameservers = [nameserver]
+            self._resolvers.append(resolver)
+
+    async def query_txt_record(
+        self, resolver: dns.asyncresolver.Resolver, name: str
+    ) -> typing.Set[str]:
+        """Queries a DNS TXT record.
+
+        :param name: Name of the TXT record to query.
+        :return: Set of strings stored in the TXT record.
+        """
+        txt_records = []
+
+        with contextlib.suppress(
+            dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer
+        ):
+            resp = await resolver.resolve(name, "TXT")
+
+            for records in resp.rrset.items.keys():
+                txt_records.extend([record.decode() for record in records.strings])
+
+        return set(txt_records)
+
+    async def _query_until_completed(self, name, text):
+        while True:
+            record_sets = await asyncio.gather(
+                *[self.query_txt_record(resolver, name) for resolver in self._resolvers]
+            )
+
+            # Determine set of records that has been seen by all name servers
+            seen_by_all = set.intersection(*record_sets)
+
+            if text in seen_by_all:
+                return
+
+            logger.debug(
+                f"{name} does not have TXT {text} yet. Retrying (Records seen by all name servers: {seen_by_all}"
+            )
+            logger.debug(f"Records seen: {record_sets}")
+            await asyncio.sleep(1.0)
+
+
+@PluginRegistry.register_plugin("infoblox")
+class InfobloxClient(DNSSolver):
+    """InfoBlox DNS-01 challenge solver.
+
+    This challenge solver connects to an InfoBlox API to provision
+    DNS TXT records in order to complete the ACME DNS-01 challenge type.
+    """
+
     DEFAULT_VIEWS = ["Extern"]
     """The views to use if none are specified during initialization."""
 
@@ -158,16 +212,10 @@ class InfobloxClient(ChallengeSolver):
             "password": password,
             "ssl_verify": True,
         }
-        self._loop = asyncio.get_event_loop()
-
-        self._resolvers = []
-
-        for nameserver in dns_servers or self.DEFAULT_DNS_SERVERS:
-            resolver = dns.asyncresolver.Resolver()
-            resolver.nameservers = [nameserver]
-            self._resolvers.append(resolver)
 
         self._views = views or self.DEFAULT_VIEWS
+
+        super().__init__(dns_servers=dns_servers)
 
     async def connect(self):
         """Connects to the InfoBlox API.
@@ -229,44 +277,6 @@ class InfobloxClient(ChallengeSolver):
         await asyncio.gather(
             *[self._loop.run_in_executor(None, record.delete) for record in records]
         )
-
-    async def query_txt_record(
-        self, resolver: dns.asyncresolver.Resolver, name: str
-    ) -> typing.Set[str]:
-        """Queries a DNS TXT record.
-
-        :param name: Name of the TXT record to query.
-        :return: Set of strings stored in the TXT record.
-        """
-        txt_records = []
-
-        with contextlib.suppress(
-            dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer
-        ):
-            resp = await resolver.resolve(name, "TXT")
-
-            for records in resp.rrset.items.keys():
-                txt_records.extend([record.decode() for record in records.strings])
-
-        return set(txt_records)
-
-    async def _query_until_completed(self, name, text):
-        while True:
-            record_sets = await asyncio.gather(
-                *[self.query_txt_record(resolver, name) for resolver in self._resolvers]
-            )
-
-            # Determine set of records that has been seen by all name servers
-            seen_by_all = set.intersection(*record_sets)
-
-            if text in seen_by_all:
-                return
-
-            logger.debug(
-                f"{name} does not have TXT {text} yet. Retrying (Records seen by all name servers: {seen_by_all}"
-            )
-            logger.debug(f"Records seen: {record_sets}")
-            await asyncio.sleep(1.0)
 
     async def complete_challenge(
         self,
