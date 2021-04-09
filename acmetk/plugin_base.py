@@ -24,21 +24,23 @@ class PluginRegistry:
         :param path: The path to load plugins from.
         """
         project_base = "acmetk"
-        path_ = Path(path)
+        import sys
+
         try:
-            cls._load_plugins_from_path(path_)
+            module_base_name = f"{project_base}.{path}"
+            __import__(module_base_name)
+            o = sys.modules[module_base_name]
+            path_ = Path(o.__file__).parent
+            for i in path_.iterdir():
+                __import__(f"{module_base_name}.{i.stem}")
+
         except FileNotFoundError:
-            try:
-                cls._load_plugins_from_path(
-                    path_.parent.parent / project_base / path_.stem
-                )
-            except FileNotFoundError:
-                logger.warning(
-                    "Could not find the plugins directory in ./%s/%s or ./%s",
-                    project_base,
-                    path,
-                    path,
-                )
+            logger.warning(
+                "Could not find the plugins directory in ./%s/%s or ./%s",
+                project_base,
+                path,
+                path,
+            )
 
     @classmethod
     def _load_plugins_from_path(cls, path: Path):
