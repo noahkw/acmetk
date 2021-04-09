@@ -68,6 +68,17 @@ class TestOurClientProxyLocalCA(
     pass
 
 
+class TestOurClientProxyLocalCALexicon(
+    TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
+):
+    @property
+    def config_sec(self):
+        return self._config["tests"]["ProxyLocalCALexicon"]
+
+    async def test_run(self):
+        await super().test_run()
+
+
 class TestOurClientEC384EC384ProxyLocalCA(
     TestOurClientStress, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
 ):

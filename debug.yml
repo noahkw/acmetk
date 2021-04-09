@@ -143,7 +143,7 @@ tests:
     broker:
       hostname: *host
       port: *port
-      db: *db_debug_broker
+      db: &db_proxy_ca 'postgresql+asyncpg://acme_admin:admin@localhost:5432/proxy'
       rsa_min_keysize: *rsa_min
       tos_url: *tos
       mail_suffixes: *mail_suffixes
@@ -164,6 +164,44 @@ tests:
       rsa_min_keysize: *rsa_min
       tos_url: *tos
       allow_wildcard: true
+  ProxyLocalCALexicon:
+    names:
+      - 'proxylocalcalexicon.test.de'
+      - 'proxylocalcalexicon2.test.de'
+    broker:
+      hostname: *host
+      port: *port
+      db: *db_proxy_ca
+      rsa_min_keysize: *rsa_min
+      tos_url: *tos
+      mail_suffixes: *mail_suffixes
+      allow_wildcard: true
+      client: &xclient
+        directory: 'http://localhost:8000/ca/directory'
+        private_key: 'proxy_client_account.key'
+        contact:
+          # phone: ''
+          email: 'woehler+testproxyclient@luis.uni-hannover.de'
+        challenge_solver:
+          lexicon:
+            provider_name: infoblox
+            provider_options:
+              auth_user: koetter
+              auth_psw: test
+              ib_host: ipam.uni-hannover.de
+              ib_view: Intern
+
+    client:
+      directory: 'http://localhost:8000/broker/directory'
+      contact:
+        # phone: ''
+        email: 'woehler+testclient@luis.uni-hannover.de'
+    ca:
+      db: *db_debug_ca
+      rsa_min_keysize: *rsa_min
+      tos_url: *tos
+      allow_wildcard: true
+
   ProxyLE:
     names:
       - 'acmenoah.luis.uni-hannover.de'
@@ -172,7 +210,7 @@ tests:
     broker:
       hostname: *host
       port: *port
-      db: *db_debug_broker
+      db: *db_proxy_ca
       rsa_min_keysize: *rsa_min
       tos_url: *tos
       mail_suffixes: *mail_suffixes
