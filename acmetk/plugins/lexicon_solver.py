@@ -2,38 +2,35 @@ import asyncio
 import logging
 import functools
 import typing
-import contextlib
+import importlib
 
 import dns.name
 import acme.messages
 from requests.exceptions import HTTPError, RequestException
 import josepy.jwk
-import lexicon.providers
 from lexicon.providers.base import Provider as BaseProvider
 from lexicon.config import ConfigResolver
 
 from acmetk.client import CouldNotCompleteChallenge
-from acmetk.client.challenge_solver import ChallengeSolver
-from acmetk.models import ChallengeType
+from acmetk.client.challenge_solver import DNSSolver
 from acmetk.plugin_base import PluginRegistry
 
 logger = logging.getLogger(__name__)
 
-"""This module contains a a solver based on the lexicon library.
+"""This module contains a DNS challenge solver based on the lexicon library.
 """
 
 
 @PluginRegistry.register_plugin("lexicon")
-class LexiconChallengeSolver(ChallengeSolver):
-    SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01])
-
+class LexiconChallengeSolver(DNSSolver):
     def __init__(self, provider_name=None, provider_options=None):
         try:
-            __import__("lexicon.providers." + provider_name)
+            provider_module = importlib.import_module(
+                "lexicon.providers." + provider_name
+            )
         except Exception as e:
             print(e)
-        module = getattr(lexicon.providers, provider_name)
-        self.providing = getattr(module, "Provider")
+        self.providing: typing.Type[BaseProvider] = getattr(provider_module, "Provider")
 
         config: typing.Dict[str, typing.Any] = {
             "provider_name": provider_name,
@@ -42,7 +39,9 @@ class LexiconChallengeSolver(ChallengeSolver):
         provider_config = {}
         provider_config.update(provider_options)
         config[provider_name] = provider_config
-        self.config = ConfigResolver().with_dict(config).with_env()
+        self.config = ConfigResolver().with_dict(config)
+
+        super().__init__()
 
     @staticmethod
     async def _find_domain_id(provider, domain):
@@ -86,8 +85,6 @@ class LexiconChallengeSolver(ChallengeSolver):
         :param views: List of views to set the TXT record in. Defaults to *Intern* and *Extern*.
         :param ttl: Time to live of the TXT record in seconds.
         """
-        #        views = views or self._views
-        # ib_view ib_host
         logger.debug("Setting TXT record %s = %s, TTL %d", name, text, ttl)
 
         await self._find_domain_id(provider, name)
@@ -98,7 +95,7 @@ class LexiconChallengeSolver(ChallengeSolver):
                     self._loop.run_in_executor(
                         None,
                         functools.partial(
-                            provider.create_record, type="TXT", name=name, content=text
+                            provider.create_record, rtype="TXT", name=name, content=text
                         ),
                     )
                 ]
@@ -121,53 +118,17 @@ class LexiconChallengeSolver(ChallengeSolver):
                 *[
                     self._loop.run_in_executor(
                         None,
-                        provider.delete_record,
-                        type="TXT",
-                        name=name,
-                        content=text,
+                        functools.partial(
+                            provider.delete_record,
+                            rtype="TXT",
+                            name=name,
+                            content=text,
+                        ),
                     )
                 ]
             )
         except RequestException as e:
             logger.debug("Encountered error deleting TXT record: %s", e, exc_info=True)
-
-    async def query_txt_record(
-        self, resolver: dns.asyncresolver.Resolver, name: str
-    ) -> typing.Set[str]:
-        """Queries a DNS TXT record.
-
-        :param name: Name of the TXT record to query.
-        :return: Set of strings stored in the TXT record.
-        """
-        txt_records = []
-
-        with contextlib.suppress(
-            dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer
-        ):
-            resp = await resolver.resolve(name, "TXT")
-
-            for records in resp.rrset.items.keys():
-                txt_records.extend([record.decode() for record in records.strings])
-
-        return set(txt_records)
-
-    async def _query_until_completed(self, name, text):
-        while True:
-            record_sets = await asyncio.gather(
-                *[self.query_txt_record(resolver, name) for resolver in self._resolvers]
-            )
-
-            # Determine set of records that has been seen by all name servers
-            seen_by_all = set.intersection(*record_sets)
-
-            if text in seen_by_all:
-                return
-
-            logger.debug(
-                f"{name} does not have TXT {text} yet. Retrying (Records seen by all name servers: {seen_by_all}"
-            )
-            logger.debug(f"Records seen: {record_sets}")
-            await asyncio.sleep(1.0)
 
     async def complete_challenge(
         self,
