@@ -4,7 +4,7 @@ import unittest
 import uuid
 
 
-from acmetk.client import InfobloxClient
+from acmetk.plugins.infoblox_solver import InfobloxClient
 from acmetk.main import load_config
 
 log = logging.getLogger("acmetk.test_infoblox")
@@ -22,7 +22,6 @@ class TestInfobloxClient(unittest.IsolatedAsyncioTestCase):
 
     async def asyncSetUp(self) -> None:
         self.infoblox_client = InfobloxClient(**self.config["infoblox"])
-        await self.infoblox_client.connect()
 
     async def test_set_txt_record(self):
         test_name = self.config["infoblox_test"]["name"]
