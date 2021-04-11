@@ -81,10 +81,25 @@ class TestOurClientProxyLocalCALexicon(
         and to have execution traces when lexicon client is invoked
         """
 
+        CONTENTS = set()
+
         def _authenticate(self):
-            print("Authenticate action")
+            print(f"Authenticate action {self.domain}")
+            self.__authenticate()
+
+        def __authenticate(self):
+            # require .test.de
+            if len(self.domain.split(".")) != 2:
+                raise ValueError(f"No domain found {self.domain}")
+            if (
+                self._get_provider_option("auth_user") != "user"
+                or self._get_provider_option("auth_psw") != "password"
+            ):
+                raise ValueError("Invalid login")
 
         def _create_record(self, rtype, name, content):
+            self.__authenticate()
+            self.CONTENTS.add(content)
             return {
                 "action": "create",
                 "domain": self.domain,
@@ -113,6 +128,8 @@ class TestOurClientProxyLocalCALexicon(
             }
 
         def _delete_record(self, identifier=None, rtype=None, name=None, content=None):
+            self.__authenticate()
+            self.CONTENTS.remove(content)
             return {
                 "action": "delete",
                 "domain": self.domain,
@@ -126,10 +143,9 @@ class TestOurClientProxyLocalCALexicon(
             # Not use for tests
             pass
 
-    async def asyncSetUp(self) -> None:
+    def setUp(self) -> None:
         original_import = importlib.import_module
         self.mocks = []
-        m = mock.patch("importlib.import_module")
 
         def return_import(module_name):
             """
@@ -146,23 +162,26 @@ class TestOurClientProxyLocalCALexicon(
                 return module
             return original_import(module_name)
 
-        m.side_effect = return_import
-        self.mocks.append(m)
-
         m = mock.patch(
-            "acmetk.plugins.lexicon_solver.LexiconChallengeSolver._query_until_completed"
+            "acmetk.plugins.lexicon_solver.importlib.import_module",
+            **{"side_effect": return_import},
         )
         self.mocks.append(m)
+        m.start()
 
-        for m in self.mocks:
-            m.start()
+        m = mock.patch(
+            "acmetk.plugins.lexicon_solver.LexiconChallengeSolver.query_txt_record",
+            **{"return_value": TestOurClientProxyLocalCALexicon.FakeProvider.CONTENTS},
+        )
+        self.mocks.append(m)
+        m.start()
 
-        await super().asyncSetUp()
+        super().setUp()
 
-    async def asyncTearDown(self) -> None:
+    def tearDown(self) -> None:
         for m in self.mocks:
             m.stop()
-        await super().asyncTearDown()
+        super().tearDown()
 
     @property
     def config_sec(self):
