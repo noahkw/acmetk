@@ -4,12 +4,15 @@ import functools
 import typing
 import importlib
 
-import dns.name
 import acme.messages
-from requests.exceptions import HTTPError, RequestException
+import asyncache
+import cachetools
+import dns.name
 import josepy.jwk
 from lexicon.providers.base import Provider as BaseProvider
 from lexicon.config import ConfigResolver
+from requests.exceptions import HTTPError, RequestException
+
 
 from acmetk.client import CouldNotCompleteChallenge
 from acmetk.client.challenge_solver import DNSSolver
@@ -43,8 +46,11 @@ class LexiconChallengeSolver(DNSSolver):
 
         super().__init__()
 
-    @staticmethod
-    async def _find_domain_id(provider, domain):
+    @asyncache.cached(
+        cache=cachetools.LRUCache(maxsize=32),
+        key=lambda _self, provider, domain: domain.lower(),
+    )
+    async def _find_domain_id(self, provider, domain):
         """
         Find the domain_id for a given domain.
 
@@ -60,14 +66,15 @@ class LexiconChallengeSolver(DNSSolver):
         for domain_name in domain_name_guesses:
             provider.domain = domain_name
             try:
-                provider.authenticate()
-                return
+                await asyncio.gather(
+                    *[self._loop.run_in_executor(None, provider.authenticate)]
+                )
+                return domain_name
             except HTTPError as e0:
                 raise e0
             except Exception as e1:
-                if str(e1).startswith("No domain found"):
-                    return
-                raise e1
+                if not str(e1).startswith("No domain found"):
+                    raise e1
         raise ValueError(
             "Unable to determine zone identifier for {0} using zone names: {1}".format(
                 domain, domain_name_guesses
@@ -86,8 +93,6 @@ class LexiconChallengeSolver(DNSSolver):
         :param ttl: Time to live of the TXT record in seconds.
         """
         logger.debug("Setting TXT record %s = %s, TTL %d", name, text, ttl)
-
-        await self._find_domain_id(provider, name)
 
         try:
             await asyncio.gather(
@@ -154,11 +159,7 @@ class LexiconChallengeSolver(DNSSolver):
         provider = self.providing(self.config)
 
         try:
-            await self._find_domain_id(provider, name)
-        except Exception as e:
-            logger.exception(e)
-
-        try:
+            provider.domain = await self._find_domain_id(provider, name)
             await self.set_txt_record(provider, name, text)
         except Exception as e:
             logger.exception(
@@ -203,7 +204,7 @@ class LexiconChallengeSolver(DNSSolver):
         name = challenge.chall.validation_domain_name(identifier.value)
         text = challenge.chall.validation(key)
         try:
-            await self._find_domain_id(provider, name)
+            provider.domain = await self._find_domain_id(provider, name)
             await self.delete_txt_record(provider, name, text)
         except Exception as e:
             logger.exception(e)
