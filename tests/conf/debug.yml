@@ -166,8 +166,8 @@ tests:
       allow_wildcard: true
   ProxyLocalCALexicon:
     names:
-      - 'proxylocalcalexicon.test.de'
-      - 'proxylocalcalexicon2.test.de'
+      - 'proxylocalcalexicon.a.test.de'
+      - 'proxylocalcalexicon2.b.test.de'
     broker:
       hostname: *host
       port: *port
