@@ -32,7 +32,9 @@ class PluginRegistry:
             o = sys.modules[module_base_name]
             path_ = Path(o.__file__).parent
             for i in path_.iterdir():
-                __import__(f"{module_base_name}.{i.stem}")
+                module_name = f"{module_base_name}.{i.stem}"
+                logger.debug("Loading %s", module_name)
+                __import__(module_name)
 
         except FileNotFoundError:
             logger.warning(

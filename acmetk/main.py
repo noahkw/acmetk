@@ -2,7 +2,6 @@ import asyncio
 import logging
 import logging.config
 import subprocess
-import sys
 from pathlib import Path
 
 import aiohttp_jinja2
@@ -22,8 +21,6 @@ from acmetk.server import (
 from acmetk.util import generate_root_cert, generate_rsa_key, generate_ec_key, names_of
 
 logger = logging.getLogger(__name__)
-
-sys.path.append(r"./acmetk")
 
 PluginRegistry.load_plugins(r"plugins")
 server_app_registry = PluginRegistry.get_registry(AcmeServerBase)
@@ -217,7 +214,6 @@ async def run_relay(config, path, class_, config_name):
         challenge_solver = create_challenge_solver(
             config_section["client"]["challenge_solver"]
         )
-        await challenge_solver.connect()
 
         challenge_validator = create_challenge_validator(
             config_section["challenge_validator"]

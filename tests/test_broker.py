@@ -8,7 +8,6 @@ import acmetk.util
 from acmetk import AcmeCA, AcmeBroker
 from acmetk.client import (
     AcmeClient,
-    InfobloxClient,
     DummySolver,
 )
 from acmetk.server import DummyValidator
@@ -216,7 +215,6 @@ class TestBrokerLE(TestBroker):
             self._config["infoblox"]["password"] = f.read().strip()
 
         self.infoblox_client = InfobloxClient(**self._config["infoblox"])
-        await self.infoblox_client.connect()
 
         self.broker_client.register_challenge_solver(self.infoblox_client)
 
