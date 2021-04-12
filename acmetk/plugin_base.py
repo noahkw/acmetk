@@ -1,4 +1,3 @@
-import importlib
 import logging
 import typing
 from pathlib import Path
@@ -34,7 +33,10 @@ class PluginRegistry:
             for i in path_.iterdir():
                 module_name = f"{module_base_name}.{i.stem}"
                 logger.debug("Loading %s", module_name)
-                __import__(module_name)
+                try:
+                    __import__(module_name)
+                except Exception as e:
+                    logger.info("… failed %s", str(e))
 
         except FileNotFoundError:
             logger.warning(
@@ -43,13 +45,6 @@ class PluginRegistry:
                 path,
                 path,
             )
-
-    @classmethod
-    def _load_plugins_from_path(cls, path: Path):
-        for module in path.iterdir():
-            module_qualified = f"{module.parent.stem}.{module.stem}"
-            logger.debug("Loading plugin from module %s", module_qualified)
-            importlib.import_module(module_qualified, __name__)
 
     @classmethod
     def get_registry(cls, plugin_parent_cls: type) -> "PluginRegistry":
