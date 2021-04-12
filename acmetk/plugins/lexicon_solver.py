@@ -27,12 +27,7 @@ logger = logging.getLogger(__name__)
 @PluginRegistry.register_plugin("lexicon")
 class LexiconChallengeSolver(DNSSolver):
     def __init__(self, provider_name=None, provider_options=None):
-        try:
-            provider_module = importlib.import_module(
-                "lexicon.providers." + provider_name
-            )
-        except Exception as e:
-            print(e)
+        provider_module = importlib.import_module("lexicon.providers." + provider_name)
         self.providing: typing.Type[BaseProvider] = getattr(provider_module, "Provider")
 
         config: typing.Dict[str, typing.Any] = {
@@ -73,7 +68,10 @@ class LexiconChallengeSolver(DNSSolver):
             except HTTPError as e0:
                 raise e0
             except Exception as e1:
-                if not str(e1).startswith("No domain found"):
+                # lexicon could do better here ...
+                # infoblox: f"Domain {domain_name} not found in view"
+                # luadns: No domain found
+                if "omain" not in str(e1):
                     raise e1
         raise ValueError(
             "Unable to determine zone identifier for {0} using zone names: {1}".format(
