@@ -16,6 +16,7 @@ configobj==5.0.6
 cryptography==3.3.2
 debtcollector==2.2.0
 distro==1.5.0
+dns-lexicon
 dnspython==2.0.0
 greenlet==1.0.0
 idna==2.10
