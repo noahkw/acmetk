@@ -98,10 +98,14 @@ def versioned_session(session):
                 )
 
 
+class OutdatedSchemaException(Exception):
+    pass
+
+
 class Database:
     ALEMBIC_REVISION = "24004ca7a5ea"
 
-    def __init__(self, connection_string, pool_size=5, **kwargs):
+    def __init__(self, connection_string, pool_size, **kwargs):
         # asyncpg typeinfo_tree slows down for custom types - including enums when using the pg jit
         # https://github.com/MagicStack/asyncpg/issues/530
         # -> disable the jit via connect_args/server_settings
@@ -110,10 +114,40 @@ class Database:
             pool_size=pool_size,
             connect_args={"server_settings": {"jit": "off"}},
             #            echo=True,
-            **kwargs
+            **kwargs,
         )
 
         self.session = versioned_sessionmaker(bind=self.engine, class_=AsyncSession)
+
+    @classmethod
+    async def create_db(cls, connection_string, pool_size=5, **kwargs) -> "Database":
+        """Factory for creating database instances.
+
+        Checks whether there are pending migrations.
+
+        :raises: :class:`OutdatedSchemaException` If the database's schema is outdated and migrations need
+            to be run.
+        :return: The database instance.
+        """
+        db = Database(connection_string, pool_size, **kwargs)
+        await db._check_migrations()
+
+        return db
+
+    async def _check_migrations(self):
+        async with self.session() as session:
+            statement = select(models.base.alembic_version)
+            alembic_version = (await session.execute(statement)).first()[0]
+
+        version = alembic_version.version_num
+
+        if version != self.ALEMBIC_REVISION:
+            raise OutdatedSchemaException(
+                f"""The database schema is outdated and not compatible with your ACMEtk version.
+DB: {version} vs. ACMEtk: {self.ALEMBIC_REVISION}
+Please migrate the database by issuing the following command:
+    python -m acmetk db migrate"""
+            )
 
     async def begin(self):
         """Creates the database's tables according to the models defined in :mod:`acmetk.models`."""
