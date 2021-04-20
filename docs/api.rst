@@ -84,7 +84,7 @@ External Account Binding
 .. autoclass:: acmetk.server.external_account_binding.ExternalAccountBindingStore
     :members:
 
-.. autoclass:: acmetk.server.external_account_binding.AcmeEAB
+.. autoclass:: acmetk.server.external_account_binding.AcmeEABMixin
     :members:
 
 Plugin Registry
