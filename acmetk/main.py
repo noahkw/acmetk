@@ -271,11 +271,14 @@ def init(connection_string, password):
     """Initializes the database's tables.
 
     The user needs to have admin privileges, i.e. 'acme_admin' should be used."""
-    db = Database(connection_string.format(password))
+
+    async def init_db():
+        db = await Database.create_db(connection_string.format(password))
+        await db.begin()
 
     click.echo("Initializing tables...")
     loop = asyncio.get_event_loop()
-    loop.run_until_complete(db.begin())
+    loop.run_until_complete(init_db())
     click.echo("OK.")
 
 
@@ -287,13 +290,16 @@ def drop(connection_string, password):
 
     Make sure to backup the database before running this command.
     """
-    db = Database(connection_string.format(password))
+
+    async def drop_db():
+        db = await Database.create_db(connection_string.format(password))
+        await db.drop()
 
     click.echo("Dropping tables...")
     loop = asyncio.get_event_loop()
 
     if click.confirm("Really drop all tables?"):
-        loop.run_until_complete(db.drop())
+        loop.run_until_complete(drop_db())
         click.echo("OK.")
     else:
         click.echo("Aborting...")

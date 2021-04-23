@@ -203,7 +203,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         :param config: A dictionary holding the configuration. See :doc:`configuration` for supported options.
         :return: The server instance
         """
-        db = Database(config["db"])
+        db = await Database.create_db(config["db"])
 
         instance = cls(
             **config,
@@ -1279,7 +1279,7 @@ class AcmeCA(AcmeServerBase):
 
     @classmethod
     async def create_app(cls, config, **kwargs):
-        db = Database(config["db"])
+        db = await Database.create_db(config["db"])
 
         ca = cls(
             **config,
@@ -1367,7 +1367,7 @@ class AcmeRelayBase(AcmeServerBase):
         :param client: The internal started :class:`AcmeClient` instance
         :return: The server instance
         """
-        db = Database(config["db"])
+        db = await Database.create_db(config["db"])
 
         config.pop("client")
 
