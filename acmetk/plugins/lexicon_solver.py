@@ -11,6 +11,7 @@ import dns.name
 import josepy.jwk
 from lexicon.providers.base import Provider as BaseProvider
 from lexicon.config import ConfigResolver
+from lexicon.exceptions import AuthenticationError, LexiconError
 from requests.exceptions import HTTPError, RequestException
 
 
@@ -65,14 +66,15 @@ class LexiconChallengeSolver(DNSSolver):
                     *[self._loop.run_in_executor(None, provider.authenticate)]
                 )
                 return domain_name
-            except HTTPError as e0:
+            except AuthenticationError:
+                # Authentication failed … continue guessing
+                continue
+            except (LexiconError, HTTPError) as e0:
+                logger.warning("lexicon failed with %s", str(e0))
                 raise e0
             except Exception as e1:
-                # lexicon could do better here ...
-                # infoblox: f"Domain {domain_name} not found in view"
-                # luadns: No domain found
-                if "omain" not in str(e1):
-                    raise e1
+                logger.warning("lexicon failed with %s", str(e1))
+                raise e1
         raise ValueError(
             "Unable to determine zone identifier for {0} using zone names: {1}".format(
                 domain, domain_name_guesses

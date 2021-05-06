@@ -12,7 +12,9 @@ dependencies = [
     "aiohttp==3.7.4",
     "aiohttp_jinja2==1.4.2",
     "alembic==1.4.3",
+    "asyncache",
     "asyncpg==0.21.0",
+    "cachetools",
     "click==7.1.2",
     "cryptography==3.3.2",
     "dnspython==2.0.0",
@@ -24,7 +26,7 @@ dependencies = [
 
 extras_require = {
     "infoblox": ["infoblox-client==0.5.0"],
-    "lexicon": ["dns-lexicon==3.5.6"],
+    "lexicon": ["dns-lexicon>=3.6"],
 }
 
 tests_require = [
