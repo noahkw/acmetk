@@ -8,6 +8,8 @@ from acmetk import AcmeProxy
 from tests.test_broker import TestBrokerLocalCA, TestBrokerLE
 from tests.test_ca import TestAcmetiny, TestOurClient, TestOurClientStress, TestCertBot
 
+from lexicon.exceptions import AuthenticationError
+
 log = logging.getLogger("acmetk.test_proxy")
 
 
@@ -90,12 +92,12 @@ class TestOurClientProxyLocalCALexicon(
         def __authenticate(self):
             # require .test.de
             if len(self.domain.split(".")) != 2:
-                raise ValueError(f"No domain found {self.domain}")
+                raise AuthenticationError(f"No domain found {self.domain}")
             if (
                 self._get_provider_option("auth_user") != "user"
                 or self._get_provider_option("auth_psw") != "password"
             ):
-                raise ValueError("Invalid login")
+                raise AuthenticationError("Invalid login")
 
         def _create_record(self, rtype, name, content):
             self.__authenticate()
