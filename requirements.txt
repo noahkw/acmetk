@@ -4,8 +4,10 @@ aiohttp==3.7.4
 aiohttp-jinja2==1.4.2
 alembic==1.4.3
 async-timeout==3.0.1
+asyncache
 asyncpg==0.21.0
 attrs==20.3.0
+cachetools
 certbot==1.10.1
 certifi==2020.12.5
 cffi==1.14.5
@@ -16,6 +18,7 @@ configobj==5.0.6
 cryptography==3.3.2
 debtcollector==2.2.0
 distro==1.5.0
+dns-lexicon
 dnspython==2.0.0
 greenlet==1.0.0
 idna==2.10

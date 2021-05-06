@@ -1,10 +1,14 @@
 import logging
 import unittest
+import importlib
+from unittest import mock
 import acme.messages
 
 from acmetk import AcmeProxy
 from tests.test_broker import TestBrokerLocalCA, TestBrokerLE
 from tests.test_ca import TestAcmetiny, TestOurClient, TestOurClientStress, TestCertBot
+
+from lexicon.exceptions import AuthenticationError
 
 log = logging.getLogger("acmetk.test_proxy")
 
@@ -66,6 +70,127 @@ class TestOurClientProxyLocalCA(
     TestOurClientStress, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
 ):
     pass
+
+
+class TestOurClientProxyLocalCALexicon(
+    TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
+):
+    from lexicon.providers.base import Provider as BaseProvider
+
+    class FakeProvider(BaseProvider):
+        """
+        Fake provider to simulate the provider resolution from configuration,
+        and to have execution traces when lexicon client is invoked
+        """
+
+        CONTENTS = set()
+
+        def _authenticate(self):
+            print(f"Authenticate action {self.domain}")
+            self.__authenticate()
+
+        def __authenticate(self):
+            # require .test.de
+            if len(self.domain.split(".")) != 2:
+                raise AuthenticationError(f"No domain found {self.domain}")
+            if (
+                self._get_provider_option("auth_user") != "user"
+                or self._get_provider_option("auth_psw") != "password"
+            ):
+                raise AuthenticationError("Invalid login")
+
+        def _create_record(self, rtype, name, content):
+            self.__authenticate()
+            self.CONTENTS.add(content)
+            return {
+                "action": "create",
+                "domain": self.domain,
+                "type": rtype,
+                "name": name,
+                "content": content,
+            }
+
+        def _list_records(self, rtype=None, name=None, content=None):
+            return {
+                "action": "list",
+                "domain": self.domain,
+                "type": rtype,
+                "name": name,
+                "content": content,
+            }
+
+        def _update_record(self, identifier, rtype=None, name=None, content=None):
+            return {
+                "action": "update",
+                "domain": self.domain,
+                "identifier": identifier,
+                "type": rtype,
+                "name": name,
+                "content": content,
+            }
+
+        def _delete_record(self, identifier=None, rtype=None, name=None, content=None):
+            self.__authenticate()
+            self.CONTENTS.remove(content)
+            return {
+                "action": "delete",
+                "domain": self.domain,
+                "identifier": identifier,
+                "type": rtype,
+                "name": name,
+                "content": content,
+            }
+
+        def _request(self, action="GET", url="/", data=None, query_params=None):
+            # Not use for tests
+            pass
+
+    def setUp(self) -> None:
+        original_import = importlib.import_module
+        self.mocks = []
+
+        def return_import(module_name):
+            """
+            This will return a adhoc fakeprovider module if necessary,
+            or fallback to the normal return of importlib.import_module.
+            """
+            if module_name == "lexicon.providers.fakeprovider":
+                from types import ModuleType
+
+                module = ModuleType("lexicon.providers.fakeprovider")
+                setattr(
+                    module, "Provider", TestOurClientProxyLocalCALexicon.FakeProvider
+                )
+                return module
+            return original_import(module_name)
+
+        m = mock.patch(
+            "acmetk.plugins.lexicon_solver.importlib.import_module",
+            **{"side_effect": return_import},
+        )
+        self.mocks.append(m)
+        m.start()
+
+        m = mock.patch(
+            "acmetk.plugins.lexicon_solver.LexiconChallengeSolver.query_txt_record",
+            **{"return_value": TestOurClientProxyLocalCALexicon.FakeProvider.CONTENTS},
+        )
+        self.mocks.append(m)
+        m.start()
+
+        super().setUp()
+
+    def tearDown(self) -> None:
+        for m in self.mocks:
+            m.stop()
+        super().tearDown()
+
+    @property
+    def config_sec(self):
+        return self._config["tests"]["ProxyLocalCALexicon"]
+
+    async def test_run(self):
+        await super().test_run()
 
 
 class TestOurClientEC384EC384ProxyLocalCA(

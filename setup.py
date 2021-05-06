@@ -9,20 +9,29 @@ with open(r"acmetk/version.py") as fp:
 
 dependencies = [
     "acme==1.9.0",
-    "acme-tiny==4.1.0",
     "aiohttp==3.7.4",
     "aiohttp_jinja2==1.4.2",
     "alembic==1.4.3",
+    "asyncache",
     "asyncpg==0.21.0",
-    "certbot==1.10.1",
+    "cachetools",
     "click==7.1.2",
     "cryptography==3.3.2",
     "dnspython==2.0.0",
-    "infoblox-client==0.5.0",
     "josepy~=1.7.0",
     "psycopg2==2.8.6",
     "PyYAML==5.4",
     "sqlalchemy==1.4.0b1",
+]
+
+extras_require = {
+    "infoblox": ["infoblox-client==0.5.0"],
+    "lexicon": ["dns-lexicon>=3.6"],
+}
+
+tests_require = [
+    "acme-tiny==4.1.0",
+    "certbot==1.10.1",
     "trustme==0.6.0",
 ]
 
@@ -37,6 +46,8 @@ setuptools.setup(
     url="https://github.com/noahkw/acmetk",
     packages=setuptools.find_packages(),
     install_requires=dependencies,
+    extras_require=extras_require,
+    tests_require=tests_require,
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",

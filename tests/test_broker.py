@@ -8,10 +8,10 @@ import acmetk.util
 from acmetk import AcmeCA, AcmeBroker
 from acmetk.client import (
     AcmeClient,
-    InfobloxClient,
     DummySolver,
 )
 from acmetk.server import DummyValidator
+from acmetk.main import create_challenge_solver
 from tests.test_ca import (
     TestCA,
     TestAcmetiny,
@@ -101,11 +101,18 @@ class TestBrokerLocalCA(TestBroker):
             contact=self.config_sec["broker"]["client"]["contact"],
         )
 
-        broker_client.register_challenge_solver(DummySolver())
+        if "challenge_solver" in self.config_sec["broker"]["client"]:
+            solver = create_challenge_solver(
+                self.config_sec["broker"]["client"]["challenge_solver"]
+            )
+            broker_client.register_challenge_solver(solver)
+        else:
+            broker_client.register_challenge_solver(DummySolver())
 
         broker = await self._cls.create_app(
             self.config_sec["broker"], client=broker_client
         )
+
         broker.register_challenge_validator(DummyValidator())
 
         await broker._db._recreate()
@@ -206,7 +213,6 @@ class TestBrokerLE(TestBroker):
             self._config["infoblox"]["password"] = f.read().strip()
 
         self.infoblox_client = InfobloxClient(**self._config["infoblox"])
-        await self.infoblox_client.connect()
 
         self.broker_client.register_challenge_solver(self.infoblox_client)
 
