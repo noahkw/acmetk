@@ -7,6 +7,7 @@ import shutil
 import unittest
 import unittest.mock
 from pathlib import Path
+import sys
 
 import acme.messages
 
@@ -615,35 +616,38 @@ class TestOurClient:
 
 class TestOurClientStress(TestOurClient):
     async def test_run_stress(self):
+        if sys.version_info < (3, 11):
+            return
+        # TaskGroups are >= 3.11
         clients_csr = []  # (client, csr) tuples
-        for i in range(10):
-            self._make_key(
-                client_account_key_path := self.path / f"client_{i}_account.key",
-                self.ACCOUNT_KEY_ALG_BITS,
-            )
-            client_cert_key = self._make_key(
-                self.path / f"client_{i}_cert.key", self.CERT_KEY_ALG_BITS
-            )
-
-            csr = acmetk.util.generate_csr(
-                f"{self.name}.test.de",
-                client_cert_key,
-                self.path / f"client_{i}.csr",
-                names=[f"{self.name}.{i}.test.de", f"{self.name}2.{i}.test.de"],
-            )
-
-            clients_csr.append(
-                (
-                    self._make_client(
-                        client_account_key_path, f"client_{i}_{self.contact}"
-                    ),
-                    csr,
+        async with asyncio.TaskGroup() as tg:
+            for i in range(10):
+                self._make_key(
+                    client_account_key_path := self.path / f"client_{i}_account.key",
+                    self.ACCOUNT_KEY_ALG_BITS,
                 )
-            )
+                client_cert_key = self._make_key(
+                    self.path / f"client_{i}_cert.key", self.CERT_KEY_ALG_BITS
+                )
 
-        await asyncio.gather(
-            *[self._run_one(client, csr) for client, csr in clients_csr]
-        )
+                csr = acmetk.util.generate_csr(
+                    f"{self.name.lower()}.stress.test.de",
+                    client_cert_key,
+                    self.path / f"client_{i}.csr",
+                    names=[
+                        f"{self.name.lower()}.stress{i}.test.de",
+                        f"{self.name.lower()}2.stress{i}.test.de",
+                    ],
+                )
+
+                client = self._make_client(
+                    client_account_key_path, f"client_{i}_{self.contact}"
+                )
+                task = tg.create_task(self._run_one(client, csr))
+                assert task
+                # errors as the tg closes before the last clients add_done is run …
+                # task.add_done_callback(lambda x: tg.create_task(client.close()))
+
         await asyncio.gather(*[client.close() for client, _ in clients_csr])
 
     async def test_revoke(self):
