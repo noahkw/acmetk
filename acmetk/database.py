@@ -6,7 +6,7 @@ from aiohttp import web
 from sqlalchemy import select, event
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, selectinload
+from sqlalchemy.orm import sessionmaker, selectinload, aliased
 
 from acmetk import models
 from acmetk.models import (
@@ -178,20 +178,24 @@ class Database:
 
     @staticmethod
     async def get_authz(session, account_id, authz_id):
+        authorization = aliased(Authorization, flat=True)
+        order = aliased(Order, flat=True)
+        account = aliased(Account, flat=True)
+        identifier = aliased(Identifier, flat=True)
         statement = (
-            select(Authorization)
+            select(authorization)
             .options(
-                selectinload(Authorization.identifier)
-                .selectinload(Identifier.order)
+                selectinload(authorization.identifier.of_type(identifier))
+                .selectinload(identifier.order)
                 .selectinload(Order.account),
-                selectinload(Authorization.challenges),
+                selectinload(authorization.challenges),
             )
-            .join(Identifier, Authorization.identifier_id == Identifier.identifier_id)
-            .join(Order, Identifier.order_id == Order.order_id)
-            .join(Account, Order.account_id == Account.account_id)
+            .join(identifier, authorization.identifier_id == identifier.identifier_id)
+            .join(order, identifier.order_id == order.order_id)
+            .join(account, order.account_id == account.account_id)
             .filter(
-                (account_id == Account.account_id)
-                & (Authorization.authorization_id == authz_id)
+                (account_id == account.account_id)
+                & (authorization.authorization_id == authz_id)
             )
         )
         try:
@@ -204,29 +208,33 @@ class Database:
 
     @staticmethod
     async def get_challenge(session, account_id, challenge_id):
+        challenge = aliased(Challenge, flat=True)
+        identifier = aliased(Identifier, flat=True)
+        order = aliased(Order, flat=True)
+        account = aliased(Account, flat=True)
         statement = (
-            select(Challenge)
+            select(challenge)
             .options(
-                selectinload(Challenge.authorization).options(
+                selectinload(challenge.authorization).options(
                     selectinload(Authorization.challenges),
-                    selectinload(Authorization.identifier).options(
-                        selectinload(Identifier.authorization),
-                        selectinload(Identifier.order)
-                        .selectinload(Order.identifiers)
-                        .joinedload(Identifier.authorization),
+                    selectinload(Authorization.identifier.of_type(identifier)).options(
+                        selectinload(identifier.authorization),
+                        selectinload(identifier.order.of_type(order))
+                        .selectinload(order.identifiers.of_type(identifier))
+                        .joinedload(identifier.authorization),
                     ),
                 )
             )
             .join(
                 Authorization,
-                Challenge.authorization_id == Authorization.authorization_id,
+                challenge.authorization_id == Authorization.authorization_id,
             )
-            .join(Identifier, Authorization.identifier_id == Identifier.identifier_id)
-            .join(Order, Identifier.order_id == Order.order_id)
-            .join(Account, Order.account_id == Account.account_id)
+            .join(identifier, Authorization.identifier_id == identifier.identifier_id)
+            .join(order, identifier.order_id == order.order_id)
+            .join(account, order.account_id == account.account_id)
             .filter(
-                (account_id == Account.account_id)
-                & (Challenge.challenge_id == challenge_id)
+                (account_id == account.account_id)
+                & (challenge.challenge_id == challenge_id)
             )
         )
         try:
@@ -239,6 +247,7 @@ class Database:
 
     @staticmethod
     async def get_order(session, account_id, order_id):
+        account = aliased(Account, flat=True)
         statement = (
             select(Order)
             .options(
@@ -246,8 +255,8 @@ class Database:
                 selectinload(Order.identifiers).selectinload(Identifier.authorization),
                 selectinload(Order.certificate),
             )
-            .join(Account, Order.account_id == Account.account_id)
-            .filter((account_id == Account.account_id) & (order_id == Order.order_id))
+            .join(account, Order.account_id == account.account_id)
+            .filter((account_id == account.account_id) & (order_id == Order.order_id))
         )
         try:
             result = (await session.execute(statement)).first()
@@ -261,18 +270,20 @@ class Database:
     async def get_certificate(
         session, account_id=None, certificate_id=None, certificate=None
     ):
+        order = aliased(Order, flat=True)
+        account = aliased(Account, flat=True)
         if account_id and certificate_id:
             statement = (
                 select(Certificate)
                 .options(
-                    selectinload(Order.certificate),
-                    selectinload(Order.account),
-                    selectinload(Certificate.order).selectinload(Order.account),
+                    selectinload(Certificate.order.of_type(order)).selectinload(
+                        order.account
+                    )
                 )
-                .join(Order, Certificate.order_id == Order.order_id)
-                .join(Account, Order.account_id == Account.account_id)
+                .join(order, Certificate.order_id == order.order_id)
+                .join(account, order.account_id == account.account_id)
                 .filter(
-                    (account_id == Account.account_id)
+                    (account_id == account.account_id)
                     & (Certificate.certificate_id == certificate_id)
                 )
             )
@@ -280,9 +291,13 @@ class Database:
             statement = (
                 select(Certificate)
                 .filter(Certificate.cert == certificate)
-                .options(selectinload(Certificate.order).selectinload(Order.account))
-                .join(Order, Certificate.order_id == Order.order_id)
-                .join(Account, Order.account_id == Account.account_id)
+                .options(
+                    selectinload(Certificate.order.of_type(order)).selectinload(
+                        order.account
+                    )
+                )
+                .join(order, Certificate.order_id == order.order_id)
+                .join(account, order.account_id == account.account_id)
             )
         else:
             raise ValueError(
