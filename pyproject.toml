@@ -1,0 +1,63 @@
+[project]
+name = "acmetk"
+version = "0.0.2"
+description = "An ACME Broker for Automated Certificate Acquisition in University Environments"
+authors = [
+    {name = "Noah Wöhler", email = "noah.woehler@gmail.com"},
+]
+dependencies = [
+    "PyYAML==5.4",
+    "acme-tiny==4.1.0",
+    "acme==1.9.0",
+    "aiohttp==3.7.4",
+    "aiohttp_jinja2==1.4.2",
+    "alembic==1.4.3",
+    "asyncpg==0.21.0",
+    "certbot==1.10.1",
+    "click==7.1.2",
+    "cryptography==3.3.2",
+    "dnspython==2.0.0",
+    "infoblox-client==0.5.0",
+    "josepy~=1.7.0",
+    "psycopg2==2.8.6",
+    "sqlalchemy==1.4.0b1",
+    "trustme==0.6.0",
+]
+requires-python = ">=3.8"
+readme = "README.md"
+license = {text = "MIT"}
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://acmetk.readthedocs.io"
+Repository = "https://github.com/noahkw/acmetk"
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.pdm.dev-dependencies]
+tests = [
+
+]
+
+[tool.pdm]
+plugins = [
+    "pdm-autoexport"
+]
+
+[tool.setuptools]
+packages = [
+    "acmetk",
+    "acmetk.client",
+    "acmetk.models",
+    "acmetk.plugins",
+    "acmetk.server",
+]
+
+[tool.setuptools.dynamic]
+version = {attr = "acmetk.version.__version__"}
