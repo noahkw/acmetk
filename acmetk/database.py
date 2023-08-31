@@ -92,7 +92,7 @@ def versioned_session(session):
                 obj.changes.append(
                     models.Change(
                         timestamp=now,
-                        remote_host=session.info.get("remote_host"),
+                        remote_host=str(session.info.get("remote_host")),
                         data=diff,
                     )
                 )
@@ -109,8 +109,9 @@ class Database:
             connection_string,
             pool_size=pool_size,
             connect_args={"server_settings": {"jit": "off"}},
-            #            echo=True,
-            **kwargs
+            # echo=True,
+            native_inet_types=True,
+            **kwargs,
         )
 
         self.session = versioned_sessionmaker(bind=self.engine, class_=AsyncSession)
