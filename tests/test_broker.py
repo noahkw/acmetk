@@ -81,6 +81,7 @@ class TestBroker(TestCA):
     async def asyncTearDown(self) -> None:
         await super().asyncTearDown()
         await self.broker_client.close()
+        await self.relay._db.engine.dispose()
 
 
 class TestBrokerLocalCA(TestBroker):

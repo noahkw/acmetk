@@ -140,6 +140,7 @@ class TestCA(TestAcme):
     async def asyncTearDown(self) -> None:
         await self.runner.shutdown()
         await self.runner.cleanup()
+        await self.ca._db.engine.dispose()
 
 
 class TestAcmetiny:
