@@ -15,6 +15,10 @@ from .base import Serializer, Entity
 from .order import OrderStatus
 from ..util import url_for, names_of
 
+if typing.TYPE_CHECKING:
+    import acmetk
+    import cryptography
+
 
 class AccountStatus(str, enum.Enum):
     # subclassing str simplifies json serialization using json.dumps
@@ -25,6 +29,7 @@ class AccountStatus(str, enum.Enum):
 
 class JWKType(types.TypeDecorator):
     impl = types.LargeBinary
+    cache_ok = True
 
     def process_bind_param(self, value, dialect):
         return value.key.public_bytes(

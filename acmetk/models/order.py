@@ -26,10 +26,16 @@ from .identifier import Identifier
 from ..util import url_for, names_of
 
 
+if typing.TYPE_CHECKING:
+    import acmetk
+    import cryptography
+
+
 class CSRType(TypeDecorator):
     """x509 Certificate as PEM"""
 
     impl = LargeBinary
+    cache_ok = True
 
     def process_bind_param(self, value, dialect):
         if value:
