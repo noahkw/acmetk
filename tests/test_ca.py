@@ -291,6 +291,14 @@ class Testacmesh:
 
 class TestCertBot:
     def setUp(self) -> None:
+        # FIXME
+        # certbot setuptools pkg
+        # DeprecationWarning: pkg_resources is deprecated as an API.
+        # See https://setuptools.pypa.io/en/latest/pkg_resources.html
+        import warnings
+
+        warnings.simplefilter("ignore", category=DeprecationWarning)
+
         super().setUp()
 
         self._rmtree.extend(["archive", "renewal", "live"])
