@@ -37,6 +37,9 @@ from acmetk.server.routes import routes
 from acmetk.version import __version__
 from acmetk.plugin_base import PluginRegistry
 
+if typing.TYPE_CHECKING:
+    import aiohttp
+
 logger = logging.getLogger(__name__)
 
 
@@ -541,6 +544,16 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                 )
             except UnicodeError:
                 raise ValueError("Domain name contains malformed punycode")
+
+            # not lowercase
+            r = set(
+                map(
+                    lambda identifier: identifier.value.lower() == identifier.value,
+                    obj.identifiers,
+                )
+            )
+            if False in r:
+                raise ValueError("Domain name is not lowercase")
 
             # regex
             r = set(
@@ -1084,7 +1097,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             """, with the following differences:"""
 
             if inner_jws.signature.combined.url != jws.signature.combined.url:
-                """ The inner JWS MUST have the same "url" header parameter as the outer JWS. """
+                """The inner JWS MUST have the same "url" header parameter as the outer JWS."""
                 raise acme.messages.Error.with_code(
                     "malformed",
                     detail="The inner JWS of the keychange url mismatches the outer JWS url.",
@@ -1105,7 +1118,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                 )
 
             if not inner_jws.verify(sig.jwk):
-                """ 4.  Check that the inner JWS verifies using the key in its "jwk" field."""
+                """4.  Check that the inner JWS verifies using the key in its "jwk" field."""
                 raise acme.messages.Error.with_code("unauthorized")
 
             key_change = messages.KeyChange.json_loads(inner_jws.payload)
