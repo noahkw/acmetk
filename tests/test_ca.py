@@ -616,7 +616,9 @@ class TestOurClient:
 class TestAcmeZ:
     def setUp(self) -> None:
         super().setUp()
-        self.bin = str(Path("~/workspace/acmez/examples/porcelain/porcelain").expanduser())
+        self.bin = str(
+            Path("~/workspace/acmez/examples/porcelain/porcelain").expanduser()
+        )
 
     async def _run(self):
         cmd = self.bin
@@ -636,7 +638,6 @@ class TestAcmeZ:
 
         while r := await p.stdout.readline():
             llog(r, log.info)
-
 
     async def test_run(self):
         await self._run()
@@ -787,9 +788,7 @@ class TestCertBotRSA2048EC256CA(TestCertBot, TestCA, unittest.IsolatedAsyncioTes
     CERT_KEY_ALG_BITS = ("EC", 256)
 
     async def test_skey_revocation(self):
-        # certbot 1.10.1 can do ec certificates but can not skey revoke them
-        with self.assertRaises(AssertionError):
-            await super().test_skey_revocation()
+        await super().test_skey_revocation()
 
 
 class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestCase):
@@ -806,7 +805,6 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
         await super().test_keychange()
 
     async def no_test_mock_keychange(self):
-
         keys = []
         for alg, abits in {"EC": (256, 521)}.items():
             for bits in abits:
@@ -823,7 +821,6 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
                 try:
                     await self.client.key_change(kp)
                 except acme.messages.Error:
-
                     self.client._make_request = m = unittest.mock.AsyncMock()
                     m.return_value = (0, 0)
 
@@ -984,6 +981,7 @@ class TestDehydratedECCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCas
 
 class TestacmeshCA(Testacmesh, TestCA, unittest.IsolatedAsyncioTestCase):
     pass
+
 
 class TestAcmeZCA(TestAcmeZ, TestCA, unittest.IsolatedAsyncioTestCase):
     pass
