@@ -12,7 +12,7 @@ from sqlalchemy import (
     MetaData,
 )
 from sqlalchemy.dialects.postgresql import INET, JSONB
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import relationship
 
