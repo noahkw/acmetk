@@ -613,6 +613,35 @@ class TestOurClient:
         self.assertEqual(r.content_type, "application/pem-certificate-chain")
 
 
+class TestAcmeZ:
+    def setUp(self) -> None:
+        super().setUp()
+        self.bin = str(Path("~/workspace/acmez/examples/porcelain/porcelain").expanduser())
+
+    async def _run(self):
+        cmd = self.bin
+        log.info(cmd)
+        p = await asyncio.create_subprocess_exec(
+            *shlex.split(cmd), stdout=asyncio.subprocess.PIPE
+        )
+
+        def llog(_line, logger):
+            if not _line:
+                return
+            args = _line.decode().strip().split("]", maxsplit=2)
+            if len(args) == 2:
+                logger(args[1])
+            else:
+                logger(_line)
+
+        while r := await p.stdout.readline():
+            llog(r, log.info)
+
+
+    async def test_run(self):
+        await self._run()
+
+
 class TestOurClientStress(TestOurClient):
     async def test_run_stress(self):
         clients_csr = []  # (client, csr) tuples
@@ -954,4 +983,7 @@ class TestDehydratedECCA(TestDehydrated, TestCA, unittest.IsolatedAsyncioTestCas
 
 
 class TestacmeshCA(Testacmesh, TestCA, unittest.IsolatedAsyncioTestCase):
+    pass
+
+class TestAcmeZCA(TestAcmeZ, TestCA, unittest.IsolatedAsyncioTestCase):
     pass
