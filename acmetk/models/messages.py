@@ -2,7 +2,6 @@ import enum
 import json
 import typing
 
-import OpenSSL
 import acme.jws
 import acme.messages
 import josepy
@@ -12,6 +11,10 @@ from josepy import JSONDeSerializable
 
 from acmetk.models.account import AccountStatus
 from acmetk.models.authorization import AuthorizationStatus
+
+if typing.TYPE_CHECKING:
+    import cryptography
+    import datetime
 
 ERROR_CODE_STATUS = {
     "unauthorized": 401,
@@ -41,9 +44,7 @@ def decode_cert(b64der):
 
 
 def encode_cert(cert):
-    return josepy.encode_b64jose(
-        OpenSSL.crypto.dump_certificate(OpenSSL.crypto.FILETYPE_ASN1, cert)
-    )
+    return josepy.encode_b64jose(cert.public_bytes(serialization.Encoding.DER))
 
 
 class RevocationReason(enum.Enum):
