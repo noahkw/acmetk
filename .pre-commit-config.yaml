@@ -1,10 +1,10 @@
 repos:
   - repo: 'https://github.com/psf/black'
-    rev: 20.8b1
+    rev: 23.7.0
     hooks:
       - id: black
   - repo: 'https://github.com/pre-commit/pre-commit-hooks'
-    rev: v3.3.0
+    rev: v4.4.0
     hooks:
       - id: end-of-file-fixer
         exclude: '^docs/[^/]*\.svg$'
@@ -32,8 +32,9 @@ repos:
           - '--allow-missing-credentials'
       - id: detect-private-key
         exclude: ^examples/
-  - repo: 'https://gitlab.com/pycqa/flake8'
-    rev: 3.8.4
+  - repo: 'https://github.com/PyCQA/flake8'
+    rev: 6.1.0
     hooks:
       - id: flake8
         exclude: ^docs/|^alembic/(versions/.*\.py|env\.py)
+        args: ['--max-line-length=120']
