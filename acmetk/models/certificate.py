@@ -23,6 +23,7 @@ class x509Certificate(TypeDecorator):
     """x509 Certificate as PEM."""
 
     impl = LargeBinary
+    cache_ok = True
 
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(self.impl)
