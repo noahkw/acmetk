@@ -128,6 +128,8 @@ class Database:
 
     async def drop(self):
         """Drops all of the database's tables."""
+        # FIXME
+        # sqlalchemy greenlet_spawn asyncpg resourcewarning
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
 
