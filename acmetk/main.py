@@ -136,7 +136,8 @@ def generate_account_key(account_key_file, key_type):
 def run(config_file, bootstrap_port, path):
     """Starts the app as defined in the config file.
 
-    Starts the app in bootstrap mode if the bootstrap port is set via --bootstrap-port."""
+    Starts the app in bootstrap mode if the bootstrap port is set via --bootstrap-port.
+    """
     config = load_config(config_file)
 
     loop = asyncio.get_event_loop()
@@ -206,7 +207,7 @@ async def run_ca(config, path):
     return runner, ca
 
 
-@jinja2.contextfunction
+@jinja2.pass_context
 def _url_for(context, __route_name, **parts):
     try:
         return (
