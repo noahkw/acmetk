@@ -16,8 +16,8 @@ class TestInfobloxClient(unittest.IsolatedAsyncioTestCase):
         return type(self).__name__[4:]
 
     def setUp(self) -> None:
-        self.config = load_config("../debug.yml")
-        with open("../infoblox", "r") as f:
+        self.config = load_config("tests/conf/debug.yml")
+        with open("tests/conf/infoblox", "r") as f:
             self.config["infoblox"]["password"] = f.read().strip()
 
     async def asyncSetUp(self) -> None:

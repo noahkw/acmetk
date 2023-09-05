@@ -57,7 +57,7 @@ class TestAcme:
 
     def setUp(self) -> None:
         """Sets up our test object with the necessary properties for testing using a client"""
-        self._config = load_config("../debug.yml")
+        self._config = load_config("tests/conf/debug.yml")
         self.log = logging.getLogger(f"acmetk.tests.{self.name}")
         self.contact = f"woehler+{self.name}@luis.uni-hannover.de"
 
