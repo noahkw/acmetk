@@ -732,9 +732,7 @@ class TestOurClientStress(TestOurClient):
 class TestAcmeZ:
     def setUp(self) -> None:
         super().setUp()
-        self.bin = str(
-            Path("~/workspace/acmez/examples/porcelain/porcelain").expanduser()
-        )
+        self.bin = str(Path("/tmp/acmez/examples/porcelain/porcelain"))
 
     async def _run(self):
         cmd = self.bin
