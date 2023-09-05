@@ -74,6 +74,21 @@ jobs:
       run: |
         pdm use -f $PYTHON
         pdm install -d
+
+    - name: Install acme.sh ACME client
+      run: |
+        git clone --depth 1 https://github.com/acmesh-official/acme.sh /tmp/acme.sh
+
+    - name: Install dehydrated ACME client
+      run: |
+        git clone --depth 1 https://github.com/dehydrated-io/dehydrated.git /tmp/dehydrated
+
+    - name: Install acmez ACME client
+      run: |
+        git clone --depth=1 https://github.com/mholt/acmez.git /tmp/acmez
+        sed -i /tmp/acmez/examples/porcelain/main.go -e s@https://127.0.0.1:14000/dir@http://127.0.0.1:8000/directory@ -e s/mailto:you@example.com/mailto:you@uni-hannover.de/
+        cd /tmp/acmez && go build && cd examples/porcelain && go build
+
     - name: Generate coverage report
       run: |
         pdm run coverage run --data-file=ca.coverage -m unittest "tests/test_ca.py"
