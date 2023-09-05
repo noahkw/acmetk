@@ -16,7 +16,7 @@ from tests.test_ca import (
     TestCA,
     TestAcmetiny,
     TestCertBot,
-    TestOurClient,
+    TestOurClientStress,
     TestDehydrated,
 )
 
@@ -162,7 +162,7 @@ class TestCertBotBrokerLocalCA(
 
 
 class TestOurClientBrokerLocalCA(
-    TestOurClient, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase
+    TestOurClientStress, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase
 ):
     async def test_run(self):
         await super().test_run()
@@ -240,7 +240,7 @@ class TestCertBotBrokerLE(TestCertBot, TestBrokerLE, unittest.IsolatedAsyncioTes
 
 
 class TestOurClientBrokerLE(
-    TestOurClient, TestBrokerLE, unittest.IsolatedAsyncioTestCase
+    TestOurClientStress, TestBrokerLE, unittest.IsolatedAsyncioTestCase
 ):
     async def test_run(self):
         await super().test_run()
