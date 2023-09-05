@@ -1,11 +1,9 @@
 name: Docker
 
 on:
-  push:
-    branches: [ master, ci_github ]
+  workflow_dispatch: {}
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:

@@ -1,0 +1,99 @@
+name: Codecov
+on:
+  push:
+    branches: [ master, ci_github ]
+
+jobs:
+  run:
+    name: test ${{ matrix.os }} / ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python: ["3.8","3.9","3.10","3.11"]
+    env:
+      OS: ${{ matrix.os }}
+      PYTHON: ${{ matrix.python }}
+    steps:
+    - uses: actions/checkout@master
+
+    - name: create .env file
+      shell: bash
+      run: |
+        cat <<EOF>.env
+        ACME_TESTS_PG_PW=acme-broker-debug-pw
+        ACME_SUPERUSER_PW=YOUR_SUPERUSER_PW
+        ACME_ADMIN_PW=YOUR_ADMIN_PW
+        ACME_RW_PW=YOUR_READ_WRITE_PW
+        ACME_RO_PW=YOUR_READ_ONLY_PW
+        ACME_PREFIX=/FIXME
+        ACME_CONFIG_FILE=/etc/acme_server/config.yml
+        EOF
+
+    - name: create docker-compose for unit tests
+      shell: bash
+      run: |
+        cat <<EOF>docker-compose-tests.yml
+        version: "2.1"
+        services:
+          db:
+            container_name: acmetk_db
+            image: postgres
+            volumes:
+              - ./db_data:/var/lib/postgresql/data
+            environment:
+              POSTGRES_PASSWORD: \${ACME_TESTS_PG_PW}
+              POSTGRES_USER: acme-broker
+            ports:
+              - 55432:5432
+        EOF
+
+
+    - name: Start containers
+      run: docker-compose --env-file .env -f "docker-compose-tests.yml" up -d
+
+    - name: Show containers
+      run: docker ps -a
+
+    - name: wait 7s
+      run: sleep 7
+
+    - name: Show containers
+      run: docker ps -a
+
+    - name: List containers
+      run: docker container ls
+
+    - name: create acme-ca table
+      run: docker exec acmetk_db createdb -U acme-broker acme-ca
+
+    - uses: pdm-project/setup-pdm@v3
+      with:
+        python-version: ${{ matrix.python }}
+    - name: install deps
+      run: |
+        pdm use -f $PYTHON
+        pdm install -d
+    - name: Generate coverage report
+      run: |
+        pdm run coverage run --data-file=ca.coverage -m unittest "tests/test_ca.py"
+        pdm run coverage run --data-file=eab-ca.coverage -m unittest "tests/test_eab.py"
+        pdm run coverage run --data-file=broker-ca.coverage -m unittest "tests/test_broker.py" -k CA
+        pdm run coverage combine --data-file=.coverage ca.coverage eab-ca.coverage broker-ca.coverage
+        pdm run coverage xml --data-file=.coverage -o coverage.xml
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        directory: .
+        env_vars: OS,PYTHON
+        fail_ci_if_error: false
+        files: coverage.xml
+        flags: unittests
+        name: codecov-acmetk
+        verbose: true
+
+    - name: Stop containers
+      if: always()
+      run: docker-compose -f "docker-compose.yml" down
