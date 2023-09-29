@@ -19,7 +19,7 @@ from acmetk.server import (
     AcmeCA,
     ChallengeValidator,
 )
-from acmetk.util import generate_root_cert, generate_rsa_key, generate_ec_key
+from acmetk.util import generate_root_cert, generate_rsa_key, generate_ec_key, names_of
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +182,9 @@ def run(config_file, bootstrap_port, path):
         raise ValueError(app_class)
 
     aiohttp_jinja2.setup(site.app, loader=jinja2.FileSystemLoader("./tpl/"))
-    aiohttp_jinja2.get_env(site.app).globals.update({"url_for": _url_for})
+    aiohttp_jinja2.get_env(site.app).globals.update(
+        {"url_for": _url_for, "names_of_csr": names_of}
+    )
 
     try:
         loop.run_forever()
