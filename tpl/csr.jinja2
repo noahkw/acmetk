@@ -1,0 +1,26 @@
+{% from "certificate.jinja2" import Name, PublicKey, Extensions, Blob with context %}
+
+{%- macro alginfo_of(public_key) -%}
+{%- set alg={'_RSAPublicKey':'RSA','_EllipticCurvePublicKey':'EC'}.get(public_key.__class__.__name__, public_key.__class__.__name__) %}
+    {{ alg }}/{{ public_key.key_size }} bits
+{%- endmacro -%}
+
+{%- macro csr_(c) -%}
+Certificate Request:
+    Data:
+        Version: FIXME
+        Subject: {{ Name(c.subject) }}
+        Subject Public Key Info:
+{{- PublicKey(c.public_key()) }}
+        Attributes:
+            Requested Attributes:
+{{- Extensions(c) }}
+    Signature Algorithm: {{c.signature_algorithm_oid._name}}
+    Signature Value:
+{{ Blob(c.signature, 18, 9) }}
+{{ c.public_bytes(encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM).decode() }}
+{%- endmacro -%}
+
+{%- if csr is defined -%}
+{{ csr_(csr) }}
+{%- endif -%}

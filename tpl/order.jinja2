@@ -1,13 +1,37 @@
-{%  extends "template.jinja2" %}
+{% extends "template.jinja2" %}
+{% from "csr.jinja2" import csr,alginfo_of with context %}
 
 {%  block body %}
 <h1>Order {{ order.order }}</h1>
 <p>
+
 <table>
     <tr>
         <td>Account:</td>
         <td>{{ account_url(order.account) }}</td>
     </tr>
+    <tr>
+        <td>CSR</td>
+{%  if order.csr %}
+        <td><a href="{{ url_for('mgmt-csr', order=order.order_id|string)}}">Yes</a></td>
+    </tr>
+    <tr>
+        <td  valign="top">Names</td>
+        <td>
+{% for name in names_of_csr(order.csr) %}
+    {{ name }} </br>
+{% endfor %}
+        </td>
+    </tr>
+    <tr>
+        <td>Alg/Bits</td>
+        <td>{{ alginfo_of(order.csr.public_key()) }}</td>
+    </tr>
+{% else %}
+        <td>MISSING</td>
+    </tr>
+{% endif %}
+
     <tr>
         <td>Status:</td>
         <td>{{ order.status.name }}</td>
@@ -46,7 +70,7 @@
 {% for a in order.identifiers|map(attribute='authorization')|sort(attribute='identifier.value') %}
 <tr class="h">
     <td colspan="2">{{ a.identifier.value }}</td>
-    <td>{{ a.authorization }}</td>
+    <td>{{ a.authorization_id }}</td>
     <td>{{ time(a.expires) }}</td>
     <td>{{ a.status.name }}</td>
 </tr>
@@ -65,6 +89,7 @@
 
 <h2>History</h2>
 <table>
+{% set ns = namespace(time=None) %}
 {% for c in changes %}
 {% if loop.changed(time(c.timestamp, fmt='%Y-%m-%d')) %}
 <tr class="h">
@@ -72,7 +97,13 @@
 </tr>
 {% endif %}
 <tr>
-<td>{{ time(c.timestamp, fmt='%H:%M:%S.%f %Z') }}</td>
+{% set now = time(c.timestamp, fmt='%H:%M:%S.%f %Z')%}
+{% if ns.time != now %}
+{% set ns.time = now %}
+<td>{{ now }}</td>
+{% else %}
+<td></td>
+{% endif %}
 <td>{{ c.entity.identity }}/{{ c.entity|attr(c.entity.identity + '_id') }}</td>
 <td>
     <ul class="data">
