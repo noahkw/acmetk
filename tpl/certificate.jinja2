@@ -42,24 +42,7 @@ Public Key Algorithm: {{key.__class__.__name__}}
 {{ PublicKey_(key)|indent(indent, first=True) }}
 {%- endmacro -%}
 
-{% if certificate is defined %}
-{%- set c=certificate -%}
-{%- set key=c.public_key() -%}
-
-Certificate:
-    Data:
-        Version: {{ c.version.name }} ({{ c.version.value}})
-        Serial Number:
-{{ IntBlob(c.serial_number, 64, 12) }}
-        Signature Algorithm: {{ c.signature_algorithm_oid._name }}
-        Issuer: {{ Name(c.issuer) }}
-        Validity
-            Not Before: {{ c.not_valid_before }}
-            Not After : {{ c.not_valid_after }}
-        Subject: {{ Name(c.subject) }}
-        Subject Public Key Info:
-{{- PublicKey(key) }}
-        X509v3 extensions:
+{%- macro Extensions(c) -%}
 {%- for e in c.extensions %}
 {%- set v=e.value %}
             X509v3 {{ e.oid._name }}: {{ 'critical' if e.critical }}
@@ -116,7 +99,29 @@ Certificate:
                 Can't decode {{ v.__class__.__name__ }}
 {%- endif %}
 {%- endfor %}
+{%- endmacro -%}
+
+{% if certificate is defined %}
+{%- set c=certificate -%}
+{%- set key=c.public_key() -%}
+
+Certificate:
+    Data:
+        Version: {{ c.version.name }} ({{ c.version.value}})
+        Serial Number:
+{{ IntBlob(c.serial_number, 64, 12) }}
+        Signature Algorithm: {{ c.signature_algorithm_oid._name }}
+        Issuer: {{ Name(c.issuer) }}
+        Validity
+            Not Before: {{ c.not_valid_before }}
+            Not After : {{ c.not_valid_after }}
+        Subject: {{ Name(c.subject) }}
+        Subject Public Key Info:
+{{- PublicKey(key) }}
+        X509v3 extensions:
+{{- Extensions(c) }}
     Signature Algorithm: {{c.signature_algorithm_oid._name}}
+    Signature Value:
 {{ Blob(c.signature, 18, 9) }}
 {{  c.public_bytes(encoding=cryptography.hazmat.primitives.serialization.Encoding.PEM).decode() }}
 {% else %}
