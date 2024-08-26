@@ -5,7 +5,7 @@ import cryptography
 import sqlalchemy
 import sqlalchemy.dialects.postgresql
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload, selectin_polymorphic, defer
+from sqlalchemy.orm import selectinload, defer, defaultload
 from sqlalchemy.sql import text
 
 from acmetk.models import (
@@ -138,7 +138,7 @@ class AcmeManagementMixin:
                 total = (await session.execute(q)).scalars().first()
 
             q = select(Change).options(
-                selectin_polymorphic(Change.entity, [Account]),
+                selectinload(Change.entity).selectin_polymorphic([Account]),
                 selectinload(Change.entity.of_type(Authorization))
                 .selectinload(Authorization.identifier)
                 .selectinload(Identifier.order)
@@ -156,6 +156,7 @@ class AcmeManagementMixin:
                 .selectinload(Order.account),
                 selectinload(Change.entity.of_type(Order)).selectinload(Order.account),
             )
+
             if f:
                 q = q.filter(sqlalchemy.or_(*f))
             q = q.order_by(Change.change.desc())
@@ -223,11 +224,11 @@ class AcmeManagementMixin:
             q = (
                 select(Order)
                 .options(
-                    defer("csr"),
-                    selectinload(Order.account).options(defer("key")),
+                    defer(Order.csr),
+                    selectinload(Order.account).options(defer(Account.key)),
                     selectinload(Order.identifiers),
                     selectinload(Order.changes).options(
-                        defer("data"),
+                        defer(Change.data),
                     ),
                 )
                 .order_by(Order._entity.desc())
@@ -246,9 +247,14 @@ class AcmeManagementMixin:
             q = (
                 select(Order)
                 .options(
+                    defaultload(Order.csr),
                     selectinload(Order.account),
                     selectinload(Order.identifiers).options(
+                        defaultload(Identifier.value),
                         selectinload(Identifier.authorization).options(
+                            selectinload(Authorization.identifier).defaultload(
+                                Identifier.value
+                            ),
                             selectinload(Authorization.challenges)
                             .selectinload(Challenge.changes)
                             .selectinload(Change.entity),
@@ -269,10 +275,13 @@ class AcmeManagementMixin:
                 r = await session.execute(q)
             o = r.scalars().first()
 
+            if o is None:
+                from aiohttp.web_exceptions import HTTPNotFound
+
+                raise HTTPNotFound()
             changes.extend(o.changes)
 
         async with pms.measure():
-
             for i in o.identifiers:
                 changes.extend(i.changes)
                 changes.extend(i.authorization.changes)
@@ -284,7 +293,12 @@ class AcmeManagementMixin:
 
             changes = sorted(changes, key=lambda x: x.timestamp, reverse=True)
 
-        return {"order": o, "changes": changes, "pms": pms}
+        return {
+            "order": o,
+            "changes": changes,
+            "pms": pms,
+            "cryptography": cryptography,
+        }
 
     @routes.get("/mgmt/certificates", name="mgmt-certificates")
     @aiohttp_jinja2.template("certificates.jinja2")
@@ -298,12 +312,12 @@ class AcmeManagementMixin:
             q = (
                 select(Certificate)
                 .options(
-                    defer("cert"),
-                    selectinload(Certificate.changes).options(defer("data")),
+                    defer(Certificate.cert),
+                    selectinload(Certificate.changes).options(defer(Change.data)),
                     selectinload(Certificate.order)
-                    .options(defer("csr"), selectinload(Order.identifiers))
+                    .options(defer(Order.csr), selectinload(Order.identifiers))
                     .selectinload(Order.account)
-                    .options(defer("key")),
+                    .options(defer(Account.key)),
                 )
                 .order_by(Certificate._entity.desc())
             )
@@ -330,6 +344,24 @@ class AcmeManagementMixin:
             response = aiohttp_jinja2.render_template(
                 "certificate.jinja2", request, context
             )
+            response.content_type = "text"
+            response.charset = "utf-8"
+            return response
+
+    @routes.get("/mgmt/orders/{order}/csr", name="mgmt-csr")
+    async def management_csr(self, request):
+        order = request.match_info["order"]
+        async with self._session(request) as session:
+            q = (
+                select(Order)
+                .options(defaultload(Order.csr))
+                .filter(Order.order_id == order)
+            )
+
+            r = await session.execute(q)
+            a = r.scalars().first()
+            context = {"csr": a.csr, "cryptography": cryptography}
+            response = aiohttp_jinja2.render_template("csr.jinja2", request, context)
             response.content_type = "text"
             response.charset = "utf-8"
             return response

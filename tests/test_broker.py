@@ -129,7 +129,8 @@ class TestBrokerLocalCA(TestBroker):
 
         self.runner = runner
         self.broker_client = broker_client
-        self.relay = broker
+        self.relay = self._broker = broker
+        self._ca = ca
 
 
 class TestAcmetinyBrokerLocalCA(

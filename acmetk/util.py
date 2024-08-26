@@ -13,6 +13,9 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.x509 import NameOID
 
+if typing.TYPE_CHECKING:
+    import cryptography
+
 KEY_FILE_MODE = 0o600
 
 
@@ -312,8 +315,11 @@ class PerformanceMeasurementSystem:
         self.begin = perf_counter()
         self.end = None
         self.measuring_points = []
-        self.profile = cProfile.Profile()
-        self.profile.enable()
+        if self.enable:
+            self.profile = cProfile.Profile()
+            self.profile.enable()
+        else:
+            self.profile = None
 
     def measure(self):
         if self.enable:
