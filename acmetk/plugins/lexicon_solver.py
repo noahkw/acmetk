@@ -2,18 +2,20 @@ import asyncio
 import logging
 import functools
 import typing
-import importlib
 
 import acme.messages
 import asyncache
 import cachetools
 import dns.name
+import dns.asyncresolver
 import josepy.jwk
-from lexicon.providers.base import Provider as BaseProvider
-from lexicon.config import ConfigResolver
-from lexicon.exceptions import AuthenticationError, LexiconError
-from requests.exceptions import HTTPError, RequestException
 
+import lexicon
+import lexicon.client
+from lexicon.config import ConfigResolver, DictConfigSource
+from lexicon.exceptions import AuthenticationError, LexiconError
+
+from requests.exceptions import HTTPError, RequestException
 
 from acmetk.client import CouldNotCompleteChallenge
 from acmetk.client.challenge_solver import DNSSolver
@@ -28,19 +30,21 @@ logger = logging.getLogger(__name__)
 @PluginRegistry.register_plugin("lexicon")
 class LexiconChallengeSolver(DNSSolver):
     def __init__(self, provider_name=None, provider_options=None):
-        provider_module = importlib.import_module("lexicon.providers." + provider_name)
-        self.providing: typing.Type[BaseProvider] = getattr(provider_module, "Provider")
-
-        config: typing.Dict[str, typing.Any] = {
+        self.config: typing.Dict[str, typing.Any] = {
             "provider_name": provider_name,
-            "domain": "..invalid..",
+            provider_name: provider_options.copy() if provider_options else {},
         }
-        provider_config = {}
-        provider_config.update(provider_options)
-        config[provider_name] = provider_config
-        self.config = ConfigResolver().with_dict(config)
+        self.provider_name = provider_name
 
         super().__init__()
+
+    async def _config_for(self, name: str) -> ConfigResolver:
+        zone = await dns.asyncresolver.zone_for_name(name)
+        cfg = ConfigResolver().with_dict(self.config)
+        cfg.add_config_source(
+            DictConfigSource({"domain": name, "ddns": {"domain": zone.to_text()}}), 0
+        )
+        return cfg
 
     @asyncache.cached(
         cache=cachetools.LRUCache(maxsize=32),
@@ -82,11 +86,16 @@ class LexiconChallengeSolver(DNSSolver):
         )
 
     async def set_txt_record(
-        self, provider: BaseProvider, name: str, text: str, views=None, ttl: int = 60
+        self,
+        ops: lexicon.client._ClientOperations,
+        name: str,
+        text: str,
+        views=None,
+        ttl: int = 60,
     ):
         """Sets a DNS TXT record.
 
-        :param provider: The Lexicon Provider.
+        :param ops: The Lexicon Client operations.
         :param name: The name of the TXT record.
         :param text: The text of the TXT record.
         :param views: List of views to set the TXT record in. Defaults to *Intern* and *Extern*.
@@ -100,7 +109,7 @@ class LexiconChallengeSolver(DNSSolver):
                     self._loop.run_in_executor(
                         None,
                         functools.partial(
-                            provider.create_record, rtype="TXT", name=name, content=text
+                            ops.create_record, rtype="TXT", name=name, content=text
                         ),
                     )
                 ]
@@ -109,10 +118,12 @@ class LexiconChallengeSolver(DNSSolver):
             logger.debug("Encountered error adding TXT record: %s", e, exc_info=True)
             raise ValueError("Error adding TXT record: {0}".format(e))
 
-    async def delete_txt_record(self, provider: BaseProvider, name: str, text: str):
+    async def delete_txt_record(
+        self, ops: lexicon.client._ClientOperations, name: str, text: str
+    ):
         """Deletes a DNS TXT record.
 
-        :param provider: The Lexicon Provider.
+        :param ops: The Lexicon Client operations.
         :param name: The name of the TXT record to delete.
         :param text: The text of the TXT record to delete.
         """
@@ -124,7 +135,7 @@ class LexiconChallengeSolver(DNSSolver):
                     self._loop.run_in_executor(
                         None,
                         functools.partial(
-                            provider.delete_record,
+                            ops.delete_record,
                             rtype="TXT",
                             name=name,
                             content=text,
@@ -155,12 +166,11 @@ class LexiconChallengeSolver(DNSSolver):
         """
         name = challenge.chall.validation_domain_name(identifier.value)
         text = challenge.chall.validation(key)
-
-        provider = self.providing(self.config)
+        cfg = await self._config_for(name)
 
         try:
-            provider.domain = await self._find_domain_id(provider, name)
-            await self.set_txt_record(provider, name, text)
+            with lexicon.client.Client(cfg) as ops:
+                await self.set_txt_record(ops, name, text)
         except Exception as e:
             logger.exception(
                 "Could not set TXT record to solve challenge: %s = %s", name, text
@@ -199,12 +209,17 @@ class LexiconChallengeSolver(DNSSolver):
         :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to clean up after.
         """
-        provider = self.providing(self.config)
 
         name = challenge.chall.validation_domain_name(identifier.value)
         text = challenge.chall.validation(key)
+
+        cfg = await self._config_for(name)
+
         try:
-            provider.domain = await self._find_domain_id(provider, name)
-            await self.delete_txt_record(provider, name, text)
+            #            provider.domain = await self._find_domain_id(provider, name)
+            with lexicon.client.Client(cfg) as ops:
+                assert ops.provider.zone is not None, ops.provider.zone
+                assert ops.provider.domain
+                await self.delete_txt_record(ops, name, text)
         except Exception as e:
             logger.exception(e)
