@@ -33,6 +33,13 @@ dynamic = ['version']
 Homepage = "https://acmetk.readthedocs.io"
 Repository = "https://github.com/noahkw/acmetk"
 
+[project.optional-dependencies]
+infoblox = [
+    "infoblox-client",
+]
+lexicon = [
+    "dns-lexicon",
+]
 [build-system]
 requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
