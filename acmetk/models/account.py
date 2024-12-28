@@ -90,7 +90,7 @@ class Account(Entity, Serializer):
         """
         return url_for(request, "orders", id=str(self.kid))
 
-    def orders_list(self, request) -> typing.List[str]:
+    def orders_list(self, request) -> list[str]:
         """Returns the account's orders list.
 
         :param request: The client request needed to build the list of URLs.
@@ -102,7 +102,7 @@ class Account(Entity, Serializer):
             if order.status == OrderStatus.PENDING
         ]
 
-    def authorized_identifiers(self, lower: bool = False) -> typing.Set[str]:
+    def authorized_identifiers(self, lower: bool = False) -> set[str]:
         """Returns the identifiers that the account holds valid authorizations for.
 
         :param lower: True if the list of authorized identifiers should be lowercased.
@@ -118,10 +118,10 @@ class Account(Entity, Serializer):
             if identifier.authorization.is_valid(expired=True)
         ]
 
-        return set(
+        return {
             identifier.value.lower() if lower else identifier.value
             for identifier in identifiers
-        )
+        }
 
     def validate_cert(self, cert: "cryptography.x509.Certificate") -> bool:
         """Validates whether the account holds authorizations for all names present in the certificate.

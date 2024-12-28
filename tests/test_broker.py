@@ -10,6 +10,7 @@ from acmetk.client import (
     AcmeClient,
     DummySolver,
 )
+from acmetk.plugins.infoblox_solver import InfobloxClient
 from acmetk.server import DummyValidator
 from acmetk.main import create_challenge_solver
 from tests.test_ca import (
@@ -211,7 +212,7 @@ class TestBrokerLE(TestBroker):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
 
-        with open("../infoblox", "r") as f:
+        with open("../infoblox") as f:
             self._config["infoblox"]["password"] = f.read().strip()
 
         self.infoblox_client = InfobloxClient(**self._config["infoblox"])

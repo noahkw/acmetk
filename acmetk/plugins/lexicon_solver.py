@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 @PluginRegistry.register_plugin("lexicon")
 class LexiconChallengeSolver(DNSSolver):
     def __init__(self, provider_name=None, provider_options=None):
-        self.config: typing.Dict[str, typing.Any] = {
+        self.config: dict[str, typing.Any] = {
             "provider_name": provider_name,
             provider_name: provider_options.copy() if provider_options else {},
         }
@@ -80,7 +80,7 @@ class LexiconChallengeSolver(DNSSolver):
                 logger.warning("lexicon failed with %s", str(e1))
                 raise e1
         raise ValueError(
-            "Unable to determine zone identifier for {0} using zone names: {1}".format(
+            "Unable to determine zone identifier for {} using zone names: {}".format(
                 domain, domain_name_guesses
             )
         )
@@ -116,7 +116,7 @@ class LexiconChallengeSolver(DNSSolver):
             )
         except RequestException as e:
             logger.debug("Encountered error adding TXT record: %s", e, exc_info=True)
-            raise ValueError("Error adding TXT record: {0}".format(e))
+            raise ValueError(f"Error adding TXT record: {e}")
 
     async def delete_txt_record(
         self, ops: lexicon.client._ClientOperations, name: str, text: str

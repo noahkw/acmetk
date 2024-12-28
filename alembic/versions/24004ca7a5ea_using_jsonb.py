@@ -5,6 +5,7 @@ Revises: da620267c2f6
 Create Date: 2021-03-04 07:40:24.478687
 
 """
+
 from alembic import op
 import sqlalchemy as sa
 import acmetk.models.account

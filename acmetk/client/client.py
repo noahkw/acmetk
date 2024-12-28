@@ -16,6 +16,9 @@ from acmetk.client.exceptions import PollingException, CouldNotCompleteChallenge
 from acmetk.models import messages, ChallengeType
 from acmetk.version import __version__
 
+if typing.TYPE_CHECKING:
+    import cryptography.x509
+
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
 
@@ -71,7 +74,7 @@ class AcmeClient:
         *,
         directory_url: str,
         private_key: str,
-        contact: typing.Dict[str, str] = None,
+        contact: dict[str, str] = None,
         server_cert: str = None,
         kid: str = None,
         hmac_key: str = None,
@@ -126,7 +129,7 @@ class AcmeClient:
         return self._eab_credentials
 
     @eab_credentials.setter
-    def eab_credentials(self, credentials: typing.Tuple[str]):
+    def eab_credentials(self, credentials: tuple[str]):
         """Sets the client's stored external account binding credentials
 
         :param credentials: The kid and hmac_key
@@ -283,7 +286,7 @@ class AcmeClient:
         self._account = messages.Account.from_json(account_obj)
 
     async def order_create(
-        self, identifiers: typing.Union[typing.List[dict], typing.List[str]]
+        self, identifiers: typing.Union[list[dict], list[str]]
     ) -> messages.Order:
         """Creates a new order with the given identifiers.
 
@@ -353,7 +356,7 @@ class AcmeClient:
         order["url"] = order_url
         return messages.Order.from_json(order)
 
-    async def orders_get(self) -> typing.List[str]:
+    async def orders_get(self) -> list[str]:
         """Fetches the account's orders list.
 
         :return: List containing the URLs of the account's orders.
@@ -400,13 +403,11 @@ class AcmeClient:
             for authorization_url in order.authorizations
         ]
 
-        challenge_types = set(
-            [
-                ChallengeType(challenge.chall.typ)
-                for authorization in authorizations
-                for challenge in authorization.challenges
-            ]
-        )
+        challenge_types = {
+            ChallengeType(challenge.chall.typ)
+            for authorization in authorizations
+            for challenge in authorization.challenges
+        }
         possible_types = self._challenge_solvers.keys() & challenge_types
 
         if len(possible_types) == 0:
@@ -423,8 +424,8 @@ class AcmeClient:
             type(solver).__name__,
         )
 
-        challenges_to_complete: typing.List[
-            typing.Tuple[acme.messages.Identifier, acme.messages.ChallengeBody]
+        challenges_to_complete: list[
+            tuple[acme.messages.Identifier, acme.messages.ChallengeBody]
         ] = []
 
         for authorization in authorizations:
@@ -459,9 +460,7 @@ class AcmeClient:
     async def challenges_cleanup(
         self,
         solver: ChallengeSolver,
-        challenges: typing.List[
-            typing.Tuple[acme.messages.Identifier, acme.messages.ChallengeBody]
-        ],
+        challenges: list[tuple[acme.messages.Identifier, acme.messages.ChallengeBody]],
     ):
         """Cleans up after the challenges leveraging the given solver.
 
@@ -477,9 +476,7 @@ class AcmeClient:
     async def challenges_complete(
         self,
         solver: ChallengeSolver,
-        challenges: typing.List[
-            typing.Tuple[acme.messages.Identifier, acme.messages.ChallengeBody]
-        ],
+        challenges: list[tuple[acme.messages.Identifier, acme.messages.ChallengeBody]],
     ):
         """Attempts to complete the challenges leveraging the given solver.
 

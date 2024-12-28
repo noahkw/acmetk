@@ -95,13 +95,11 @@ class Challenge(Entity, Serializer):
         return d
 
     @classmethod
-    def create_all(cls) -> typing.List["Challenge"]:
+    def create_all(cls) -> list["Challenge"]:
         return cls.create_types(ChallengeType)
 
     @classmethod
-    def create_types(
-        cls, types: typing.Iterable[ChallengeType]
-    ) -> typing.List["Challenge"]:
+    def create_types(cls, types: typing.Iterable[ChallengeType]) -> list["Challenge"]:
         """Returns new pending challenges of the given types.
 
         :param types: The types of challenges to be created.

@@ -87,7 +87,7 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
 
         return resolved_ips
 
-    async def query_records(self, name: str) -> typing.Set[str]:
+    async def query_records(self, name: str) -> set[str]:
         """Queries DNS A and AAAA records.
 
         :param name: Name of the A/AAAA record to query.

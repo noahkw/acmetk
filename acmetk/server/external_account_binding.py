@@ -13,6 +13,9 @@ from cryptography import x509
 from acmetk.server.routes import routes
 from acmetk.util import url_for, forwarded_url
 
+if typing.TYPE_CHECKING:
+    import cryptography.hazmat.primitives.asymmetric.rsa
+
 
 class ExternalAccountBinding:
     """Represents an external account binding.
@@ -86,7 +89,7 @@ class ExternalAccountBindingStore:
     def __init__(self):
         self._pending = dict()
 
-    def create(self, request) -> typing.Tuple[str, str]:
+    def create(self, request) -> tuple[str, str]:
         """Creates an :class:`ExternalAccountBinding` request and stores it internally for verification at a later
         point in time.
 
