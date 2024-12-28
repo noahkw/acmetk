@@ -80,8 +80,9 @@ Public Key Algorithm: {{key.__class__.__name__}}
                         Log ID    : {{ Blob(sct.log_id, 16, 0)|indent(36) }}
                         Timestamp : {{ sct.timestamp }}
                         Extensions: unknown
-                        Signature : {# ecdsa-with-SHA256 #}unkown-alg-no-nid-available
-                                    {{ Blob(sct._signature, 16, 0)|indent(36) }}
+                        Signature : unkown-alg-no-nid-available
+                                    {{ Blob(sct.signature, 16, 0)|indent(36) }}
+
 {%- endfor %}
 {%- elif v.__class__.__name__ == 'AuthorityInformationAccess' %}
             Authority Information Access:

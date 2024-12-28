@@ -1,10 +1,10 @@
 repos:
   - repo: 'https://github.com/psf/black'
-    rev: 23.7.0
+    rev: 24.10.0
     hooks:
       - id: black
   - repo: 'https://github.com/pre-commit/pre-commit-hooks'
-    rev: v4.4.0
+    rev: v5.0.0
     hooks:
       - id: end-of-file-fixer
         exclude: '^docs/[^/]*\.svg$'
@@ -33,8 +33,13 @@ repos:
       - id: detect-private-key
         exclude: ^examples/
   - repo: 'https://github.com/PyCQA/flake8'
-    rev: 6.1.0
+    rev: 7.1.1
     hooks:
       - id: flake8
         exclude: ^docs/|^alembic/(versions/.*\.py|env\.py)
         args: ['--max-line-length=120']
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.19.1
+    hooks:
+      - id: pyupgrade
+        args: [--py311-plus]
