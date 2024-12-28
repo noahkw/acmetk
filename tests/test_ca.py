@@ -132,7 +132,7 @@ class TestCA(TestAcme):
         runner, ca = await AcmeCA.runner(self.config_sec["ca"])
         ca.register_challenge_validator(DummyValidator())
 
-        #        await ca._db._recreate()
+        await ca._db._recreate()
 
         self.runner = runner
         self.ca = ca
