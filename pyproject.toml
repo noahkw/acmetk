@@ -19,7 +19,7 @@ dependencies = [
     "psycopg2-binary",
     "sqlalchemy",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 readme = "README.md"
 license = {text = "MIT"}
 classifiers = [
@@ -39,6 +39,7 @@ infoblox = [
 ]
 lexicon = [
     "dns-lexicon",
+    "asyncache",
 ]
 [build-system]
 requires = ["setuptools>=61", "wheel"]
@@ -56,6 +57,10 @@ tests = [
 plugins = [
     "pdm-autoexport"
 ]
+
+[[tool.pdm.autoexport]]
+filename = "requirements.txt"
+groups = ["default","lexicon","infoblox"]
 
 [tool.setuptools]
 packages = [

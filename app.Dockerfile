@@ -4,13 +4,14 @@ RUN apt-get update \
     && apt-get install -y supervisor
 
 COPY acmetk /app/acmetk
-COPY requirements.txt app_entrypoint.sh setup.py README.md /app/
+COPY tpl /app/tpl
+COPY requirements.txt app_entrypoint.sh pyproject.toml README.md /app/
 
 VOLUME /var/log/supervisor
 
 WORKDIR /app
 
-RUN pip install --use-feature=2020-resolver -r requirements.txt \
+RUN pip install -r requirements.txt \
     && pip install . \
     && chmod 700 acmetk/main.py app_entrypoint.sh
 
