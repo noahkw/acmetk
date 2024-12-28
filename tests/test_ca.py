@@ -468,7 +468,7 @@ class TestOurClient:
             else:
                 alg, bits = self.CERT_KEY_ALG_BITS
 
-        alg = {"RSA": "_RSAPublicKey", "EC": "_EllipticCurvePublicKey"}[alg]
+        alg = {"RSA": "RSAPublicKey", "EC": "ECPublicKey"}[alg]
         bits = str(bits)
 
         m = e.expected_regex.match(str(e.exception)).groupdict()
