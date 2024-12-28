@@ -198,7 +198,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
     @classmethod
     async def create_app(
-        cls, config: typing.Dict[str, typing.Any], **kwargs
+        cls, config: dict[str, typing.Any], **kwargs
     ) -> "AcmeServerBase":
         """A factory that also creates and initializes the database and session objects,
         reading the necessary arguments from the passed config dict.
@@ -224,8 +224,8 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
     @classmethod
     async def runner(
-        cls, config: typing.Dict[str, typing.Any], **kwargs
-    ) -> typing.Tuple["aiohttp.web.AppRunner", "AcmeServerBase"]:
+        cls, config: dict[str, typing.Any], **kwargs
+    ) -> tuple["aiohttp.web.AppRunner", "AcmeServerBase"]:
         """A factory that starts the server on the given hostname and port using an AppRunner
         after constructing a server instance using :meth:`.create_app`.
 
@@ -245,8 +245,8 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
     @classmethod
     async def unix_socket(
-        cls, config: typing.Dict[str, typing.Any], path: str, **kwargs
-    ) -> typing.Tuple["aiohttp.web.AppRunner", "AcmeServerBase"]:
+        cls, config: dict[str, typing.Any], path: str, **kwargs
+    ) -> tuple["aiohttp.web.AppRunner", "AcmeServerBase"]:
         """A factory that starts the server on a Unix socket bound to the given path using an AppRunner
         after constructing a server instance using :meth:`.create_app`.
 
@@ -946,11 +946,13 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                         if order.status == models.OrderStatus.PENDING
                     ]
                 },
-                links=[
-                    f'<{acmetk.util.next_url(account.orders_url(request), cursor)}>; rel="next"'
-                ]
-                if more_orders
-                else [],
+                links=(
+                    [
+                        f'<{acmetk.util.next_url(account.orders_url(request), cursor)}>; rel="next"'
+                    ]
+                    if more_orders
+                    else []
+                ),
             )
 
     async def _validate_order(
@@ -1371,7 +1373,7 @@ class AcmeRelayBase(AcmeServerBase):
 
     @classmethod
     async def create_app(
-        cls, config: typing.Dict[str, typing.Any], *, client: AcmeClient, **kwargs
+        cls, config: dict[str, typing.Any], *, client: AcmeClient, **kwargs
     ) -> "AcmeRelayBase":
         """A factory that also creates and initializes the database and session objects,
         reading the necessary arguments from the passed config dict.

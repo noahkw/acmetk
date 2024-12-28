@@ -74,7 +74,7 @@ class TestMGMT(TestCertBotBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
 
         base = URL(self.site.name)
         try:
-            async with (asyncio.TaskGroup() as tg):
+            async with asyncio.TaskGroup() as tg:
                 for psar in self.runner.app.router._resources:
                     service = getattr(self, f"_{psar.canonical[1:]}")
 

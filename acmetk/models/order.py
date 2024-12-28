@@ -146,7 +146,7 @@ class Order(Entity, Serializer):
         :param cert: The CSR to validate.
         :return: *True* iff the set of names in the CSR equals the order's set of identifiers.
         """
-        identifiers = set(identifier.value.lower() for identifier in self.identifiers)
+        identifiers = {identifier.value.lower() for identifier in self.identifiers}
 
         return identifiers == names_of(csr, lower=True)
 

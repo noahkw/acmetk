@@ -1,5 +1,4 @@
 import logging
-import typing
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -80,7 +79,7 @@ class PluginRegistry:
 
         return deco
 
-    def config_mapping(self) -> typing.Dict[str, type]:
+    def config_mapping(self) -> dict[str, type]:
         """Method that maps plugin config names to the actual class object.
 
         :return: Mapping from config names to the actual class objects.

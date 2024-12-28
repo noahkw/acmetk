@@ -156,9 +156,7 @@ class AccountUpdate(JSONDeSerializableAllowEmpty, acme.messages.Registration):
 class NewOrder(josepy.JSONObjectWithFields):
     """Message type for new order requests."""
 
-    identifiers: typing.List[typing.Dict[str, str]] = josepy.Field(
-        "identifiers", omitempty=True
-    )
+    identifiers: list[dict[str, str]] = josepy.Field("identifiers", omitempty=True)
     """The requested identifiers."""
     not_before: "datetime.datetime" = acme.messages.fields.RFC3339Field(
         "notBefore", omitempty=True
@@ -172,9 +170,7 @@ class NewOrder(josepy.JSONObjectWithFields):
     @classmethod
     def from_data(
         cls,
-        identifiers: typing.Union[
-            typing.List[typing.Dict[str, str]], typing.List[str]
-        ] = None,
+        identifiers: typing.Union[list[dict[str, str]], list[str]] = None,
         not_before: "datetime.datetime" = None,
         not_after: "datetime.datetime" = None,
     ) -> "NewOrder":
@@ -216,7 +212,7 @@ class Account(josepy.JSONObjectWithFields):
 
     status: AccountStatus = josepy.Field("status", omitempty=True)
     """The account's status."""
-    contact: typing.Tuple[str] = josepy.Field("contact", omitempty=True)
+    contact: tuple[str] = josepy.Field("contact", omitempty=True)
     """The account's contact info."""
     orders: str = josepy.Field("orders", omitempty=True)
     """URL of the account's orders list."""

@@ -84,7 +84,7 @@ class AcmeErrorType(TypeDecorator):
         return value
 
 
-class Serializer(object):
+class Serializer:
     __serialize__ = []
     __type_serializers__ = dict()
 

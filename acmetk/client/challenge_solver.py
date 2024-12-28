@@ -146,7 +146,7 @@ class DNSSolver(ChallengeSolver):
 
     async def query_txt_record(
         self, resolver: dns.asyncresolver.Resolver, name: str
-    ) -> typing.Set[str]:
+    ) -> set[str]:
         """Queries a DNS TXT record.
 
         :param name: Name of the TXT record to query.

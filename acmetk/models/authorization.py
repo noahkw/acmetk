@@ -1,6 +1,7 @@
 import enum
 import uuid
 from datetime import datetime, timezone, timedelta
+import typing
 
 from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer, Boolean
 from sqlalchemy.dialects.postgresql import UUID
@@ -9,6 +10,9 @@ from sqlalchemy.orm import relationship
 from .base import Serializer, Entity
 from .challenge import ChallengeStatus
 from ..util import url_for
+
+if typing.TYPE_CHECKING:
+    import acmetk.models.messages
 
 
 class AuthorizationStatus(str, enum.Enum):

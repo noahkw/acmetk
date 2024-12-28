@@ -194,7 +194,7 @@ class TestDehydrated:
             if not (r := (self.path / n)).exists():
                 r.mkdir()
 
-        with open(str(self.path / "config"), "wt") as f:
+        with open(str(self.path / "config"), "w") as f:
             f.write(
                 f"""
 KEY_ALGO={self.key_algo}
@@ -372,7 +372,7 @@ class TestCertBot:
 
         logging.config.dictConfig(self._config["logging"])
 
-        log.info("certbot %s" % (" ".join(argv),))
+        log.info("certbot {}".format(" ".join(argv)))
         r = await self.loop.run_in_executor(None, cbm.main, argv)
         return r
 

@@ -33,7 +33,7 @@ PATH_OR_HOST_AND_PORT_MSG = (
 
 
 def load_config(config_file):
-    with open(config_file, "r") as stream:
+    with open(config_file) as stream:
         config = yaml.safe_load(stream)
 
     if logging_section := config.get("logging"):
@@ -47,7 +47,7 @@ def create_challenge_solver(config):
 
     challenge_solver_class = challenge_solver_registry.get_plugin(challenge_solver_name)
 
-    if type((kwargs := config[challenge_solver_name])) is not dict:
+    if type(kwargs := config[challenge_solver_name]) is not dict:
         kwargs = {}
 
     challenge_solver = challenge_solver_class(**kwargs)

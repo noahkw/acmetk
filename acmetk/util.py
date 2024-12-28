@@ -19,9 +19,7 @@ if typing.TYPE_CHECKING:
 KEY_FILE_MODE = 0o600
 
 
-def generate_csr(
-    CN: str, private_key: rsa.RSAPrivateKey, path: Path, names: typing.List[str]
-):
+def generate_csr(CN: str, private_key: rsa.RSAPrivateKey, path: Path, names: list[str]):
     """Generates a certificate signing request.
 
     :param CN: The requested common name.
@@ -172,7 +170,7 @@ def generate_cert_from_csr(
 
 def generate_root_cert(
     path: Path, country: str, state: str, locality: str, org_name: str, common_name: str
-) -> typing.Tuple["cryptography.x509.Certificate", rsa.RSAPrivateKey]:
+) -> tuple["cryptography.x509.Certificate", rsa.RSAPrivateKey]:
     """Generates a self-signed CA root certificate (RSA).
 
     :param path: The path of the generated private key. The resulting certificate will be saved to
@@ -218,7 +216,7 @@ def generate_root_cert(
 
 def names_of(
     csr: "cryptography.x509.CertificateSigningRequest", lower: bool = False
-) -> typing.Set[str]:
+) -> set[str]:
     """Returns all names contained in the given CSR.
 
     :param csr: The CRS whose names to extract.
@@ -235,12 +233,12 @@ def names_of(
         ).value.get_values_for_type(x509.DNSName)
     )
 
-    return set([name.lower() if lower else name for name in names])
+    return {name.lower() if lower else name for name in names}
 
 
 def pem_split(
     pem: str,
-) -> typing.List[
+) -> list[
     typing.Union[
         "cryptography.x509.CertificateSigningRequest", "cryptography.x509.Certificate"
     ]
