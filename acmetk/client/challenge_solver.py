@@ -82,7 +82,7 @@ class DummySolver(ChallengeSolver):
         key: josepy.jwk.JWK,
         identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
-    ):
+    ) -> None:
         """Does not complete the given challenge.
 
         Instead, this method only logs the mock completion attempt and pauses
@@ -102,7 +102,7 @@ class DummySolver(ChallengeSolver):
         key: josepy.jwk.JWK,
         identifier: acme.messages.Identifier,
         challenge: acme.messages.ChallengeBody,
-    ):
+    ) -> None:
         """Performs cleanup for the given challenge.
 
         Does not actually do any cleanup, instead it just logs the mock attempt and pauses execution
@@ -164,7 +164,7 @@ class DNSSolver(ChallengeSolver):
 
         return set(txt_records)
 
-    async def _query_until_completed(self, name, text):
+    async def _query_until_completed(self, name, text) -> None:
         while True:
             record_sets = await asyncio.gather(
                 *[self.query_txt_record(resolver, name) for resolver in self._resolvers]
