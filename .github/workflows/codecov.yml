@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python: ["3.8","3.9","3.10","3.11"]
+        python: ["3.9","3.10","3.11","3.12"]
     env:
       OS: ${{ matrix.os }}
       PYTHON: ${{ matrix.python }}
@@ -50,7 +50,7 @@ jobs:
 
 
     - name: Start containers
-      run: docker-compose --env-file .env -f "docker-compose-tests.yml" up -d
+      run: docker compose --env-file .env -f "docker-compose-tests.yml" up -d
 
     - name: Show containers
       run: docker ps -a
@@ -67,7 +67,7 @@ jobs:
     - name: create acme-ca table
       run: docker exec acmetk_db createdb -U acme-broker acme-ca
 
-    - uses: pdm-project/setup-pdm@v3
+    - uses: pdm-project/setup-pdm@v4
       with:
         python-version: ${{ matrix.python }}
     - name: install deps
@@ -98,7 +98,7 @@ jobs:
         pdm run coverage xml --data-file=.coverage -o coverage.xml
 
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v5
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         directory: .
@@ -111,4 +111,4 @@ jobs:
 
     - name: Stop containers
       if: always()
-      run: docker-compose -f "docker-compose.yml" down
+      run: docker compose -f "docker-compose.yml" down
