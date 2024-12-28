@@ -322,7 +322,7 @@ class TestCertBot:
     async def _register(self):
         await self._run(f"register --no-eff-email --agree-tos  -m {self.contact}")
 
-    async def _certonly(self, *argv, names=None, preferred_challenges="dns"):
+    def _manual_auth(self):
         authhook = "\t" + "\n\t".join(
             map(
                 lambda s: f"CERTBOT_{s}=$CERTBOT_{s}",
@@ -335,13 +335,21 @@ class TestCertBot:
                 ],
             )
         )
+        return (
+            "--manual "
+            f'--manual-auth-hook "echo \\"{authhook}\\"" '
+            "--manual-cleanup-hook /bin/true "
+        )
 
+    async def _certonly(self, *argv, names=None, preferred_challenges="dns"):
         domains = " --domain ".join(names or self.domains)
         extra = " ".join(argv) if argv else ""
+
         await self._run(
-            f"certonly {self.key_args} --manual "
-            f'--manual-auth-hook "echo \\"{authhook}\\"" '
-            f"--manual-cleanup-hook /bin/true --preferred-challenges {preferred_challenges} --domain {domains} {extra}"
+            f"certonly {self.key_args} {self._manual_auth()} "
+            f"--preferred-challenges {preferred_challenges} "
+            f"--domain {domains} "
+            f"{extra}"
         )
 
     async def _run(self, cmd):
@@ -416,9 +424,7 @@ class TestCertBot:
         await self._register()
         await self._certonly()
 
-        await self._run(
-            f"renew --no-random-sleep-on-renew --webroot --webroot-path {self.path}"
-        )
+        await self._run(f"renew --no-random-sleep-on-renew {self._manual_auth()}")
 
     async def test_register(self):
         await self._register()
