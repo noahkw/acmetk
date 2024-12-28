@@ -1,7 +1,5 @@
 name: Codecov
-on:
-  push:
-    branches: [ master, ci_github ]
+on: [push, pull_request]
 
 jobs:
   run:
