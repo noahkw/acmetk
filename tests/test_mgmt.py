@@ -8,6 +8,7 @@ import sys
 
 from yarl import URL
 import aiohttp
+import aiohttp.web
 
 from sqlalchemy import select
 from sqlalchemy.orm import (

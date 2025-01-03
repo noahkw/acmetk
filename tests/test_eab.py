@@ -15,7 +15,10 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 
-from acmetk.server.external_account_binding import ExternalAccountBindingStore
+from acmetk.server.external_account_binding import (
+    ExternalAccountBindingStore,
+    AcmeEABMixin,
+)
 from tests.test_ca import TestCertBotCA, TestOurClientCA
 
 
@@ -61,8 +64,11 @@ class TestEAB(unittest.TestCase):
 
     def test_create(self):
         URL = yarl.URL("http://localhost/eab")
+
         request = Mock(
-            headers={"X-SSL-CERT": generate_x509_client_cert("test@test.test")},
+            headers={
+                AcmeEABMixin.HEADER_NAME: generate_x509_client_cert("test@test.test")
+            },
             url=URL,
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
@@ -87,7 +93,7 @@ class TestCertbotCA_EAB(TestCertBotCA):
     async def test_register(self):
         URL = yarl.URL("http://localhost:8000/eab")
         request = Mock(
-            headers={"X-SSL-CERT": generate_x509_client_cert(self.contact)},
+            headers={AcmeEABMixin.HEADER_NAME: generate_x509_client_cert(self.contact)},
             url=URL,
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
@@ -130,7 +136,9 @@ class TestOurClientCA_EAB(TestOurClientCA):
 
         request = Mock(
             headers={
-                "X-SSL-CERT": generate_x509_client_cert(self.client._contact["email"])
+                AcmeEABMixin.HEADER_NAME: generate_x509_client_cert(
+                    self.client._contact["email"]
+                )
             },
             url=yarl.URL("http://localhost:8000/eab"),
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
