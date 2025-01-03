@@ -100,21 +100,24 @@ class ExternalAccountBindingStore:
 
         # The client certificate in the PEM format (urlencoded) for an established SSL connection (1.13.5);
         cert = x509.load_pem_x509_certificate(
-            urllib.parse.unquote(request.headers["X-SSL-CERT"]).encode()
+            urllib.parse.unquote(request.headers[AcmeEABMixin.HEADER_NAME]).encode()
         )
 
         if not (
-            mail := cert.subject.get_attributes_for_oid(x509.NameOID.EMAIL_ADDRESS)
+            mails := cert.subject.get_attributes_for_oid(x509.NameOID.EMAIL_ADDRESS)
         ):
             ext = cert.extensions.get_extension_for_oid(
                 x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME
             )
             mails = ext.value.get_values_for_type(x509.RFC822Name)
 
-            if len(mails) != 1:
-                raise ValueError(f"{len(mails)} mail addresses in cert, expecting 1")
+        if len(mails) != 1:
+            raise ValueError(f"{len(mails)} mail addresses in cert, expecting 1")
 
-            mail = mails.pop()
+        mail = mails.pop()
+
+        if isinstance(mail, x509.NameAttribute):
+            mail = mail.value
 
         if not (pending_eab := self._pending.get(mail, None)) or pending_eab.expired():
             pending_eab = self._pending[mail] = ExternalAccountBinding(
@@ -156,6 +159,8 @@ class AcmeEABMixin:
     The reverse proxy then forwards the PEM and URL-encoded client certificate in the *X-SSL-CERT* header after
     verifying it.
     """
+
+    HEADER_NAME = "ssl-client-cert"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -236,7 +241,7 @@ class AcmeEABMixin:
         # from unittest.mock import Mock
         # request = Mock(headers={"X-SSL-CERT": urllib.parse.quote(self.data)}, url=request.url)
 
-        if not request.headers.get("X-SSL-CERT"):
+        if not request.headers.get(self.HEADER_NAME):
             response = aiohttp_jinja2.render_template("eab.jinja2", request, {})
             response.set_status(403)
             response.text = (

@@ -155,7 +155,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             ]
         )
         # request.app['_service_'] available in jinja2 templates
-        self.app["_service_"] = self
+        self.app[web.AppKey("_service_", str)] = self
 
         self._add_routes()
 

@@ -114,8 +114,8 @@ Certificate:
         Signature Algorithm: {{ c.signature_algorithm_oid._name }}
         Issuer: {{ Name(c.issuer) }}
         Validity
-            Not Before: {{ c.not_valid_before }}
-            Not After : {{ c.not_valid_after }}
+            Not Before: {{ c.not_valid_before_utc }}
+            Not After : {{ c.not_valid_after_utc }}
         Subject: {{ Name(c.subject) }}
         Subject Public Key Info:
 {{- PublicKey(key) }}
