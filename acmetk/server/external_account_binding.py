@@ -6,6 +6,7 @@ import urllib.parse
 
 import acme.jws
 import acme.messages
+import aiohttp.web
 import aiohttp_jinja2
 import josepy
 from cryptography import x509
@@ -59,7 +60,7 @@ class ExternalAccountBinding:
         """
         return datetime.datetime.now() - self.when > self.EXPIRES_AFTER
 
-    def _eab(self, key_json):
+    def _eab(self, key_json) -> acme.jws.JWS:
         decoded_hmac_key = josepy.b64.b64decode(self.hmac_key)
         eab = acme.jws.JWS.sign(
             key_json,
@@ -89,7 +90,7 @@ class ExternalAccountBindingStore:
     def __init__(self):
         self._pending = dict()
 
-    def create(self, request) -> tuple[str, str]:
+    def create(self, request: aiohttp.web.Request) -> tuple[str, str]:
         """Creates an :class:`ExternalAccountBinding` request and stores it internally for verification at a later
         point in time.
 
@@ -168,12 +169,13 @@ class AcmeEABMixin:
 
     def verify_eab(
         self,
-        request,
+        request: aiohttp.web.Request,
         pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
         reg: acme.messages.Registration,
-    ):
+    ) -> None:
         """Verifies an ACME Registration request whose payload contains an external account binding JWS.
 
+        :param request: The request
         :param pub_key: The public key that is contained in the outer JWS, i.e. the ACME account key.
         :param reg: The registration message.
         :raises:
@@ -205,7 +207,7 @@ class AcmeEABMixin:
                 f"Supported algorithms: {', '.join([str(alg) for alg in self.SUPPORTED_EAB_JWS_ALGORITHMS])}",
             )
 
-        sig = jws.signature.combined
+        sig: acme.jws.Header = jws.signature.combined
         kid = sig.kid
 
         if sig.url != str(forwarded_url(request)):
@@ -233,7 +235,7 @@ class AcmeEABMixin:
 
     @routes.get("/eab", name="eab")
     @aiohttp_jinja2.template("eab.jinja2")
-    async def eab(self, request):
+    async def eab(self, request: aiohttp.web.Request) -> aiohttp.web.Response:
         """Handler that displays the user's external account binding credentials, i.e. their *kid* and *hmac_key*
         after their client certificate has been verified and forwarded by the reverse proxy.
         """

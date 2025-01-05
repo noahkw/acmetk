@@ -45,7 +45,7 @@ class Page:
         self.current_page = page
 
 
-async def paginate(session, request, query, by="limit", total=-1, pms=None):
+async def paginate(session, request, query, by="limit", total=-1, pms=None) -> Page:
     if total is None:
         # None is passed at the changes endpoint if there are no changes yet.
         raise web.HTTPBadRequest(body="No changes have been logged.")

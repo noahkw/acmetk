@@ -8,6 +8,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload, defer, defaultload
 from sqlalchemy.sql import text
 
+import aiohttp.web
+
 from acmetk.models import (
     Change,
     Account,
@@ -24,9 +26,16 @@ from .pagination import paginate
 
 
 class AcmeManagementMixin:
+    async def _session(
+        self, request: aiohttp.web.Request
+    ) -> sqlalchemy.ext.asyncio.AsyncSession:
+        pass
+
     @routes.get("/mgmt", name="mgmt-index")
     @aiohttp_jinja2.template("index.jinja2")
-    async def management_index(self, request):
+    async def management_index(
+        self, request: aiohttp.web.Request
+    ) -> aiohttp.web.Response:
         import datetime
 
         pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
@@ -86,7 +95,7 @@ class AcmeManagementMixin:
 
     @routes.get("/mgmt/changes", name="mgmt-changes")
     @aiohttp_jinja2.template("changes.jinja2")
-    async def management_changes(self, request):
+    async def management_changes(self, request: aiohttp.web.Request):
         pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
             f = []
@@ -170,7 +179,7 @@ class AcmeManagementMixin:
 
     @routes.get("/mgmt/accounts", name="mgmt-accounts")
     @aiohttp_jinja2.template("accounts.jinja2")
-    async def management_accounts(self, request):
+    async def management_accounts(self, request: aiohttp.web.Request):
         pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Account.account_id))
@@ -190,7 +199,7 @@ class AcmeManagementMixin:
 
     @routes.get("/mgmt/accounts/{account}", name="mgmt-account")
     @aiohttp_jinja2.template("account.jinja2")
-    async def management_account(self, request):
+    async def management_account(self, request: aiohttp.web.Request):
         pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         account = request.match_info["account"]
         async with self._session(request) as session:
@@ -214,7 +223,7 @@ class AcmeManagementMixin:
 
     @routes.get("/mgmt/orders", name="mgmt-orders")
     @aiohttp_jinja2.template("orders.jinja2")
-    async def management_orders(self, request):
+    async def management_orders(self, request: aiohttp.web.Request):
         pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Order.order_id))
@@ -239,7 +248,7 @@ class AcmeManagementMixin:
 
     @routes.get("/mgmt/orders/{order}", name="mgmt-order")
     @aiohttp_jinja2.template("order.jinja2")
-    async def management_order(self, request):
+    async def management_order(self, request: aiohttp.web.Request):
         order = request.match_info["order"]
         pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         changes = []
@@ -302,7 +311,7 @@ class AcmeManagementMixin:
 
     @routes.get("/mgmt/certificates", name="mgmt-certificates")
     @aiohttp_jinja2.template("certificates.jinja2")
-    async def management_certificates(self, request):
+    async def management_certificates(self, request: aiohttp.web.Request):
         pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
             q = select(sqlalchemy.func.count(Certificate.certificate_id))
@@ -326,7 +335,7 @@ class AcmeManagementMixin:
             return {"certificates": page.items, "page": page, "pms": pms}
 
     @routes.get("/mgmt/certificates/{certificate}", name="mgmt-certificate")
-    async def management_certificate(self, request):
+    async def management_certificate(self, request: aiohttp.web.Request):
         certificate = request.match_info["certificate"]
         async with self._session(request) as session:
             q = (
@@ -349,7 +358,7 @@ class AcmeManagementMixin:
             return response
 
     @routes.get("/mgmt/orders/{order}/csr", name="mgmt-csr")
-    async def management_csr(self, request):
+    async def management_csr(self, request: aiohttp.web.Request):
         order = request.match_info["order"]
         async with self._session(request) as session:
             q = (

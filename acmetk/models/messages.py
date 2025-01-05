@@ -39,11 +39,11 @@ def get_status(error_type: str) -> int:
     return ERROR_CODE_STATUS.get(error_type, 400)
 
 
-def decode_cert(b64der):
+def decode_cert(b64der: str) -> "cryptography.x509.Certificate":
     return x509.load_der_x509_certificate(josepy.json_util.decode_b64jose(b64der))
 
 
-def encode_cert(cert):
+def encode_cert(cert: "cryptography.x509.Certificate") -> str:
     return josepy.encode_b64jose(cert.public_bytes(serialization.Encoding.DER))
 
 
@@ -82,12 +82,12 @@ class Revocation(josepy.JSONObjectWithFields):
     """The reason for the revocation."""
 
 
-def encode_csr(csr):
+def encode_csr(csr: "cryptography.x509.CertificateSigningRequest") -> str:
     # Encode CSR as JOSE Base-64 DER.
     return josepy.encode_b64jose(csr.public_bytes(encoding=serialization.Encoding.DER))
 
 
-def decode_csr(b64der):
+def decode_csr(b64der: str) -> "cryptography.x509.CertificateSigningRequest":
     return x509.load_der_x509_csr(josepy.json_util.decode_b64jose(b64der))
 
 
@@ -244,7 +244,9 @@ class SignedKeyChange(josepy.JSONObjectWithFields):
     signature = josepy.Field("signature")
 
     @classmethod
-    def from_data(cls, kc, key, alg, **kwargs):
+    def from_data(
+        cls, kc: KeyChange, key: josepy.jwk.JWK, alg: josepy.jwa.JWASignature, **kwargs
+    ) -> "SignedKeyChange":
         data = acme.jws.JWS.sign(
             kc.json_dumps().encode(), key=key, alg=alg, nonce=None, **kwargs
         )

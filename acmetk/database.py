@@ -1,5 +1,6 @@
 import datetime
 import uuid
+import typing
 
 import acme
 from aiohttp import web
@@ -21,7 +22,7 @@ from acmetk.models.base import Base
 
 
 class versioned_sessionmaker(sessionmaker):
-    def __call__(self, **local_kw):
+    def __call__(self, **local_kw) -> AsyncSession:
         """Produce a new :class:`.Session` object using the configuration
         established in this :class:`.sessionmaker`.
 
@@ -47,7 +48,7 @@ class versioned_sessionmaker(sessionmaker):
 
 def versioned_session(session):
     @event.listens_for(session.sync_session, "before_flush")
-    def before_flush(session, flush_context, instances):
+    def before_flush(session: AsyncSession, flush_context, instances) -> None:
         now = datetime.datetime.now(datetime.timezone.utc)
         for obj in session.dirty.union(session.new).union(session.deleted):
             if not hasattr(obj, "__diff__"):
@@ -114,9 +115,11 @@ class Database:
             **kwargs,
         )
 
-        self.session = versioned_sessionmaker(bind=self.engine, class_=AsyncSession)
+        self.session: sessionmaker = versioned_sessionmaker(
+            bind=self.engine, class_=AsyncSession
+        )
 
-    async def begin(self):
+    async def begin(self) -> None:
         """Creates the database's tables according to the models defined in :mod:`acmetk.models`."""
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
@@ -126,20 +129,22 @@ class Database:
             await session.flush()
             await session.commit()
 
-    async def drop(self):
+    async def drop(self) -> None:
         """Drops all of the database's tables."""
         # FIXME
         # sqlalchemy greenlet_spawn asyncpg resourcewarning
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.drop_all)
 
-    async def _recreate(self):
+    async def _recreate(self) -> None:
         """Drops, then recreates all of the database's tables."""
         await self.drop()
         await self.begin()
 
     @staticmethod
-    async def get_account(session, key=None, kid=None, account_id=None):
+    async def get_account(
+        session: AsyncSession, key=None, kid=None, account_id=None
+    ) -> typing.Optional[models.Account]:
         statement = (
             select(Account)
             .options(
@@ -160,8 +165,8 @@ class Database:
 
     @staticmethod
     async def get_orders_list(
-        session, account_id: uuid.UUID, limit: int, cursor: int = 0
-    ):
+        session: AsyncSession, account_id: uuid.UUID, limit: int, cursor: int = 0
+    ) -> list[models.Order]:
         if cursor < 0:
             raise ValueError("Cursor must be >= 0")
 
@@ -179,7 +184,9 @@ class Database:
         return [r for (r,) in result]
 
     @staticmethod
-    async def get_authz(session, account_id, authz_id):
+    async def get_authz(
+        session: AsyncSession, account_id, authz_id
+    ) -> typing.Optional[models.Authorization]:
         authorization = aliased(Authorization, flat=True)
         order = aliased(Order, flat=True)
         account = aliased(Account, flat=True)
@@ -209,7 +216,9 @@ class Database:
         return result[0] if result else None
 
     @staticmethod
-    async def get_challenge(session, account_id, challenge_id):
+    async def get_challenge(
+        session: AsyncSession, account_id, challenge_id
+    ) -> typing.Optional[models.Challenge]:
         challenge = aliased(Challenge, flat=True)
         identifier = aliased(Identifier, flat=True)
         order = aliased(Order, flat=True)
@@ -248,7 +257,9 @@ class Database:
         return result[0] if result else None
 
     @staticmethod
-    async def get_order(session, account_id, order_id):
+    async def get_order(
+        session: AsyncSession, account_id, order_id
+    ) -> typing.Optional[models.Order]:
         account = aliased(Account, flat=True)
         statement = (
             select(Order)
@@ -270,8 +281,8 @@ class Database:
 
     @staticmethod
     async def get_certificate(
-        session, account_id=None, certificate_id=None, certificate=None
-    ):
+        session: AsyncSession, account_id=None, certificate_id=None, certificate=None
+    ) -> typing.Optional[models.Certificate]:
         order = aliased(Order, flat=True)
         account = aliased(Account, flat=True)
         if account_id and certificate_id:

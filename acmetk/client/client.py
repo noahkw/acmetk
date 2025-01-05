@@ -129,7 +129,7 @@ class AcmeClient:
         return self._eab_credentials
 
     @eab_credentials.setter
-    def eab_credentials(self, credentials: tuple[str]):
+    def eab_credentials(self, credentials: tuple[str, str]):
         """Sets the client's stored external account binding credentials
 
         :param credentials: The kid and hmac_key
@@ -140,7 +140,9 @@ class AcmeClient:
         else:
             raise ValueError("A tuple containing the kid and hmac_key is required")
 
-    def _open_key(self, private_key):
+    def _open_key(
+        self, private_key: str
+    ) -> tuple[josepy.jwk.JWK, josepy.jwa.JWASignature]:
         with open(private_key, "rb") as pem:
             data = pem.read()
             certs = acmetk.util.pem_split(data.decode())

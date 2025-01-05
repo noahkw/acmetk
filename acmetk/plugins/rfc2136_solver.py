@@ -22,7 +22,7 @@ It looks up the zone name using the TSIG credentials on the resolver
 
 @PluginRegistry.register_plugin("rfc2136")
 class RFC2136Client(DNSSolver):
-    def __init__(self, server, keyid, alg, secret):
+    def __init__(self, server: str, keyid: str, alg: str, secret: str):
         super().__init__()
         self.keyring = dns.tsigkeyring.from_text({keyid: (alg, secret)})
 
