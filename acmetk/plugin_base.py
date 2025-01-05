@@ -56,7 +56,7 @@ class PluginRegistry:
         return registry
 
     @classmethod
-    def register_plugin(cls, config_name):
+    def register_plugin(cls, config_name: str):
         """Decorator that registers a class as a plugin under the given name.
         The name is used to refer to the class in config files.
 
@@ -86,7 +86,7 @@ class PluginRegistry:
         """
         return self._subclasses
 
-    def get_plugin(self, config_name) -> type:
+    def get_plugin(self, config_name: str) -> type:
         """Queries the registry for a plugin by config name.
 
         :param config_name: The plugin's config name

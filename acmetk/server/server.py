@@ -24,6 +24,11 @@ from aiohttp.web_middlewares import middleware
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
+from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 import acmetk.util
 from acmetk import models
@@ -43,7 +48,7 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-async def handle_get(request):
+async def handle_get(request: web.Request) -> web.Response:
     return web.Response(status=405)
 
 
@@ -159,10 +164,10 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
         self._add_routes()
 
-        self._nonces = set()
+        self._nonces: set[str] = set()
 
         self._db: typing.Optional[Database] = None
-        self._db_session = None
+        self._db_session: sessionmaker = None
 
         self._challenge_validators = {}
 
@@ -217,7 +222,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
         return instance
 
-    def _session(self, request):
+    def _session(self, request: web.Request) -> AsyncSession:
         return self._db_session(
             info={"remote_host": request.get("actual_ip", "0.0.0.0")}
         )
@@ -287,7 +292,9 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
     def _supported_challenges(self):
         return self._challenge_validators.keys()
 
-    def _response(self, request, data=None, text=None, *args, **kwargs):
+    def _response(
+        self, request: web.Request, data=None, text=None, *args, **kwargs
+    ) -> web.Response:
         if data and text:
             raise ValueError("only one of data, text, or body should be specified")
         elif data and (data is not sentinel):
@@ -304,12 +311,12 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             text=text,
         )
 
-    def _issue_nonce(self):
+    def _issue_nonce(self) -> str:
         nonce = uuid.uuid4().hex
         self._nonces.add(nonce)
         return nonce
 
-    def _verify_nonce(self, nonce):
+    def _verify_nonce(self, nonce: str) -> None:
         if nonce in self._nonces:
             self._nonces.remove(nonce)
         else:
@@ -317,12 +324,12 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
     async def _verify_request(
         self,
-        request,
-        session,
+        request: web.Request,
+        session: AsyncSession,
         key_auth: bool = False,
         post_as_get: bool = False,
         expunge_account: bool = True,
-    ):
+    ) -> tuple[acme.jws.JWS, models.Account]:
         """Verifies an ACME request whose payload is encapsulated in a JWS.
 
         `6.2. Request Authentication <https://tools.ietf.org/html/rfc8555#section-6.2>`_
@@ -357,6 +364,8 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                     :attr:`acmetk.models.AccountStatus.VALID`
         """
         data = await request.text()
+        account_id: str
+        account: models.Account | None
         try:
             jws = acme.jws.JWS.json_loads(data)
         except josepy.errors.DeserializationError:
@@ -370,7 +379,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                 detail='The request payload must be b"" in a POST-as-GET request.',
             )
 
-        sig = jws.signature.combined
+        sig: acme.jws.Header = jws.signature.combined
 
         if sig.url != str(acmetk.util.forwarded_url(request)):
             raise acme.messages.Error.with_code("unauthorized")
@@ -422,7 +431,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
             account = await self._db.get_account(session, account_id=account_id)
 
-            if not account:
+            if account is None:
                 logger.info("Could not find account with account_id %s", account_id)
                 raise acme.messages.Error.with_code("accountDoesNotExist")
 
@@ -442,8 +451,11 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return jws, account
 
     async def _verify_revocation(
-        self, request, session
+        self, request: web.Request, session: AsyncSession
     ) -> (models.Certificate, messages.Revocation):
+        jws: acme.jws.JWS
+        account: models.Account | None
+        certificate: models.Certificate
         try:
             # check whether the message is signed using an account key
             jws, account = await self._verify_request(request, session)
@@ -584,7 +596,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             raise acme.messages.Error.with_code("rejectedIdentifier", detail=e.args[0])
 
     @routes.get("/directory", name="directory")
-    async def directory(self, request):
+    async def directory(self, request: web.Request):
         """Handler that returns the server's directory.
 
         `7.1.1. Directory <https://tools.ietf.org/html/rfc8555#section-7.1.1>`_
@@ -611,7 +623,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return self._response(request, directory)
 
     @routes.get("/new-nonce", name="new-nonce", allow_head=True)
-    async def new_nonce(self, request):
+    async def new_nonce(self, request: web.Request):
         """Handler that returns a new nonce.
 
         `7.2. Getting a Nonce <https://tools.ietf.org/html/rfc8555#section-7.2>`_
@@ -625,7 +637,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             return self._response(request, status=200)
 
     @routes.post("/new-account", name="new-account")
-    async def new_account(self, request):
+    async def new_account(self, request: web.Request):
         """Handler that registers a new account.
 
         `7.3. Account Management <https://tools.ietf.org/html/rfc8555#section-7.3>`_
@@ -697,7 +709,9 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                         },
                     )
 
-    def _validate_account_key(self, pub_key):
+    def _validate_account_key(
+        self, pub_key: typing.Union[RSAPublicKey, EllipticCurvePublicKey]
+    ):
         if isinstance(pub_key, self.SUPPORTED_ACCOUNT_KEYS):
             try:
                 self._match_keysize(pub_key, "account")
@@ -714,7 +728,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             )
 
     @routes.post("/accounts/{account_id}", name="accounts")
-    async def accounts(self, request):
+    async def accounts(self, request: web.Request):
         """Handler that updates or queries the given account.
 
         `7.3.2.  Account Update <https://tools.ietf.org/html/rfc8555#section-7.3.2>`_
@@ -755,7 +769,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return self._response(request, serialized)
 
     @routes.post("/new-order", name="new-order")
-    async def new_order(self, request):
+    async def new_order(self, request: web.Request):
         """Handler that creates a new order.
 
         `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
@@ -784,7 +798,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         )
 
     @routes.post("/authz/{id}", name="authz")
-    async def authz(self, request):
+    async def authz(self, request: web.Request):
         """Handler that updates or queries the given authorization.
 
         `7.5. Identifier Authorization <https://tools.ietf.org/html/rfc8555#section-7.5>`_
@@ -822,7 +836,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return self._response(request, serialized)
 
     @routes.post("/challenge/{id}", name="challenge")
-    async def challenge(self, request):
+    async def challenge(self, request: web.Request):
         """Handler that queries the given challenge and initiates its validation.
 
         `7.5.1. Responding to Challenges <https://tools.ietf.org/html/rfc8555#section-7.5.1>`_
@@ -856,7 +870,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return self._response(request, serialized, links=[f'<{authz_url}>; rel="up"'])
 
     @routes.post("/revoke-cert", name="revoke-cert")
-    async def revoke_cert(self, request):
+    async def revoke_cert(self, request: web.Request):
         """Handler that initiates revocation of the given certificate.
 
         `7.6.  Certificate Revocation <https://tools.ietf.org/html/rfc8555#section-7.6>`_
@@ -885,7 +899,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return self._response(request, status=200)
 
     @routes.post("/order/{id}", name="order")
-    async def order(self, request):
+    async def order(self, request: web.Request):
         """Handler that queries the given order.
 
         `7.1.3. Order Objects <https://tools.ietf.org/html/rfc8555#section-7.1.3>`_
@@ -908,7 +922,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             return self._response(request, order.serialize(request))
 
     @routes.post("/orders/{id}", name="orders")
-    async def orders(self, request):
+    async def orders(self, request: web.Request):
         """Handler that retrieves the account's chunked orders list.
 
         `7.1.2.1.  Orders List <https://tools.ietf.org/html/rfc8555#section-7.1.2.1>`_
@@ -956,7 +970,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             )
 
     async def _validate_order(
-        self, request, session
+        self, request: web.Request, session: AsyncSession
     ) -> (models.Order, x509.CertificateSigningRequest):
         jws, account = await self._verify_request(request, session)
         order_id = request.match_info["id"]
@@ -1011,7 +1025,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return order, csr
 
     @routes.post("/order/{id}/finalize", name="finalize-order")
-    async def finalize_order(self, request):
+    async def finalize_order(self, request: web.Request):
         """Handler that initiates finalization of the given order.
 
         `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
@@ -1051,7 +1065,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
     @routes.post("/certificate/{id}", name="certificate")
     @abc.abstractmethod
-    async def certificate(self, request):
+    async def certificate(self, request: web.Request):
         """Handler that queries the given certificate.
 
         `7.4.2. Downloading the Certificate <https://tools.ietf.org/html/rfc8555#section-7.4.2>`_
@@ -1061,7 +1075,9 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         """
         pass
 
-    async def _handle_challenge_validate(self, request, account_id, challenge_id):
+    async def _handle_challenge_validate(
+        self, request: web.Request, account_id, challenge_id
+    ) -> None:
         logger.debug("Validating challenge %s", challenge_id)
 
         async with self._session(request) as session:
@@ -1081,7 +1097,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             await session.commit()
 
     @routes.post("/key-change", name="key-change")
-    async def key_change(self, request):
+    async def key_change(self, request: web.Request) -> web.Response:
         """7.3.5.  Account Key Rollover"""
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
@@ -1173,7 +1189,9 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             )
 
     @abc.abstractmethod
-    async def handle_order_finalize(self, request, account_id: str, order_id: str):
+    async def handle_order_finalize(
+        self, request: web.Request, account_id: str, order_id: str
+    ):
         """Method that handles the actual finalization of an order.
 
         This method should be called after the order's status has been set
@@ -1194,7 +1212,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         pass
 
     @middleware
-    async def host_ip_middleware(self, request, handler):
+    async def host_ip_middleware(self, request: web.Request, handler):
         """Middleware that checks whether the requesting host's IP
         is part of any of the subnets that are whitelisted.
 
@@ -1231,7 +1249,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return await handler(request)
 
     @middleware
-    async def aiohttp_jinja2_middleware(self, request, handler):
+    async def aiohttp_jinja2_middleware(self, request: web.Request, handler):
         if isinstance(handler, functools.partial) and (
             handler := handler.keywords["handler"]
         ):
@@ -1258,7 +1276,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return await handler(request)
 
     @middleware
-    async def error_middleware(self, request, handler):
+    async def error_middleware(self, request: web.Request, handler):
         """Middleware that converts errors thrown in handlers to ACME compliant JSON and
         attaches the specified status code to the response.
 
@@ -1305,7 +1323,9 @@ class AcmeCA(AcmeServerBase):
 
         return ca
 
-    async def handle_order_finalize(self, request, account_id: str, order_id: str):
+    async def handle_order_finalize(
+        self, request: web.Request, account_id: str, order_id: str
+    ):
         """Method that handles the actual finalization of an order.
 
         This method is called after the order's status has been set
@@ -1335,7 +1355,7 @@ class AcmeCA(AcmeServerBase):
             await session.commit()
 
     # @routes.post("/certificate/{id}", name="certificate")
-    async def certificate(self, request):
+    async def certificate(self, request: web.Request):
         async with self._session(request) as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
@@ -1397,7 +1417,7 @@ class AcmeRelayBase(AcmeServerBase):
         return instance
 
     # @routes.post("/certificate/{id}", name="certificate")
-    async def certificate(self, request):
+    async def certificate(self, request: web.Request):
         """Handler that queries the given certificate.
 
         `7.4.2. Downloading the Certificate <https://tools.ietf.org/html/rfc8555#section-7.4.2>`_
@@ -1427,7 +1447,7 @@ class AcmeRelayBase(AcmeServerBase):
             )
 
     # @routes.post("/revoke-cert", name="revoke-cert")
-    async def revoke_cert(self, request):
+    async def revoke_cert(self, request: web.Request):
         """Handler that initiates revocation of the given certificate.
 
         `7.6.  Certificate Revocation <https://tools.ietf.org/html/rfc8555#section-7.6>`_
@@ -1504,7 +1524,9 @@ class AcmeBroker(AcmeRelayBase):
     the :class:`AcmeProxy` class should be used instead.
     """
 
-    async def handle_order_finalize(self, request, account_id: str, order_id: str):
+    async def handle_order_finalize(
+        self, request: web.Request, account_id: str, order_id: str
+    ):
         """Method that handles the actual finalization of an order.
 
         This method is called after the order's status has been set
@@ -1566,7 +1588,7 @@ class AcmeProxy(AcmeRelayBase):
     """
 
     # @routes.post("/new-order", name="new-order")
-    async def new_order(self, request):
+    async def new_order(self, request: web.Request):
         """Handler that creates a new order.
 
         `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
@@ -1608,7 +1630,7 @@ class AcmeProxy(AcmeRelayBase):
             },
         )
 
-    async def _complete_challenges(self, request, account_id, order_id):
+    async def _complete_challenges(self, request: web.Request, account_id, order_id):
         logger.debug("Completing challenges for order %s", order_id)
         async with self._session(request) as session:
             order = await self._db.get_order(session, account_id, order_id)
@@ -1636,7 +1658,7 @@ class AcmeProxy(AcmeRelayBase):
             await session.commit()
 
     # @routes.post("/order/{id}/finalize", name="finalize-order")
-    async def finalize_order(self, request):
+    async def finalize_order(self, request: web.Request):
         """Handler that initiates finalization of the given order.
 
         `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
@@ -1701,7 +1723,9 @@ class AcmeProxy(AcmeRelayBase):
             headers={"Location": acmetk.util.url_for(request, "order", id=order_id)},
         )
 
-    async def handle_order_finalize(self, request, account_id: str, order_id: str):
+    async def handle_order_finalize(
+        self, request: web.Request, account_id: str, order_id: str
+    ):
         """Method that handles the actual finalization of an order.
 
         This method is called after the order's status has been set

@@ -19,6 +19,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
+import aiohttp.web
+
 from .authorization import AuthorizationStatus, Authorization
 from .base import Serializer, Entity, AcmeErrorType
 from .challenge import Challenge
@@ -29,6 +31,7 @@ from ..util import url_for, names_of
 if typing.TYPE_CHECKING:
     import acmetk
     import cryptography
+    from .account import Account
 
 
 class CSRType(TypeDecorator):
@@ -114,7 +117,7 @@ class Order(Entity, Serializer):
     csr = Column(CSRType)
     """The :class:`cryptography.x509.CertificateSigningRequest` that was submitted by the client."""
 
-    def url(self, request) -> str:
+    def url(self, request: aiohttp.web.Request) -> str:
         """Returns the order's URL.
 
         :param request: The client request needed to build the URL.
@@ -122,7 +125,7 @@ class Order(Entity, Serializer):
         """
         return url_for(request, "orders", id=str(self.order_id))
 
-    def finalize_url(self, request) -> str:
+    def finalize_url(self, request: aiohttp.web.Request) -> str:
         """Returns the order's *finalize* URL.
 
         :param request: The client request needed to build the URL.
@@ -130,7 +133,7 @@ class Order(Entity, Serializer):
         """
         return url_for(request, "finalize-order", id=str(self.order_id))
 
-    def certificate_url(self, request):
+    def certificate_url(self, request: aiohttp.web.Request):
         """Returns the order's *certificate* URL.
 
         :param request: The client request needed to build the URL.
@@ -178,7 +181,7 @@ class Order(Entity, Serializer):
 
         return self.status
 
-    def serialize(self, request=None) -> dict:
+    def serialize(self, request: typing.Optional[aiohttp.web.Request] = None) -> dict:
         d = super().serialize(request)
         d["identifiers"] = super().serialize_list(self.identifiers)
 
@@ -250,9 +253,9 @@ class Order(Entity, Serializer):
         return order
 
     @property
-    def account_of(self):
+    def account_of(self) -> "Account":
         return self.account
 
     @property
-    def order_of(self):
+    def order_of(self) -> "Order":
         return self

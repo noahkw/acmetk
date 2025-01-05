@@ -2,6 +2,7 @@ import asyncio
 import logging
 import logging.config
 import subprocess
+import typing
 from pathlib import Path
 
 import aiohttp_jinja2
@@ -32,7 +33,7 @@ PATH_OR_HOST_AND_PORT_MSG = (
 )
 
 
-def load_config(config_file):
+def load_config(config_file: str) -> dict:
     with open(config_file) as stream:
         config = yaml.safe_load(stream)
 
@@ -120,7 +121,7 @@ def generate_account_key(account_key_file, key_type):
 @click.option("--config-file", envvar="APP_CONFIG_FILE", type=click.Path())
 @click.option("--bootstrap-port", type=click.INT)
 @click.option("--path", type=click.Path())
-def run(config_file, bootstrap_port, path):
+def run(config_file: str, bootstrap_port: typing.Optional[int], path: str):
     """Starts the app as defined in the config file.
 
     Starts the app in bootstrap mode if the bootstrap port is set via --bootstrap-port.
@@ -179,7 +180,7 @@ def run(config_file, bootstrap_port, path):
         loop.run_until_complete(runner.cleanup())
 
 
-async def run_ca(config, path):
+async def run_ca(config: dict[str, typing.Any], path: str):
     challenge_validator = await create_challenge_validator(
         config["ca"]["challenge_validator"]
     )
@@ -207,7 +208,9 @@ def _url_for(context, __route_name, **parts):
         return "ERROR GENERATING URL"
 
 
-async def run_relay(config, path, class_, config_name):
+async def run_relay(
+    config: dict[str, typing.Any], path: str, class_: AcmeRelayBase, config_name: str
+):
     config_section = config[config_name]
 
     try:
@@ -262,7 +265,7 @@ def migrate():
 @db.command()
 @click.argument("connection-string", type=click.STRING)
 @click.option("--password", type=click.STRING, prompt=True, hide_input=True)
-def init(connection_string, password):
+def init(connection_string: str, password: str):
     """Initializes the database's tables.
 
     The user needs to have admin privileges, i.e. 'acme_admin' should be used."""
@@ -277,7 +280,7 @@ def init(connection_string, password):
 @db.command()
 @click.argument("connection-string", type=click.STRING)
 @click.option("--password", type=click.STRING, prompt=True, hide_input=True)
-def drop(connection_string, password):
+def drop(connection_string: str, password: str):
     """Drops the database's tables.
 
     Make sure to backup the database before running this command.

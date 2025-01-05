@@ -9,6 +9,7 @@ import string
 import typing
 
 import acme.messages
+import aiohttp.web
 import dns.asyncresolver
 
 from acmetk.models import ChallengeType, Challenge
@@ -71,7 +72,7 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
     """The types of challenges that the validator supports."""
 
-    async def _query_record(self, name, type_):
+    async def _query_record(self, name: str, type_: typing.Literal["A", "AAAA"]):
         resolved_ips = []
 
         with contextlib.suppress(
@@ -99,7 +100,9 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
 
         return set(itertools.chain.from_iterable(resolved_ips))
 
-    async def validate_challenge(self, challenge: Challenge, request=None):
+    async def validate_challenge(
+        self, challenge: Challenge, request: aiohttp.web.Request = None
+    ):
         """Validates the given challenge.
 
         This method takes a challenge of :class:`ChallengeType` *DNS_01* or *HTTP_01*
@@ -107,6 +110,7 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
         authorization's identifier resolves to the IP address that the validation request is being made from.
 
         :param challenge: The challenge to be validated
+        :param request: The request to be validated
         :raises: :class:`CouldNotValidateChallenge` If the validation failed
         """
         identifier = challenge.authorization.identifier.value

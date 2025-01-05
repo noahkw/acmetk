@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from time import perf_counter
 
+import aiohttp.web
 import yarl
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
@@ -91,7 +92,7 @@ def generate_ec_key(path: Path, key_size=256) -> ec.EllipticCurvePrivateKey:
     return private_key
 
 
-def forwarded_url(request) -> "yarl.URL":
+def forwarded_url(request: aiohttp.web.Request) -> "yarl.URL":
     """Returns the URL with the correct protocol scheme.
 
     Looks for the X-Forwarded-Proto header and replaces the request URL's
@@ -106,7 +107,7 @@ def forwarded_url(request) -> "yarl.URL":
         return request.url
 
 
-def url_for(request, path: str, **kwargs) -> str:
+def url_for(request: aiohttp.web.Request, path: str, **kwargs) -> str:
     """Builds a URL for a given path and optional parameters.
 
     :param request: The request needed to build the URL.

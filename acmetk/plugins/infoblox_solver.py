@@ -28,7 +28,9 @@ class InfobloxClient(DNSSolver):
     DEFAULT_VIEWS = ["Extern"]
     """The views to use if none are specified during initialization."""
 
-    def __init__(self, *, host, username, password, dns_servers=None, views=None):
+    def __init__(
+        self, *, host: str, username: str, password: str, dns_servers=None, views=None
+    ):
         self._creds = {
             "host": host,
             "username": username,

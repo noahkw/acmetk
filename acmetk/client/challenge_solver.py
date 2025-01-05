@@ -135,7 +135,7 @@ class DNSSolver(ChallengeSolver):
     DEFAULT_DNS_SERVERS = ["1.1.1.1", "8.8.8.8"]
     """The DNS servers to use if none are specified during initialization."""
 
-    def __init__(self, dns_servers=None):
+    def __init__(self, dns_servers: typing.Optional[list[str]] = None):
         self._loop = asyncio.get_event_loop()
         self._resolvers = []
 
@@ -149,6 +149,7 @@ class DNSSolver(ChallengeSolver):
     ) -> set[str]:
         """Queries a DNS TXT record.
 
+        :param resolver: The DNS resolver to use.
         :param name: Name of the TXT record to query.
         :return: Set of strings stored in the TXT record.
         """
@@ -164,14 +165,14 @@ class DNSSolver(ChallengeSolver):
 
         return set(txt_records)
 
-    async def _query_until_completed(self, name, text) -> None:
+    async def _query_until_completed(self, name: str, text: str) -> None:
         while True:
-            record_sets = await asyncio.gather(
+            record_sets: list[set[str]] = await asyncio.gather(
                 *[self.query_txt_record(resolver, name) for resolver in self._resolvers]
             )
 
             # Determine set of records that has been seen by all name servers
-            seen_by_all = set.intersection(*record_sets)
+            seen_by_all: set[str] = set.intersection(*record_sets)
 
             if text in seen_by_all:
                 return
