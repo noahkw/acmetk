@@ -1,4 +1,5 @@
 import datetime
+import typing
 
 import acme.messages
 import asyncpg
@@ -15,6 +16,9 @@ from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.inspection import inspect
 from sqlalchemy.orm import relationship
+
+if typing.TYPE_CHECKING:
+    import aiohttp.web
 
 "alembic - The Importance of Naming Constraints"
 meta = MetaData(
@@ -86,9 +90,9 @@ class AcmeErrorType(TypeDecorator):
 
 class Serializer:
     __serialize__ = []
-    __type_serializers__ = dict()
+    __type_serializers__: dict[type, typing.Callable[[], None]] = dict()
 
-    def serialize(self, request=None):
+    def serialize(self, request: typing.Optional["aiohttp.web.Request"] = None):
         return {
             c: self._serialize_value(getattr(self, c))
             for c in inspect(self).attrs.keys()
@@ -106,8 +110,8 @@ class Serializer:
         return [m.serialize(request=request) for m in list_]
 
     @staticmethod
-    def type_serializer(type_):
-        def deco(func):
+    def type_serializer(type_: type):
+        def deco(func: typing.Callable):
             Serializer.__type_serializers__[type_] = func
 
             def wrapped(*args, **kwargs):
@@ -119,10 +123,10 @@ class Serializer:
 
 
 @Serializer.type_serializer(datetime.datetime)
-def serialize_datetime(date_time):
-    return date_time.isoformat()
+def serialize_datetime(value: datetime.datetime) -> str:
+    return value.isoformat()
 
 
 @Serializer.type_serializer(asyncpg.pgproto.pgproto.UUID)
-def serialize_uuid(uuid_):
-    return str(uuid_)
+def serialize_uuid(value: asyncpg.pgproto.pgproto.UUID) -> str:
+    return str(value)
