@@ -18,6 +18,7 @@ from ..util import url_for, names_of
 if typing.TYPE_CHECKING:
     import acmetk
     import cryptography
+    import aiohttp.web
 
 
 class AccountStatus(str, enum.Enum):
@@ -149,7 +150,7 @@ class Account(Entity, Serializer):
         elif upd.status:
             raise ValueError(f"Cannot set an account's status to {upd.status}")
 
-    def serialize(self, request=None) -> dict:
+    def serialize(self, request: typing.Optional["aiohttp.web.Request"] = None) -> dict:
         d = super().serialize(request)
         d["orders"] = self.orders_url(request)
         d["contact"] = json.loads(self.contact)
