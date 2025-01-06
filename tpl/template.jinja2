@@ -111,7 +111,7 @@ body {
 
     <div id="left" class="column">
 {% block navigation %}
-<h2>{{ request.app['_service_'].__class__.__name__ }}</h2>
+<h2>{{ service.__class__.__name__ }}</h2>
 <ul>
 {#     <li><a href="{{ url('root') }}">../</a></li>  #}
 {% for k,v in {'mgmt-index':'','mgmt-changes':'changes','mgmt-accounts':'accounts','mgmt-orders':'orders','mgmt-certificates':'certificates'}.items() %}

@@ -159,8 +159,6 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                 self.aiohttp_jinja2_middleware,
             ]
         )
-        # request.app['_service_'] available in jinja2 templates
-        self.app[web.AppKey("_service_", str)] = self
 
         self._add_routes()
 
@@ -1259,6 +1257,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                 "request": request,
                 "cprofile": cProfile,
                 "pstats": pstats,
+                "service": self,
             }
         elif isinstance(handler, types.MethodType):
             if handler.__self__.__class__ == web.AbstractRoute:
@@ -1268,6 +1267,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                     "request": request,
                     "cprofile": cProfile,
                     "pstats": pstats,
+                    "service": self,
                 }
         elif isinstance(handler, types.FunctionType):  # index_of
             pass
