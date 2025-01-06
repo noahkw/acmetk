@@ -67,7 +67,9 @@ class TestEAB(unittest.TestCase):
 
         request = Mock(
             headers={
-                AcmeEABMixin.HEADER_NAME: generate_x509_client_cert("test@test.test")
+                AcmeEABMixin.CLIENT_CERT_HEADER: generate_x509_client_cert(
+                    "test@test.test"
+                )
             },
             url=URL,
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
@@ -93,7 +95,9 @@ class TestCertbotCA_EAB(TestCertBotCA):
     async def test_register(self):
         URL = yarl.URL("http://localhost:8000/eab")
         request = Mock(
-            headers={AcmeEABMixin.HEADER_NAME: generate_x509_client_cert(self.contact)},
+            headers={
+                AcmeEABMixin.CLIENT_CERT_HEADER: generate_x509_client_cert(self.contact)
+            },
             url=URL,
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
@@ -123,32 +127,13 @@ class TestCertbotCA_EAB(TestCertBotCA):
         pass
 
 
-class TestOurClientCA_EAB(TestOurClientCA):
+class TestOurClientCA_EAB:
     @property
     def config_sec(self):
         return self._config["tests"]["LocalCA_EAB"]
 
     def setUp(self):
         super().setUp()
-
-    async def asyncSetUp(self) -> None:
-        await super().asyncSetUp()
-
-        request = Mock(
-            headers={
-                AcmeEABMixin.HEADER_NAME: generate_x509_client_cert(
-                    self.client._contact["email"]
-                )
-            },
-            url=yarl.URL("http://localhost:8000/eab"),
-            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
-        )
-        self.client.eab_credentials = self.eab_credentials = self.ca._eab_store.create(
-            request
-        )
-        self.log.debug(
-            "kid: %s, hmac_key: %s", self.eab_credentials[0], self.eab_credentials[1]
-        )
 
     async def test_register(self):
         self.client.eab_credentials = (None, None)
@@ -180,3 +165,41 @@ class TestOurClientCA_EAB(TestOurClientCA):
 
     async def test_run_stress(self):
         pass
+
+
+class TestOurClientCA_EAB_CERT(TestOurClientCA_EAB, TestOurClientCA):
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+
+        request = Mock(
+            headers={
+                AcmeEABMixin.CLIENT_CERT_HEADER: generate_x509_client_cert(
+                    self.client._contact["email"]
+                )
+            },
+            url=yarl.URL("http://localhost:8000/eab"),
+            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
+        )
+        self.client.eab_credentials = self.eab_credentials = self.ca._eab_store.create(
+            request
+        )
+        self.log.debug(
+            "kid: %s, hmac_key: %s", self.eab_credentials[0], self.eab_credentials[1]
+        )
+
+
+class TestOurClientCA_EAB_EMAIL(TestOurClientCA_EAB, TestOurClientCA):
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+
+        request = Mock(
+            headers={AcmeEABMixin.CLIENT_EMAIL_HEADER: self.client._contact["email"]},
+            url=yarl.URL("http://localhost:8000/eab"),
+            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
+        )
+        self.client.eab_credentials = self.eab_credentials = self.ca._eab_store.create(
+            request
+        )
+        self.log.debug(
+            "kid: %s, hmac_key: %s", self.eab_credentials[0], self.eab_credentials[1]
+        )

@@ -98,29 +98,33 @@ class ExternalAccountBindingStore:
         :return: The resulting pending EAB's :attr:`~ExternalAccountBinding.kid` and
             :attr:`~ExternalAccountBinding.hmac_key`.
         """
+        mail: str
+        if mail := request.headers.get(AcmeEABMixin.CLIENT_EMAIL_HEADER):
+            pass
+        elif qpem := request.headers.get(AcmeEABMixin.CLIENT_CERT_HEADER):
 
-        # The client certificate in the PEM format (urlencoded) for an established SSL connection (1.13.5);
-        cert = x509.load_pem_x509_certificate(
-            urllib.parse.unquote(request.headers[AcmeEABMixin.HEADER_NAME]).encode()
-        )
+            # The client certificate in the PEM format (urlencoded) for an established SSL connection (1.13.5);
+            cert = x509.load_pem_x509_certificate(urllib.parse.unquote(qpem).encode())
 
-        if not (
-            mails := cert.subject.get_attributes_for_oid(x509.NameOID.EMAIL_ADDRESS)
-        ):
+            mails: set[str] = set()
+            nl: list[x509.NameAttribute]
+            if nl := cert.subject.get_attributes_for_oid(x509.NameOID.EMAIL_ADDRESS):
+                mails |= set(map(lambda x: x.value, nl))
+
             ext = cert.extensions.get_extension_for_oid(
                 x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME
             )
-            mails = ext.value.get_values_for_type(x509.RFC822Name)
+            value: x509.SubjectAlternativeName = ext.value
+            mails |= set(value.get_values_for_type(x509.RFC822Name))
 
-        if len(mails) != 1:
-            raise ValueError(f"{len(mails)} mail addresses in cert, expecting 1")
+            if len(mails) != 1:
+                raise ValueError(
+                    f"{len(mails)} mail addresses in cert, expecting 1 ({mails})"
+                )
 
-        mail = mails.pop()
+            mail = mails.pop()
 
-        if isinstance(mail, x509.NameAttribute):
-            mail = mail.value
-
-        if not (pending_eab := self._pending.get(mail, None)) or pending_eab.expired():
+        if (pending_eab := self._pending.get(mail)) is None or pending_eab.expired():
             pending_eab = self._pending[mail] = ExternalAccountBinding(
                 mail, url_for(request, "new-account")
             )
@@ -161,7 +165,8 @@ class AcmeEABMixin:
     verifying it.
     """
 
-    HEADER_NAME = "ssl-client-cert"
+    CLIENT_CERT_HEADER = "ssl-client-cert"
+    CLIENT_EMAIL_HEADER = "x-auth-request-email"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -243,12 +248,15 @@ class AcmeEABMixin:
         # from unittest.mock import Mock
         # request = Mock(headers={"X-SSL-CERT": urllib.parse.quote(self.data)}, url=request.url)
 
-        if not request.headers.get(self.HEADER_NAME):
+        if (
+            request.headers.get(self.CLIENT_CERT_HEADER) is None
+            and request.headers.get(self.CLIENT_EMAIL_HEADER) is None
+        ):
             response = aiohttp_jinja2.render_template("eab.jinja2", request, {})
             response.set_status(403)
             response.text = (
                 "An External Account Binding may only be created if a valid client certificate "
-                "is sent with the request."
+                "is sent with the request or the request is authenticated and a the username supplied."
             )
             return response
 
