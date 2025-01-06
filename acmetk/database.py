@@ -106,11 +106,15 @@ class Database:
         # asyncpg typeinfo_tree slows down for custom types - including enums when using the pg jit
         # https://github.com/MagicStack/asyncpg/issues/530
         # -> disable the jit via connect_args/server_settings
+        # ConnectionDoesNotExistError
+        # https://github.com/MagicStack/asyncpg/issues/309
+        # -> use pool_pre_ping
         self.engine = create_async_engine(
             connection_string,
             pool_size=pool_size,
             connect_args={"server_settings": {"jit": "off"}},
             # echo=True,
+            pool_pre_ping=True,
             native_inet_types=True,
             **kwargs,
         )
