@@ -1220,7 +1220,9 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             * HTTP status code *400* if there is a *X-Forwarded-For* header spoofing attack going on.
 
         """
-        forwarded_for = request.headers.get("X-Forwarded-For")
+
+        if forwarded_for := request.headers.get("X-Forwarded-For"):
+            forwarded_for = forwarded_for.partition(",")[0].strip()
 
         """If the X-Forwarded-For header is set, then we need to check whether the app is configured
         to be behind a reverse proxy. Otherwise, there may be a spoofing attack going on."""
