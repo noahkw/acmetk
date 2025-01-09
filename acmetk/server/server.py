@@ -136,6 +136,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         use_forwarded_header=False,
         require_eab=False,
         allow_wildcard=False,
+        mgmt_auth=False,
         **kwargs,
     ):
         super().__init__()
@@ -158,11 +159,13 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         self._use_forwarded_header = use_forwarded_header
         self._require_eab = require_eab
         self._allow_wildcard = allow_wildcard
+        self._mgmt_auth = mgmt_auth
 
         self.app = web.Application(
             middlewares=[
                 self.error_middleware,
                 self.host_ip_middleware,
+                self.mgmt_auth_middleware,
                 self.aiohttp_jinja2_middleware,
             ]
         )
