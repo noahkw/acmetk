@@ -1,3 +1,4 @@
+import base64
 import cProfile
 import inspect
 import re
@@ -235,6 +236,17 @@ def names_of(
     )
 
     return {name.lower() if lower else name for name in names}
+
+
+class base64url:
+    @staticmethod
+    def encode(data: bytes) -> bytes:
+        return base64.urlsafe_b64encode(data).rstrip(b"=")
+
+    @staticmethod
+    def decode(data: bytes) -> bytes:
+        pad = b"=" * (4 - (len(data) % 4))
+        return base64.urlsafe_b64decode(data + pad)
 
 
 def pem_split(

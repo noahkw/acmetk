@@ -843,6 +843,8 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
         :return: The challenge object.
         """
+
+        validate_challenge = True
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             challenge_id = request.match_info["id"]
@@ -855,16 +857,18 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
             if challenge.status == models.ChallengeStatus.PENDING:
                 challenge.status = models.ChallengeStatus.PROCESSING
+            else:
+                validate_challenge = False
 
             serialized = challenge.serialize(request)
             account_id = account.account_id
             authz_url = challenge.authorization.url(request)
             await session.commit()
 
-        # TODO: only validate if PROCESSING
-        asyncio.ensure_future(
-            self._handle_challenge_validate(request, account_id, challenge_id)
-        )
+        if validate_challenge:
+            asyncio.ensure_future(
+                self._handle_challenge_validate(request, account_id, challenge_id)
+            )
         return self._response(request, serialized, links=[f'<{authz_url}>; rel="up"'])
 
     @routes.post("/revoke-cert", name="revoke-cert")

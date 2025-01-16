@@ -59,6 +59,53 @@ class ChallengeValidator(abc.ABC):
         pass
 
 
+@PluginRegistry.register_plugin("http01")
+class Http01ChallengeValidator(ChallengeValidator):
+    SUPPORTED_CHALLENGES = frozenset([ChallengeType.HTTP_01])
+    """The types of challenges that the validator supports."""
+
+    async def validate_challenge(
+        self, challenge: Challenge, request: aiohttp.web.Request = None
+    ):
+        """Validates the given challenge.
+
+        This method takes a challenge of :class:`ChallengeType` *HTTP_01*
+        and validates according to it.
+
+        :param challenge: The challenge to be validated
+        :param request: The request to be validated
+        :raises: :class:`CouldNotValidateChallenge` If the validation failed
+        """
+        identifier = challenge.authorization.identifier.value
+        logger.debug(
+            "Validating %s challenge %s for identifier %s",
+            challenge.type,
+            challenge.challenge_id,
+            identifier,
+        )
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"http://{identifier}/.well-known/acme-challenge/{challenge.token}"
+                ) as response:
+                    if response.status != 200:
+                        raise CouldNotValidateChallenge(
+                            detail=f"Validation of challenge {challenge.challenge_id} failed; "
+                            f"http_status {response.status}"
+                        )
+                    data = await response.text()
+                    if data != challenge.keyAuthorization:
+                        raise CouldNotValidateChallenge(
+                            detail=f"Validation of challenge {challenge.challenge_id} failed; "
+                            f"token mismatch {challenge.keyAuthorization} != {data}"
+                        )
+        except Exception as e:
+            raise CouldNotValidateChallenge(
+                detail=f"Validation of challenge {challenge.challenge_id} failed; {e}"
+            )
+
+
 @PluginRegistry.register_plugin("requestipdns")
 class RequestIPDNSChallengeValidator(ChallengeValidator):
     """Validator for the Request IP DNS challenge.
@@ -115,7 +162,8 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
         """
         identifier = challenge.authorization.identifier.value
         logger.debug(
-            "Validating challenge %s for identifier %s",
+            "Validating %s challenge %s for identifier %s by requestipdns",
+            challenge.type,
             challenge.challenge_id,
             identifier,
         )
@@ -170,7 +218,10 @@ class DummyValidator(ChallengeValidator):
         """
         identifier = challenge.authorization.identifier.value
         logger.debug(
-            f"(not) validating challenge {challenge.challenge_id}, type {challenge.type} identifier {identifier}"
+            "Validating %s challenge %s for identifier %s (not)",
+            challenge.type,
+            challenge.challenge_id,
+            identifier,
         )
 
         # await asyncio.sleep(1)

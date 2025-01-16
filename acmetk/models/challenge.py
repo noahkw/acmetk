@@ -2,6 +2,8 @@ import datetime
 import enum
 import typing
 import uuid
+import logging
+
 
 from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
@@ -9,7 +11,10 @@ from sqlalchemy.orm import relationship
 
 import acmetk.server.challenge_validator
 from .base import Serializer, Entity, AcmeErrorType
-from ..util import url_for
+from ..util import url_for, base64url
+
+
+logger = logging.getLogger(__name__)
 
 
 class ChallengeStatus(str, enum.Enum):
@@ -95,10 +100,6 @@ class Challenge(Entity, Serializer):
         return d
 
     @classmethod
-    def create_all(cls) -> list["Challenge"]:
-        return cls.create_types(ChallengeType)
-
-    @classmethod
     def create_types(cls, types: typing.Iterable[ChallengeType]) -> list["Challenge"]:
         """Returns new pending challenges of the given types.
 
@@ -122,9 +123,13 @@ class Challenge(Entity, Serializer):
         :param validator: The challenge validator to perform the validation with.
         :return: The challenge's status after validation.
         """
+
         try:
             await validator.validate_challenge(self, request=request)
         except acmetk.server.challenge_validator.CouldNotValidateChallenge as e:
+            logger.info(
+                f"Failed to validate challenge {self.challenge_id}/{self.type}: {e.detail}"
+            )
             self.error = e.to_acme_error()
             self.status = ChallengeStatus.INVALID
 
@@ -142,3 +147,13 @@ class Challenge(Entity, Serializer):
     @property
     def order_of(self):
         return self.authorization.order_of
+
+    @property
+    def keyAuthorization(self) -> str:
+        """
+        8.1.  Key Authorizations
+            …
+            keyAuthorization = token || '.' || base64url(Thumbprint(accountKey))
+            …
+        """
+        return f"{self.token}.{base64url.encode(self.account_of.key.thumbprint()).decode()}"
