@@ -1,15 +1,18 @@
 import abc
 import asyncio
 import contextlib
+import hashlib
 import ipaddress
 import itertools
 import logging
 import random
+import ssl
 import string
 import typing
 
 import acme.messages
 import aiohttp.web
+from cryptography import x509
 import dns.asyncresolver
 
 from acmetk.models import ChallengeType, Challenge
@@ -100,6 +103,64 @@ class Http01ChallengeValidator(ChallengeValidator):
                             detail=f"Validation of challenge {challenge.challenge_id} failed; "
                             f"token mismatch {challenge.keyAuthorization} != {data}"
                         )
+        except Exception as e:
+            raise CouldNotValidateChallenge(
+                detail=f"Validation of challenge {challenge.challenge_id} failed; {e}"
+            )
+
+
+@PluginRegistry.register_plugin("tlsalpn01")
+class TLSALPN01ChallengeValidator(ChallengeValidator):
+    PE_ACMEIDENTIFIER = "1.3.6.1.5.5.7.1.31"
+    """OID for the Certificate Extension"""
+
+    SUPPORTED_CHALLENGES = frozenset([ChallengeType.TLS_ALPN_01])
+    """The types of challenges that the validator supports."""
+
+    async def validate_challenge(
+        self, challenge: Challenge, request: aiohttp.web.Request = None
+    ):
+        """Validates the given challenge.
+
+        This method takes a challenge of :class:`ChallengeType` *HTTP_01*
+        and validates according to it.
+
+        :param challenge: The challenge to be validated
+        :param request: The request to be validated
+        :raises: :class:`CouldNotValidateChallenge` If the validation failed
+        """
+        identifier = challenge.authorization.identifier.value
+        logger.debug(
+            "Validating %s challenge %s for identifier %s",
+            challenge.type,
+            challenge.challenge_id,
+            identifier,
+        )
+
+        try:
+            reader, writer = await asyncio.open_connection(identifier, 443)
+
+            ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+            ctx.set_alpn_protocols(["acme-tls/1"])
+            ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+
+            await writer.start_tls(ctx, server_hostname=identifier)
+
+            cert: x509.Certificate = x509.load_der_x509_certificate(
+                writer.get_extra_info("ssl_object").getpeercert(binary_form=True)
+            )
+
+            logger.debug(f"The server certificate is {cert.subject.rfc4514_string()}")
+
+            ext = cert.extensions.get_extension_for_oid(
+                x509.ObjectIdentifier(self.PE_ACMEIDENTIFIER)
+            )
+            value: bytes = ext.value.value[2:]
+            expect = hashlib.sha256(challenge.keyAuthorization.encode()).digest()
+            if value != expect:
+                raise ValueError((expect.hex(sep=":"), value.hex(sep=":")))
         except Exception as e:
             raise CouldNotValidateChallenge(
                 detail=f"Validation of challenge {challenge.challenge_id} failed; {e}"
