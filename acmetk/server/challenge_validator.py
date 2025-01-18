@@ -14,6 +14,7 @@ import acme.messages
 import aiohttp.web
 from cryptography import x509
 import dns.asyncresolver
+import yarl
 
 from acmetk.models import ChallengeType, Challenge
 from acmetk.plugin_base import PluginRegistry
@@ -64,8 +65,14 @@ class ChallengeValidator(abc.ABC):
 
 @PluginRegistry.register_plugin("http01")
 class Http01ChallengeValidator(ChallengeValidator):
+    DEFAULT_PORT: int = 80
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.HTTP_01])
     """The types of challenges that the validator supports."""
+
+    def __init__(self, port: int = 80) -> None:
+        super().__init__()
+        self._port = port
+        """Choosing the port is required for unit testing."""
 
     async def validate_challenge(
         self, challenge: Challenge, request: aiohttp.web.Request = None
@@ -89,9 +96,12 @@ class Http01ChallengeValidator(ChallengeValidator):
 
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(
+                url = yarl.URL(
                     f"http://{identifier}/.well-known/acme-challenge/{challenge.token}"
-                ) as response:
+                )
+                if self._port != self.DEFAULT_PORT:
+                    url = url.with_port(self._port)
+                async with session.get(url) as response:
                     if response.status != 200:
                         raise CouldNotValidateChallenge(
                             detail=f"Validation of challenge {challenge.challenge_id} failed; "
@@ -117,6 +127,11 @@ class TLSALPN01ChallengeValidator(ChallengeValidator):
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.TLS_ALPN_01])
     """The types of challenges that the validator supports."""
 
+    def __init__(self, port: int = 443) -> None:
+        super().__init__()
+        self._port = port
+        """Choosing the port is required for unit testing."""
+
     async def validate_challenge(
         self, challenge: Challenge, request: aiohttp.web.Request = None
     ):
@@ -138,7 +153,7 @@ class TLSALPN01ChallengeValidator(ChallengeValidator):
         )
 
         try:
-            reader, writer = await asyncio.open_connection(identifier, 443)
+            reader, writer = await asyncio.open_connection(identifier, self._port)
 
             ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
             ctx.set_alpn_protocols(["acme-tls/1"])
