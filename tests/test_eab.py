@@ -105,7 +105,7 @@ class TestCertbotCA_EAB(TestCertBotCA):
 
         self.log.debug("kid: %s, hmac_key: %s", kid, hmac_key)
         await self._run(
-            f"register --agree-tos  -m {kid} --eab-kid {kid} --eab-hmac-key {hmac_key}"
+            f"register --agree-tos  -m {kid} --eab-kid {kid} --eab-hmac-key={hmac_key}"
         )
 
     async def test_run(self):
