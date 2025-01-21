@@ -102,6 +102,12 @@ class Http01ChallengeValidator(ChallengeValidator):
                 )
                 if self._port != self.DEFAULT_PORT:
                     url = url.with_port(self._port)
+                logger.info(
+                    "Validating %s challenge %s at %s",
+                    challenge.type,
+                    challenge.challenge_id,
+                    url,
+                )
                 async with session.get(url) as response:
                     if response.status != 200:
                         raise CouldNotValidateChallenge(
@@ -157,22 +163,26 @@ class TLSALPN01ChallengeValidator(ChallengeValidator):
         )
 
         try:
-            reader, writer = await asyncio.open_connection(identifier, self._port)
 
             ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
             ctx.set_alpn_protocols(["acme-tls/1"])
-            ctx.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
+            ctx.minimum_version, ctx.maximum_version = (
+                ssl.TLSVersion.TLSv1_2,
+                ssl.TLSVersion.TLSv1_3,
+            )
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
+            logger.debug("Connecting to %s:%d", identifier, self._port)
 
-            async with asyncio.timeout(20):
-                await writer.start_tls(ctx, server_hostname=identifier)
+            reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(identifier, self._port, ssl=ctx), 20
+            )
 
             cert: x509.Certificate = x509.load_der_x509_certificate(
                 writer.get_extra_info("ssl_object").getpeercert(binary_form=True)
             )
 
-            logger.debug(f"The server certificate is {cert.subject.rfc4514_string()}")
+            logger.debug("The server certificate is %s", cert.subject.rfc4514_string())
 
             ext = cert.extensions.get_extension_for_oid(
                 x509.ObjectIdentifier(self.PE_ACMEIDENTIFIER)
