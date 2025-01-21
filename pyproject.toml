@@ -51,6 +51,8 @@ tests = [
     "certbot",
     "trustme",
     "coverage",
+    "pytest",
+    "pytest-asyncio"
 ]
 
 [tool.pdm]
@@ -75,6 +77,11 @@ packages = [
 version = {attr = "acmetk.version.__version__"}
 
 [tool.pytest.ini_options]
+filterwarnings = [
+    "ignore:.* in pyOpenSSL is deprecated.:DeprecationWarning",
+    "ignore:Changing state of started or joined application is deprecated:DeprecationWarning",
+]
+
 asyncio_mode = "strict"
 asyncio_default_fixture_loop_scope = "session"
 
