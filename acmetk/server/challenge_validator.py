@@ -18,6 +18,7 @@ import yarl
 
 from acmetk.models import ChallengeType, Challenge
 from acmetk.plugin_base import PluginRegistry
+from acmetk.util import DNS01ChallengeHelper
 
 logger = logging.getLogger(__name__)
 
@@ -105,17 +106,20 @@ class Http01ChallengeValidator(ChallengeValidator):
                     if response.status != 200:
                         raise CouldNotValidateChallenge(
                             detail=f"Validation of challenge {challenge.challenge_id} failed; "
-                            f"http_status {response.status}"
+                            + f"http_status {response.status}"
                         )
                     data = await response.text()
                     if data != challenge.keyAuthorization:
                         raise CouldNotValidateChallenge(
                             detail=f"Validation of challenge {challenge.challenge_id} failed; "
-                            f"token mismatch {challenge.keyAuthorization} != {data}"
+                            + f"token mismatch {challenge.keyAuthorization} != {data}"
                         )
+        except CouldNotValidateChallenge:
+            raise
         except Exception as e:
+            logger.exception(e)
             raise CouldNotValidateChallenge(
-                detail=f"Validation of challenge {challenge.challenge_id} failed; {e}"
+                detail=f"Validation of challenge {challenge.challenge_id} failed; {str(e)}"
             )
 
 
@@ -161,7 +165,8 @@ class TLSALPN01ChallengeValidator(ChallengeValidator):
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
 
-            await writer.start_tls(ctx, server_hostname=identifier)
+            async with asyncio.timeout(20):
+                await writer.start_tls(ctx, server_hostname=identifier)
 
             cert: x509.Certificate = x509.load_der_x509_certificate(
                 writer.get_extra_info("ssl_object").getpeercert(binary_form=True)
@@ -177,8 +182,49 @@ class TLSALPN01ChallengeValidator(ChallengeValidator):
             if value != expect:
                 raise ValueError((expect.hex(sep=":"), value.hex(sep=":")))
         except Exception as e:
+            logger.exception(e)
             raise CouldNotValidateChallenge(
                 detail=f"Validation of challenge {challenge.challenge_id} failed; {e}"
+            )
+
+
+@PluginRegistry.register_plugin("dns01")
+class DNS01ChallengeValidator(DNS01ChallengeHelper, ChallengeValidator):
+    DEFAULT_PORT: int = 53
+    SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01])
+    """The types of challenges that the validator supports."""
+
+    def __init__(self, port: int = 53) -> None:
+        super().__init__()
+        self._port = port
+        """Choosing the port is required for unit testing."""
+
+    async def validate_challenge(
+        self, challenge: Challenge, request: aiohttp.web.Request = None
+    ):
+        """Validates the given challenge.
+
+        This method takes a challenge of :class:`ChallengeType` *DNS_01*
+        and validates according to it.
+
+        :param challenge: The challenge to be validated
+        :param request: The request to be validated
+        :raises: :class:`CouldNotValidateChallenge` If the validation failed
+        """
+        name = challenge.authorization.identifier.value
+
+        logger.debug(
+            "Validating %s challenge %s for identifier %s",
+            challenge.type,
+            challenge.challenge_id,
+            name,
+        )
+
+        done, missing = await self.query_txt_records(name, challenge.keyAuthorization)
+
+        if done is False:
+            raise CouldNotValidateChallenge(
+                detail=f"Validation of challenge {challenge.challenge_id} failed; record is missing on {missing}"
             )
 
 
