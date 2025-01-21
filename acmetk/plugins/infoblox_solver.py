@@ -8,7 +8,8 @@ import josepy.jwk
 from infoblox_client import connector, objects
 
 from acmetk.client import CouldNotCompleteChallenge
-from acmetk.client.challenge_solver import DNSSolver
+from acmetk.client.challenge_solver import ChallengeSolver
+from acmetk.util import DNS01ChallengeHelper
 from acmetk.plugin_base import PluginRegistry
 
 logger = logging.getLogger(__name__)
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 @PluginRegistry.register_plugin("infoblox")
-class InfobloxClient(DNSSolver):
+class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
     """InfoBlox DNS-01 challenge solver.
 
     This challenge solver connects to an InfoBlox API to provision

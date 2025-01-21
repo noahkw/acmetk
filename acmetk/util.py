@@ -1,6 +1,9 @@
+import asyncio
 import base64
 import cProfile
+import contextlib
 import inspect
+import logging
 import re
 import typing
 from datetime import datetime, timedelta
@@ -8,6 +11,7 @@ from pathlib import Path
 from time import perf_counter
 
 import aiohttp.web
+import dns.asyncresolver
 import yarl
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
@@ -15,10 +19,89 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.x509 import NameOID
 
+logger = logging.getLogger(__name__)
 if typing.TYPE_CHECKING:
     import cryptography
 
 KEY_FILE_MODE = 0o600
+
+
+class DNS01ChallengeHelper:
+    """Baseclass for DNS Challenge Solvers & Validators
+
+    Provides the methods to query the TXT records and wait for the propagation to succeed
+    """
+
+    # from acmetk.models.challenge import ChallengeType
+    SUPPORTED_CHALLENGES = frozenset(["dns-01"])
+    """The types of challenges that the solver supports."""
+
+    POLLING_DELAY = 1.0
+    """Time in seconds between consecutive DNS requests."""
+
+    POLLING_TIMEOUT = 60.0 * 5
+    """Time in seconds after which placing the TXT record is considered a failure."""
+
+    DEFAULT_DNS_SERVERS = ["1.1.1.1", "8.8.8.8"]
+    """The DNS servers to use if none are specified during initialization."""
+
+    def __init__(self, dns_servers: typing.Optional[list[str]] = None):
+        self._loop = asyncio.get_event_loop()
+        self._resolvers = []
+
+        for nameserver in dns_servers or self.DEFAULT_DNS_SERVERS:
+            resolver = dns.asyncresolver.Resolver()
+            resolver.nameservers = [nameserver]
+            self._resolvers.append(resolver)
+
+    @staticmethod
+    async def _query_txt_record(
+        resolver: dns.asyncresolver.Resolver, name: str
+    ) -> tuple[str, set[str]]:
+        """Queries a DNS TXT record.
+
+        :param resolver: The DNS resolver to use.
+        :param name: Name of the TXT record to query.
+        :return: Set of strings stored in the TXT record.
+        """
+        txt_records = []
+
+        with contextlib.suppress(
+            dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer
+        ):
+            resp = await resolver.resolve(name, "TXT")
+
+            for records in resp.rrset.items.keys():
+                txt_records.extend([record.decode() for record in records.strings])
+
+        return resolver.nameservers[0], set(txt_records)
+
+    async def query_txt_records(self, name: str, text: str) -> tuple[bool, set[str]]:
+        result_set: list[tuple[str, set[str]]] = await asyncio.gather(
+            *[self._query_txt_record(resolver, name) for resolver in self._resolvers]
+        )
+        record_sets: dict[str, set[str]] = dict(result_set)
+
+        missing = set()
+        for name, records in record_sets.items():
+            if text not in records:
+                missing.add(name)
+
+        if missing:
+            return False, missing
+
+        return True, missing
+
+    async def _query_until_completed(self, name: str, text: str) -> None:
+        """For ChallengeSolvers - wait until the change is propagated."""
+        while True:
+            done, missing = await self.query_txt_records(name, text)
+            if done is True:
+                return
+            logger.debug(
+                f"{name} does not have TXT {text} yet. Retrying (name servers missing record: {missing})"
+            )
+            await asyncio.sleep(1.0)
 
 
 def generate_csr(CN: str, private_key: rsa.RSAPrivateKey, path: Path, names: list[str]):

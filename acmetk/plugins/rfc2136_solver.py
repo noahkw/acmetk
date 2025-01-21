@@ -8,7 +8,8 @@ import dns.update
 import josepy.jwk
 
 from acmetk.client import CouldNotCompleteChallenge
-from acmetk.client.challenge_solver import DNSSolver
+from acmetk.client.challenge_solver import ChallengeSolver
+from acmetk.util import DNS01ChallengeHelper
 from acmetk.plugin_base import PluginRegistry
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ It looks up the zone name using the TSIG credentials on the resolver
 
 
 @PluginRegistry.register_plugin("rfc2136")
-class RFC2136Client(DNSSolver):
+class RFC2136Client(DNS01ChallengeHelper, ChallengeSolver):
     def __init__(self, server: str, keyid: str, alg: str, secret: str):
         super().__init__()
         self.keyring = dns.tsigkeyring.from_text({keyid: (alg, secret)})

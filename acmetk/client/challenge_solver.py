@@ -1,12 +1,10 @@
 import abc
-import asyncio
-import contextlib
 import logging
 import typing
 
 import acme.messages
-import dns.asyncresolver
 import josepy
+
 from acmetk.models import ChallengeType
 from acmetk.plugin_base import PluginRegistry
 
@@ -115,70 +113,3 @@ class DummySolver(ChallengeSolver):
         logger.debug(
             f"(not) cleaning up after challenge {challenge.uri}, type {challenge.chall.typ}"
         )
-
-
-class DNSSolver(ChallengeSolver):
-    """Baseclass for DNS Challenge Solvers
-
-    Provides the methods to query the TXT records and wait for the propagation to succeed
-    """
-
-    SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01])
-    """The types of challenges that the solver supports."""
-
-    POLLING_DELAY = 1.0
-    """Time in seconds between consecutive DNS requests."""
-
-    POLLING_TIMEOUT = 60.0 * 5
-    """Time in seconds after which placing the TXT record is considered a failure."""
-
-    DEFAULT_DNS_SERVERS = ["1.1.1.1", "8.8.8.8"]
-    """The DNS servers to use if none are specified during initialization."""
-
-    def __init__(self, dns_servers: typing.Optional[list[str]] = None):
-        self._loop = asyncio.get_event_loop()
-        self._resolvers = []
-
-        for nameserver in dns_servers or self.DEFAULT_DNS_SERVERS:
-            resolver = dns.asyncresolver.Resolver()
-            resolver.nameservers = [nameserver]
-            self._resolvers.append(resolver)
-
-    async def query_txt_record(
-        self, resolver: dns.asyncresolver.Resolver, name: str
-    ) -> set[str]:
-        """Queries a DNS TXT record.
-
-        :param resolver: The DNS resolver to use.
-        :param name: Name of the TXT record to query.
-        :return: Set of strings stored in the TXT record.
-        """
-        txt_records = []
-
-        with contextlib.suppress(
-            dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer
-        ):
-            resp = await resolver.resolve(name, "TXT")
-
-            for records in resp.rrset.items.keys():
-                txt_records.extend([record.decode() for record in records.strings])
-
-        return set(txt_records)
-
-    async def _query_until_completed(self, name: str, text: str) -> None:
-        while True:
-            record_sets: list[set[str]] = await asyncio.gather(
-                *[self.query_txt_record(resolver, name) for resolver in self._resolvers]
-            )
-
-            # Determine set of records that has been seen by all name servers
-            seen_by_all: set[str] = set.intersection(*record_sets)
-
-            if text in seen_by_all:
-                return
-
-            logger.debug(
-                f"{name} does not have TXT {text} yet. Retrying (Records seen by all name servers: {seen_by_all}"
-            )
-            logger.debug(f"Records seen: {record_sets}")
-            await asyncio.sleep(1.0)
