@@ -93,7 +93,9 @@ jobs:
         pdm run coverage run --data-file=eab-ca.coverage -m unittest "tests/test_eab.py"
         pdm run coverage run --data-file=broker-ca.coverage -m unittest "tests/test_broker.py" -k CA
         pdm run coverage run --data-file=mgmt.coverage -m unittest "tests/test_mgmt.py"
-        pdm run coverage combine --data-file=.coverage ca.coverage eab-ca.coverage broker-ca.coverage mgmt.coverage
+        pdm run coverage run --data-file=chalval_tlsalpn01.coverage -m pytest "tests/challenge_tlsalpn01_test.py"
+        pdm run coverage run --data-file=chalval_http01.coverage -m pytest "tests/challenge_http01_test.py"
+        pdm run coverage combine --data-file=.coverage ca.coverage eab-ca.coverage broker-ca.coverage mgmt.coverage chalval_tlsalpn01.coverage chalval_http01.coverage
         pdm run coverage xml --data-file=.coverage -o coverage.xml
 
     - name: Upload coverage to Codecov
