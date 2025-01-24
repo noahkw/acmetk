@@ -153,18 +153,27 @@ Refer to section `ACME Client`_ for a description of the possible options.
 Challenge Validator Plugins
 ###########################
 
-Every type of ACME server app needs an internal challenge validator.
-There are currently two types of challenge validator, both of which do not require configuration:
-:class:`~acmetk.server.challenge_validator.DummyValidator` and
-:class:`~acmetk.server.challenge_validator.RequestIPDNSChallengeValidator`.
-To use the former, set *challenge_validator* to :code:`'dummy'` in the server app's section in the config file.
-For the latter put :code:`'requestipdns'`.
+Every type of ACME server app needs an internal challenge validators.
+There are currently different types of challenge validators.
+The standard challenge validators which are specified in
+
+* :class:`~acmetk.server.challenge_validator.HTTP01ChallengeValidator` :code:`'http-01'` as defined in `RFC8555 - 8.3. HTTP Challenge <https://datatracker.ietf.org/doc/html/rfc8555#section-8.3>`
+
+* :class:`~acmetk.server.challenge_validator.DNS01ChallengeValidator` :code:`'dns-01'`as defined in `RFC8555 - 8.4. DNS Challenge <https://datatracker.ietf.org/doc/html/rfc8555#section-8.4>`
+
+* :class:`~acmetk.server.challenge_validator.TLSALPN01ChallengeValidator` :code:`'tls-alpn-01'` as defined in `RFC 8737 - 3. TLS with Application-Layer Protocol Negotiation (TLS ALPN) Challenge <https://datatracker.ietf.org/doc/html/rfc8737/#name-tls-with-application-layer->`
+
+as well as non-standard validators
+
+* :class:`~acmetk.server.challenge_validator.DummyValidator` :code:`'dummy'`
+
+* :class:`~acmetk.server.challenge_validator.RequestIPDNSChallengeValidator` :code:`'requestipdns'`
 
 The :class:`~acmetk.server.challenge_validator.DummyValidator` does not do any actual validation and should only
 be used in testing, as it is inherently insecure.
 
 The :class:`~acmetk.server.challenge_validator.RequestIPDNSChallengeValidator` may be used in university or
-corporate environments where the *DNS-01* or *HTTP-01* challenge are difficult to realize.
+corporate environments where the *DNS-01*, *HTTP-01* or *TLS-ALPN-01* challenge are difficult to realize.
 It does not validate any actual ACME challenge, but instead checks whether the DNS identifier that is
 to be authorized resolves to the host's IP address that requested challenge validation via an A or AAAA record.
 To achieve this, the *DNS-01* and *HTTP-01* challenge are repurposed, so that no further client-side configuration is
