@@ -614,8 +614,30 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         except ValueError as e:
             raise acme.messages.Error.with_code("rejectedIdentifier", detail=e.args[0])
 
+    def _directory_data(self, request):
+        directory = {
+            "newAccount": acmetk.util.url_for(request, "new-account"),
+            "newNonce": acmetk.util.url_for(request, "new-nonce"),
+            "newOrder": acmetk.util.url_for(request, "new-order"),
+            "revokeCert": acmetk.util.url_for(request, "revoke-cert"),
+            "keyChange": acmetk.util.url_for(request, "key-change"),
+            "meta": {
+                "profiles": {
+                    "classic": "https://datatracker.ietf.org/doc/draft-aaron-acme-profiles/",
+                    "shortlived": "https://letsencrypt.org/2025/01/16/6-day-and-ip-certs/",
+                }
+            },
+        }
+
+        if self._tos_url:
+            directory["meta"]["termsOfService"] = self._tos_url
+
+        if self._require_eab is not None:
+            directory["meta"]["externalAccountRequired"] = self._require_eab
+        return directory
+
     @routes.get("/directory", name="directory")
-    async def directory(self, request: web.Request):
+    async def directory(self, request: web.Request) -> web.Response:
         """Handler that returns the server's directory.
 
         `7.1.1. Directory <https://tools.ietf.org/html/rfc8555#section-7.1.1>`_
@@ -624,25 +646,11 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
         :return: The directory object.
         """
-        directory = {
-            "newAccount": acmetk.util.url_for(request, "new-account"),
-            "newNonce": acmetk.util.url_for(request, "new-nonce"),
-            "newOrder": acmetk.util.url_for(request, "new-order"),
-            "revokeCert": acmetk.util.url_for(request, "revoke-cert"),
-            "keyChange": acmetk.util.url_for(request, "key-change"),
-            "meta": {},
-        }
-
-        if self._tos_url:
-            directory["meta"]["termsOfService"] = self._tos_url
-
-        if self._require_eab is not None:
-            directory["meta"]["externalAccountRequired"] = self._require_eab
-
+        directory = self._directory_data(request)
         return self._response(request, directory)
 
     @routes.get("/new-nonce", name="new-nonce", allow_head=True)
-    async def new_nonce(self, request: web.Request):
+    async def new_nonce(self, request: web.Request) -> web.Response:
         """Handler that returns a new nonce.
 
         `7.2. Getting a Nonce <https://tools.ietf.org/html/rfc8555#section-7.2>`_
@@ -1418,6 +1426,15 @@ class AcmeRelayBase(AcmeServerBase):
         super().__init__(**kwargs)
         self._client: AcmeClient = client
 
+    async def directory(self, request: web.Request) -> web.Response:
+        directory = self._directory_data(request)
+
+        if self._client._directory.meta.profiles:
+            # profiles is a frozendict, … is not JSON serializeable
+            directory["meta"]["profiles"] = dict(self._client._directory.meta.profiles)
+
+        return self._response(request, directory)
+
     @classmethod
     async def create_app(
         cls, config: dict[str, typing.Any], *, client: AcmeClient, **kwargs
@@ -1635,10 +1652,13 @@ class AcmeProxy(AcmeRelayBase):
                 for identifier in obj.identifiers
             ]
 
-            order_ca = await self._client.order_create(identifiers)
+            location, order_ca = await self._client.order_create(
+                identifiers, return_location=True
+            )
 
-            order = models.Order.from_obj(account, obj, self._supported_challenges)
-            order.proxied_url = order_ca.url
+            order = models.Order.from_obj(
+                account, obj, self._supported_challenges, location
+            )
             session.add(order)
 
             await session.flush()

@@ -117,6 +117,8 @@ class Order(Entity, Serializer):
     csr = Column(CSRType)
     """The :class:`cryptography.x509.CertificateSigningRequest` that was submitted by the client."""
 
+    profile = Column(String, nullable=True)
+
     def url(self, request: aiohttp.web.Request) -> str:
         """Returns the order's URL.
 
@@ -210,6 +212,9 @@ class Order(Entity, Serializer):
         if self.proxied_error:
             d["error"] = self.proxied_error.to_partial_json()
 
+        if self.profile:
+            d["profile"] = self.profile
+
         return d
 
     @classmethod
@@ -218,6 +223,7 @@ class Order(Entity, Serializer):
         account: "acmetk.models.account.Account",
         obj: acme.messages.NewOrder,
         challenge_types: typing.Iterable["acmetk.models.challenge.ChallengeType"],
+        proxied_url: str = None,
     ) -> "Order":
         """A factory that constructs a new :class:`Order` from a message object.
 
@@ -248,6 +254,7 @@ class Order(Entity, Serializer):
             status=OrderStatus.PENDING,
             account=account,
             identifiers=identifiers,
+            proxied_url=proxied_url,
         )
 
         return order
