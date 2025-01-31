@@ -166,6 +166,8 @@ class NewOrder(josepy.JSONObjectWithFields):
         "notAfter", omitempty=True
     )
     """The requested *notAfter* field in the certificate."""
+    profile: str = josepy.Field("profile", omitempty=True)
+    """TODO https://datatracker.ietf.org/doc/draft-aaron-acme-profiles/"""
 
     @classmethod
     def from_data(
@@ -173,6 +175,7 @@ class NewOrder(josepy.JSONObjectWithFields):
         identifiers: typing.Union[list[dict[str, str]], list[str]] = None,
         not_before: "datetime.datetime" = None,
         not_after: "datetime.datetime" = None,
+        profile: str = None,
     ) -> "NewOrder":
         """Class factory that takes care of parsing the list of *identifiers*.
 
@@ -198,6 +201,7 @@ class NewOrder(josepy.JSONObjectWithFields):
 
         kwargs["not_before"] = not_before
         kwargs["not_after"] = not_after
+        kwargs["profile"] = profile
 
         return cls(**kwargs)
 
@@ -221,16 +225,7 @@ class Account(josepy.JSONObjectWithFields):
 
 
 class Order(acme.messages.Order):
-    """Patched :class:`acme.messages.Order` message type that adds a *URL* field.
-
-    The *URL* field is populated by copying the *Location* header from responses in the
-    :class:`~acmetk.client.AcmeClient`.
-    This field is used by the :class:`~acmetk.server.AcmeProxy` to store the *proxied* URL and to be able
-    to map an internal order to that of the remote CA.
-    """
-
-    url: str = josepy.Field("url", omitempty=True)
-    """The order's URL at the remote CA."""
+    pass
 
 
 class KeyChange(josepy.JSONObjectWithFields):
@@ -255,3 +250,13 @@ class SignedKeyChange(josepy.JSONObjectWithFields):
         payload = josepy.b64.b64encode(data.payload).decode()
         protected = josepy.b64.b64encode(data.signature.protected.encode()).decode()
         return cls(protected=protected, payload=payload, signature=signature)
+
+
+class Directory(acme.messages.Directory):
+    class Meta(acme.messages.Directory.Meta):
+        profiles: dict[str, str] = josepy.Field("profiles", omitempty=True)
+        """
+        Automated Certificate Management Environment (ACME) Profiles Extension
+
+        https://datatracker.ietf.org/doc/draft-aaron-acme-profiles/
+        """

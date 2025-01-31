@@ -106,7 +106,7 @@ class AcmeClient:
         # Filter empty strings
         self._contact = {k: v for k, v in contact.items() if len(v) > 0}
 
-        self._directory = dict()
+        self._directory: acme.messages.Directory = None
         self._nonces = set()
         self._account = None
 
@@ -182,7 +182,8 @@ class AcmeClient:
         async with self._session.get(
             self._directory_url, ssl=self._ssl_context
         ) as resp:
-            self._directory = await resp.json()
+            data = await resp.json()
+            self._directory = messages.Directory.from_json(data)
 
         if not self._challenge_solvers.keys():
             logger.warning(
@@ -288,22 +289,42 @@ class AcmeClient:
         self._account = messages.Account.from_json(account_obj)
 
     async def order_create(
-        self, identifiers: typing.Union[list[dict], list[str]]
-    ) -> messages.Order:
+        self,
+        identifiers: typing.Union[list[dict], list[str]],
+        profile: typing.Union[str, None] = None,
+        return_location=False,
+    ) -> typing.Union[messages.Order, tuple[str, messages.Order]]:
         """Creates a new order with the given identifiers.
 
         :param identifiers: :class:`list` of identifiers that the order should contain. May either be a list of
             fully qualified domain names or a list of :class:`dict` containing the *type* and *name* (both
             :class:`str`) of each identifier.
+        :param profile:
+        :param return_location:
         :raises: :class:`acme.messages.Error` If the server is unwilling to create an order with the requested
             identifiers.
-        :returns: The new order.
+        :returns: The location, The new order.
         """
-        order = messages.NewOrder.from_data(identifiers=identifiers)
+
+        profiles = self._directory.meta.get("profiles", dict())
+        if profile is not None:
+            if not profiles:
+                raise ValueError(
+                    "Profiles are not supported {}".format(", ".join(profiles.keys()))
+                )
+            if profile not in profiles:
+                raise ValueError(
+                    "Profile must be one of {}".format(", ".join(profiles.keys()))
+                )
+
+        order = messages.NewOrder.from_data(identifiers=identifiers, profile=profile)
 
         resp, order_obj = await self._signed_request(order, self._directory["newOrder"])
-        order_obj["url"] = resp.headers["Location"]
-        return messages.Order.from_json(order_obj)
+
+        ret = messages.Order.from_json(order_obj)
+        if return_location:
+            return resp.headers["Location"], ret
+        return ret
 
     async def order_finalize(
         self, order: messages.Order, csr: "cryptography.x509.CertificateSigningRequest"

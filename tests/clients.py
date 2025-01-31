@@ -4,6 +4,7 @@ import logging.config
 import shlex
 import re
 from pathlib import Path
+import typing
 
 import cryptography.hazmat.primitives.serialization
 import pytest
@@ -87,7 +88,7 @@ class TestClient:
     async def _register(self):
         raise NotImplementedError()
 
-    async def order(self, csr):
+    async def order(self, csr, profile: typing.Union[str, None] = None):
         try:
             self.service.ca._match_keysize(csr.public_key(), "csr")
         except ValueError:
@@ -96,10 +97,10 @@ class TestClient:
             assertBadKey(e, "csr", csr.public_key())
             return False
 
-        await self._order(csr)
+        await self._order(csr, profile)
         return True
 
-    async def _order(self, csr):
+    async def _order(self, csr, profile: typing.Union[str, None] = None):
         raise NotImplementedError()
 
 
@@ -290,10 +291,10 @@ class acmetkClient(TestClient):
         await self.client.start()
         return True
 
-    async def _order(self, csr):
+    async def _order(self, csr, profile: typing.Union[str, None] = None):
         domains = self.domains_of_csr(csr)
         identifiers = self.identifiers_from_names(domains)
-        ord_ = await self.client.order_create(identifiers)
+        ord_ = await self.client.order_create(identifiers, profile=profile)
         await self.client.authorizations_complete(ord_)
         await self.client.order_finalize(ord_, csr)
         return True
