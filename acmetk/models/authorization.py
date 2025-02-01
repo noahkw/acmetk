@@ -13,6 +13,7 @@ from ..util import url_for
 
 if typing.TYPE_CHECKING:
     import acmetk.models.messages
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class AuthorizationStatus(str, enum.Enum):
@@ -81,7 +82,7 @@ class Authorization(Entity, Serializer):
         """
         return url_for(request, "authz", id=str(self.authorization_id))
 
-    async def validate(self, session) -> AuthorizationStatus:
+    async def validate(self, session: "AsyncSession") -> AuthorizationStatus:
         """Validates the authorization.
 
         This method is usually not called directly. Rather, :func:`acmetk.models.challenge.Challenge.validate`
@@ -90,6 +91,7 @@ class Authorization(Entity, Serializer):
         :param session: The open database session.
         :return: The authorization's status after validation.
         """
+
         if self.is_expired():
             self.status = AuthorizationStatus.EXPIRED
             return self.status

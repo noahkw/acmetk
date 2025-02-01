@@ -25,11 +25,25 @@ class IdentifierType(str, enum.Enum):
     https://www.rfc-editor.org/rfc/rfc8555.html#section-9.7.7
     """
 
+    EMAIL = "email"
+    """
+    RFC 8823 - Extensions to Automatic Certificate Management Environment for End-User S/MIME Certificates
+
+    https://www.rfc-editor.org/rfc/rfc8823.html
+    """
+
     IP = "ip"
     """
     RFC 8738 - Automated Certificate Management Environment (ACME) IP Identifier Validation Extension
 
     https://www.rfc-editor.org/rfc/rfc8738.html
+    """
+
+    TNAUTHLIST = "TNAuthList"
+    """
+    RFC 9448 - TNAuthList Profile of Automated Certificate Management Environment (ACME) Authority Token
+
+    https://www.rfc-editor.org/rfc/rfc9448.html
     """
 
 
