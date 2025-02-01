@@ -116,9 +116,7 @@ async def test_ourclient_http01(tmp_path_factory, unused_tcp_port_factory, http0
     await client.register()
     cert_key = client._make_key(client.tmpdir / "cert_key.pem", ("RSA", 4096))
     names = ["localhost"]
-    csr = acmetk.util.generate_csr(
-        names[0], cert_key, client.tmpdir / "csr.pem", names=names
-    )
+    csr = acmetk.util.generate_csr(names[0], cert_key, client.tmpdir / "csr.pem", names)
 
     await client.order(csr)
 

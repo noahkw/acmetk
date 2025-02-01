@@ -13,11 +13,24 @@ class IdentifierType(str, enum.Enum):
 
     `9.7.7. Identifier Types <https://tools.ietf.org/html/rfc8555#section-9.7.7>`_
 
+    https://www.iana.org/assignments/acme/acme.xhtml#acme-identifier-types
+
     Subclassing :class:`str` simplifies json serialization using :func:`json.dumps`.
     """
 
     DNS = "dns"
-    """The ACME *DNS* identifier type."""
+    """
+    RFC 8555 - Automatic Certificate Management Environment (ACME)
+
+    https://www.rfc-editor.org/rfc/rfc8555.html#section-9.7.7
+    """
+
+    IP = "ip"
+    """
+    RFC 8738 - Automated Certificate Management Environment (ACME) IP Identifier Validation Extension
+
+    https://www.rfc-editor.org/rfc/rfc8738.html
+    """
 
 
 class Identifier(Entity, Serializer):

@@ -240,7 +240,7 @@ class Order(Entity, Serializer):
         for identifier in identifiers:
             identifier.authorization = Authorization.for_identifier(identifier)
             identifier.authorization.challenges = Challenge.create_types(
-                challenge_types
+                identifier.type, challenge_types
             )
 
         order = Order(
