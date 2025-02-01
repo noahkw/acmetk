@@ -602,6 +602,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             "newOrder": acmetk.util.url_for(request, "new-order"),
             "revokeCert": acmetk.util.url_for(request, "revoke-cert"),
             "keyChange": acmetk.util.url_for(request, "key-change"),
+            "renewalInfo": acmetk.util.url_for(request, "renewal-info", aci="")[:-1],
             "meta": {
                 "profiles": {
                     "classic": "https://datatracker.ietf.org/doc/draft-aaron-acme-profiles/",
@@ -776,8 +777,67 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         """
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
-            obj = acme.messages.NewOrder.json_loads(jws.payload)
+            obj = messages.NewOrder.json_loads(jws.payload)
             self._verify_order(obj)
+            if obj.replaces:
+                repl: models.Certificate
+                import sqlalchemy
+
+                q = (
+                    sqlalchemy.select(models.Certificate)
+                    .options(
+                        sqlalchemy.orm.joinedload(models.Certificate.order).options(
+                            sqlalchemy.orm.joinedload(models.Order.account),
+                            sqlalchemy.orm.joinedload(models.Order.identifiers),
+                        ),
+                        sqlalchemy.orm.joinedload(models.Certificate.replaced_by),
+                    )
+                    .filter(models.Certificate.certid == obj.replaces)
+                )
+                (repl,) = (await session.execute(q)).first()
+                if repl is None:
+                    raise acme.messages.Error.with_code(
+                        "serverInternal",
+                        detail="could not find an order for the given certificate",
+                    )
+
+                if repl.account_of.account_id != account.account_id:
+                    """the identified certificate and the New Order request correspond to the same ACME Account,"""
+                    raise acme.messages.Error.with_code(
+                        "unauthorized",
+                        detail="requester account did not request the certificate being replaced by this order",
+                    )
+
+                if not (
+                    {(i.type.value, i.value) for i in repl.order.identifiers}
+                    & {(i.typ.name, i.value) for i in obj.identifiers}
+                ):
+                    """that they share at least one identifier,"""
+                    raise acme.messages.Error.with_code(
+                        "serverInternal",
+                        detail="at least one identifier in the new order and existing order must match",
+                    )
+
+                if repl.replaced_by and any(
+                    i.status != models.OrderStatus.INVALID for i in repl.replaced_by
+                ):
+                    """
+                    and that the identified certificate has not already been marked as replaced by
+                    a different Order that is not "invalid".
+                    """
+                    raise acme.messages.Error(
+                        typ=f"{acme.messages.ERROR_PREFIX}alreadyReplaced",
+                        detail=(
+                            "The request specified a predecessor certificate which has already been"
+                            "marked as replaced."
+                        ),
+                    )
+
+                # Can't attach instance <Account at 0x…>;
+                # another instance with key (<class 'acmetk.models.base.Entity'>, (…,), None)
+                # is already present in this session.
+                session.expunge_all()
+
             order = models.Order.from_obj(account, obj, self._supported_challenges)
             session.add(order)
 
@@ -1148,6 +1208,41 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                 headers={"Location": acmetk.util.url_for(request, "accounts", account_id=str(account.account_id))},
             )
 
+    @routes.get("/renewal-info/{aci}", name="renewal-info")
+    async def renewal_info(self, request: web.Request) -> web.Response:
+        """
+        4.1. The "renewalInfo" Resource
+
+        https://www.ietf.org/archive/id/draft-ietf-acme-ari-07.html#name-the-renewalinfo-resource
+        """
+        aci = acmetk.util.CertID.from_identifier(request.match_info["aci"])
+        import datetime
+        import cryptography.x509
+
+        async with self._session(request) as session:
+            from sqlalchemy import select
+            from ..models.certificate import Certificate
+
+            q = select(Certificate).filter(Certificate.certid == aci.identifier)
+            (c,) = (await session.execute(q)).first()
+            if c is None:
+                raise ValueError("Not found")
+            cert: cryptography.x509.Certificate = c.cert
+
+        tw = cert.not_valid_after_utc - cert.not_valid_before_utc
+        now = datetime.datetime.now(datetime.timezone.utc)
+        start = cert.not_valid_before_utc + (tw / 3)
+        end = cert.not_valid_before_utc + (tw / 3) * 2
+
+        r = messages.RenewalInfo(
+            suggestedWindow=messages.RenewalInfo.TimeWindow(start=start, end=end)
+        )
+        rtrya: datetime.timedelta = start - now
+
+        return self._response(
+            request, r.to_json(), headers={"Retry-After": str(rtrya.seconds)}
+        )
+
     @abc.abstractmethod
     async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str) -> web.Response:
         """Method that handles the actual finalization of an order.
@@ -1253,6 +1348,9 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                 status=messages.get_status(error.code),
                 content_type="application/problem+json",
             )
+        except Exception as unexpected_error:
+            logger.exception(unexpected_error)
+            return None
         else:
             return response
 
@@ -1304,8 +1402,14 @@ class AcmeCA(AcmeServerBase):
         async with self._session(request) as session:
             order = await self._db.get_order(session, account_id, order_id)
 
-            cert = acmetk.util.generate_cert_from_csr(order.csr, self._cert, self._private_key)
-            order.certificate = models.Certificate(status=models.CertificateStatus.VALID, cert=cert)
+            cert = acmetk.util.generate_cert_from_csr(
+                order.csr, self._cert, self._private_key
+            )
+            order.certificate = models.Certificate(
+                status=models.CertificateStatus.VALID,
+                cert=cert,
+                certid=acmetk.util.CertID.from_cert(cert).identifier,
+            )
 
             order.status = models.OrderStatus.VALID
             await session.commit()
@@ -1346,6 +1450,15 @@ class AcmeRelayBase(AcmeServerBase):
     def __init__(self, cfg: Config, client: AcmeClient):
         super().__init__(cfg)
         self._client: AcmeClient = client
+
+    async def directory(self, request: web.Request) -> web.Response:
+        directory = self._directory_data(request)
+
+        if self._client._directory.meta.profiles:
+            # profiles is a frozendict, … is not JSON serializeable
+            directory["meta"]["profiles"] = dict(self._client._directory.meta.profiles)
+
+        return self._response(request, directory)
 
     @classmethod
     async def create_app(cls, config: Config, client: AcmeClient) -> "AcmeRelayBase":
@@ -1449,6 +1562,7 @@ class AcmeRelayBase(AcmeServerBase):
                 status=models.CertificateStatus.VALID,
                 cert=certs[0],
                 full_chain=full_chain,
+                certid=acmetk.util.CertID.from_cert(certs[0]).identifier,
             )
 
             order.status = models.OrderStatus.VALID
@@ -1535,11 +1649,16 @@ class AcmeProxy(AcmeRelayBase):
         """
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
-            obj = acme.messages.NewOrder.json_loads(jws.payload)
+            obj = messages.NewOrder.json_loads(jws.payload)
             self._verify_order(obj, wildcardonly=True)
             identifiers = [{"type": identifier.typ, "value": identifier.value} for identifier in obj.identifiers]
 
-            location, order_ca = await self._client.order_create(identifiers, return_location=True)
+            location, order_ca = await self._client.order_create(
+                identifiers,
+                replaces=obj.replaces,
+                profile=obj.profile,
+                return_location=True,
+            )
 
             order = models.Order.from_obj(account, obj, self._supported_challenges, location)
             session.add(order)

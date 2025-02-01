@@ -87,7 +87,12 @@ class TestClient:
     async def _register(self):
         raise NotImplementedError()
 
-    async def order(self, csr, profile: str | None = None):
+    async def order(
+        self,
+        csr,
+        profile: typing.Union[str, None] = None,
+        replaces: typing.Union[str, None] = None,
+    ):
         try:
             self.service.ca._match_keysize(csr.public_key(), "csr")
         except ValueError:
@@ -96,10 +101,15 @@ class TestClient:
             assertBadKey(e, "csr", csr.public_key())
             return False
 
-        await self._order(csr, profile)
-        return True
+        r = await self._order(csr, profile, replaces)
+        return r
 
-    async def _order(self, csr, profile: str | None = None):
+    async def _order(
+        self,
+        csr,
+        profile: typing.Union[str, None] = None,
+        replaces: typing.Union[str, None] = None,
+    ):
         raise NotImplementedError()
 
 
@@ -281,13 +291,24 @@ class acmetkClient(TestClient):
         await self.client.start()
         return True
 
-    async def _order(self, csr, profile: str | None = None):
+    async def _order(
+        self,
+        csr,
+        profile: typing.Union[str, None] = None,
+        replaces: typing.Union[str, None] = None,
+    ):
         domains = self.domains_of_csr(csr)
         identifiers = self.identifiers_from_names(domains)
-        ord_ = await self.client.order_create(identifiers, profile=profile)
+        ord_ = await self.client.order_create(
+            identifiers, profile=profile, replaces=replaces
+        )
         await self.client.authorizations_complete(ord_)
-        await self.client.order_finalize(ord_, csr)
-        return True
+        ord_ = await self.client.order_finalize(ord_, csr)
+        r = await self.client.certificate_get(ord_)
+        return cryptography.x509.load_pem_x509_certificate(r.encode())
+
+    async def ari(self, aci: str):
+        return await self.client.renewalinfo_get(aci)
 
 
 class acmezClient(TestClient):

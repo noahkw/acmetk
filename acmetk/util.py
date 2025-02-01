@@ -246,6 +246,10 @@ def generate_cert_from_csr(
             x509.SubjectAlternativeName([x509.DNSName(i) for i in names]),
             critical=False,
         )
+        .add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(root_key.public_key()),
+            critical=False,
+        )
         .sign(root_key, hashes.SHA256())
     )
 
@@ -322,6 +326,55 @@ class base64url:
     def decode(data: bytes) -> bytes:
         pad = b"=" * (4 - (len(data) % 4))
         return base64.urlsafe_b64decode(data + pad)
+
+
+class CertID:
+    """ARI Certificate Identifier
+
+    Make draft-ietf-acme-ari identifier of a certificate
+
+    base64url(cert.AuthorityKeyIdentifier)|| '.' || base64url(cert.serial)
+
+    """
+
+    def __init__(self, akid: bytes, serial: int):
+        self.akid: bytes = akid
+        self.serial: int = serial
+
+    @classmethod
+    def from_cert(cls, cert: x509.Certificate) -> "CertID":
+        try:
+            ext = cert.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier)
+            if (aki := ext.value.key_identifier) is None:
+                raise ValueError("No AuthorityKeyIdentifier info")
+            return cls(aki, cert.serial_number)
+        except Exception as e:
+            raise ValueError("unable to create ARI") from e
+
+    @classmethod
+    def from_identifier(cls, aci: str) -> "CertID":
+        return cls(*cls._identifier_to_parts(aci))
+
+    @property
+    def identifier(self) -> str:
+        return self._identifier_from_parts(self.akid, self.serial)
+
+    @staticmethod
+    def _identifier_from_parts(akid: bytes, serial: int) -> str:
+        p1 = base64url.encode(akid).decode("ascii")
+
+        p2 = base64url.encode(
+            # we need one more byte when aligend due to sign padding
+            serial.to_bytes((serial.bit_length() + 8) // 8, "big")
+        ).decode("ascii")
+        return f"{p1}.{p2}"
+
+    @staticmethod
+    def _identifier_to_parts(certid: str) -> tuple[bytes, int]:
+        parts = certid.partition(".")
+        aki = base64url.decode(parts[0].encode("ascii"))
+        serial = base64url.decode(parts[2].encode("ascii"))
+        return aki, int.from_bytes(serial, byteorder="big")
 
 
 def pem_split(

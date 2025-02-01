@@ -272,6 +272,7 @@ class AcmeClient:
         self,
         identifiers: list[dict] | list[str],
         profile: str | None = None,
+        replaces: typing.Union[str, None] = None,
         return_location=False,
     ) -> messages.Order | tuple[str, messages.Order]:
         """Creates a new order with the given identifiers.
@@ -280,6 +281,7 @@ class AcmeClient:
             fully qualified domain names or a list of :class:`dict` containing the *type* and *name* (both
             :class:`str`) of each identifier.
         :param profile:
+        :param replaces:
         :param return_location:
         :raises: :class:`acme.messages.Error` If the server is unwilling to create an order with the requested
             identifiers.
@@ -293,7 +295,13 @@ class AcmeClient:
             if profile not in profiles:
                 raise ValueError("Profile must be one of {}".format(", ".join(profiles.keys())))
 
-        order = messages.NewOrder.from_data(identifiers=identifiers, profile=profile)
+        if self._directory["renewalInfo"] is None and replaces is not None:
+            logger.warning("Order with renewalInfo - not supported")
+            replaces = None
+
+        order = messages.CreateOrder.from_data(
+            identifiers=identifiers, replaces=replaces, profile=profile
+        )
 
         resp, order_obj = await self._signed_request(order, self._directory["newOrder"])
 
@@ -572,6 +580,12 @@ class AcmeClient:
         #        self._account = messages.Account.from_json(data)
         self._private_key = key
         self._alg = alg
+
+    async def renewalinfo_get(self, aci: str) -> tuple[messages.RenewalInfo, int]:
+        url = f'{self._directory["renewalInfo"]}/{aci}'
+        r = await self._session.get(url)
+        data = await r.read()
+        return messages.RenewalInfo.json_loads(data), int(r.headers.get("Retry-After"))
 
     def register_challenge_solver(
         self,

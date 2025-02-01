@@ -3,7 +3,6 @@ import typing
 import uuid
 from datetime import datetime, timezone, timedelta
 
-import acme.messages
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from sqlalchemy import (
@@ -32,6 +31,7 @@ if typing.TYPE_CHECKING:
     import acmetk
     import cryptography
     from .account import Account
+    from acmetk.models import messages
 
 
 class CSRType(TypeDecorator):
@@ -96,7 +96,7 @@ class Order(Entity, Serializer):
     """The requested *notBefore* field in the certificate."""
     notAfter = Column(DateTime(timezone=True))
     """The requested *notAfter* field in the certificate."""
-    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.account_id"), nullable=False)
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.account_id"), nullable=False, index=True)
     account = relationship("Account", back_populates="orders", lazy="noload", foreign_keys=account_id)
     """The :class:`~acmetk.models.account.Account` that created the order."""
     certificate = relationship(
@@ -112,6 +112,20 @@ class Order(Entity, Serializer):
     """The :class:`cryptography.x509.CertificateSigningRequest` that was submitted by the client."""
 
     profile = Column(String, nullable=True)
+
+    replaces = Column(
+        String, ForeignKey("certificates.certid"), nullable=True, index=True
+    )
+
+    replaced_obj = relationship(
+        "Certificate",
+        cascade="none",
+        lazy="noload",
+        uselist=False,
+        back_populates="replaced_by",
+        single_parent=True,
+        foreign_keys=replaces,
+    )
 
     def url(self, request: aiohttp.web.Request) -> str:
         """Returns the order's URL.
@@ -212,7 +226,7 @@ class Order(Entity, Serializer):
     def from_obj(
         cls,
         account: "acmetk.models.account.Account",
-        obj: acme.messages.NewOrder,
+        obj: "messages.NewOrder",
         challenge_types: typing.Iterable["acmetk.models.challenge.ChallengeType"],
         proxied_url: str = None,
     ) -> "Order":
@@ -242,6 +256,7 @@ class Order(Entity, Serializer):
             account=account,
             identifiers=identifiers,
             proxied_url=proxied_url,
+            replaces=obj.replaces,
         )
 
         return order
