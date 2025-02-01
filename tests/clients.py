@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 import logging.config
 import shlex
 import re
@@ -48,12 +49,22 @@ class TestClient:
             (self.tmpdir / "account-key.pem").read_bytes(), password=None
         )
 
-    def domains_of_csr(self, csr):
+    def domains_of_csr(self, csr) -> list[str]:
         domains = sorted(
             map(lambda x: x.lower(), acmetk.util.names_of(csr)),
             key=lambda s: s[::-1],
         )
         return domains
+
+    def identifiers_from_names(self, names):
+        identifiers = list()
+        for name in names:
+            try:
+                ipaddress.ip_address(name)
+                identifiers.append({"type": "ip", "value": name})
+            except ValueError:
+                identifiers.append({"type": "dns", "value": name})
+        return identifiers
 
     def _make_key(self, path, alg_and_bits):
         if alg_and_bits[0] == "RSA":
@@ -281,7 +292,8 @@ class acmetkClient(TestClient):
 
     async def _order(self, csr):
         domains = self.domains_of_csr(csr)
-        ord_ = await self.client.order_create(domains)
+        identifiers = self.identifiers_from_names(domains)
+        ord_ = await self.client.order_create(identifiers)
         await self.client.authorizations_complete(ord_)
         await self.client.order_finalize(ord_, csr)
         return True

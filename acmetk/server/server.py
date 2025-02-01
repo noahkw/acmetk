@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import collections
 import cProfile
 import functools
 import ipaddress
@@ -530,65 +531,85 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             * :class:`acme.messages.Error` If the Order has invalid identifiers.
         """
 
+        identifiers_: dict[str, list[acme.messages.Identifier]] = (
+            collections.defaultdict(list)
+        )
+        for i in obj.identifiers:
+            identifiers_[i.typ.name].append(i)
+
         try:
-            # wildcard
-            if self._allow_wildcard is False and True in set(
-                map(
-                    lambda identifier: identifier.value.startswith("*"),
-                    obj.identifiers,
-                )
-            ):
-                raise ValueError("The ACME server can not issue a wildcard certificate")
-            if wildcardonly:
-                return
+            for k, identifiers in identifiers_.items():
+                if k == models.IdentifierType.DNS:
+                    # wildcard
+                    if self._allow_wildcard is False and True in set(
+                        map(
+                            lambda identifier: identifier.value.startswith("*"),
+                            identifiers,
+                        )
+                    ):
+                        raise ValueError(
+                            "The ACME server can not issue a wildcard certificate"
+                        )
+                    if wildcardonly:
+                        return
 
-            # idna decoding xn-- …
-            try:
-                list(
-                    map(
-                        lambda identifier: identifier.value.encode("ascii").decode(
-                            "idna"
-                        ),
-                        obj.identifiers,
+                    # idna decoding xn-- …
+                    try:
+                        list(
+                            map(
+                                lambda identifier: identifier.value.encode(
+                                    "ascii"
+                                ).decode("idna"),
+                                identifiers,
+                            )
+                        )
+                    except UnicodeError:
+                        raise ValueError("Domain name contains malformed punycode")
+
+                    # not lowercase
+                    r = set(
+                        map(
+                            lambda identifier: identifier.value.lower()
+                            == identifier.value,
+                            identifiers,
+                        )
                     )
-                )
-            except UnicodeError:
-                raise ValueError("Domain name contains malformed punycode")
+                    if False in r:
+                        raise ValueError("Domain name is not lowercase")
 
-            # not lowercase
-            r = set(
-                map(
-                    lambda identifier: identifier.value.lower() == identifier.value,
-                    obj.identifiers,
-                )
-            )
-            if False in r:
-                raise ValueError("Domain name is not lowercase")
-
-            # regex
-            r = set(
-                map(
-                    lambda identifier: self.VALID_DOMAIN_RE.match(
-                        identifier.value.lstrip("*.")
+                    # regex
+                    r = set(
+                        map(
+                            lambda identifier: self.VALID_DOMAIN_RE.match(
+                                identifier.value.lstrip("*.")
+                            )
+                            is not None,
+                            identifiers,
+                        )
                     )
-                    is not None,
-                    obj.identifiers,
-                )
-            )
-            if False in r:
-                raise ValueError("Domain name contains an invalid character")
+                    if False in r:
+                        raise ValueError("Domain name contains an invalid character")
 
-            # ends with a letter
-            r = set(
-                map(
-                    lambda identifier: identifier.value[-1] in string.ascii_lowercase,
-                    obj.identifiers,
-                )
-            )
-            if False in r:
-                raise ValueError(
-                    "Domain name does not end with a valid public suffix (TLD)"
-                )
+                    # ends with a letter
+                    r = set(
+                        map(
+                            lambda identifier: identifier.value[-1]
+                            in string.ascii_lowercase,
+                            identifiers,
+                        )
+                    )
+                    if False in r:
+                        raise ValueError(
+                            "Domain name does not end with a valid public suffix (TLD)"
+                        )
+                elif k == "ip":
+                    try:
+                        [ipaddress.ip_address(i.value) for i in identifiers]
+                    except TypeError:
+                        raise ValueError(i.value)
+
+                else:
+                    raise ValueError(f"unknown identifier type {k}")
 
         except ValueError as e:
             raise acme.messages.Error.with_code("rejectedIdentifier", detail=e.args[0])

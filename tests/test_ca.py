@@ -78,7 +78,7 @@ class TestAcme:
             self.names[0],
             client_cert_key,
             csr_path,
-            names=self.names,
+            self.names,
         )
 
         self.client_data = ClientData(client_account_key_path, csr, csr_path)
@@ -649,7 +649,7 @@ class TestOurClientStress(TestOurClient):
                     f"{self.name.lower()}.stress.test.de",
                     client_cert_key,
                     self.path / f"client_{i}.csr",
-                    names=[
+                    [
                         f"{self.name.lower()}.stress{i}.test.de",
                         f"{self.name.lower()}2.stress{i}.test.de",
                     ],

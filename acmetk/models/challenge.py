@@ -11,8 +11,12 @@ from sqlalchemy.orm import relationship
 
 import acmetk.server.challenge_validator
 from .base import Serializer, Entity, AcmeErrorType
+from .identifier import IdentifierType
 from ..util import url_for, base64url
 
+if typing.TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+    from aiohttp.web import Request
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +44,21 @@ class ChallengeType(str, enum.Enum):
     TLS_ALPN_01 = "tls-alpn-01"
     """The ACME *tls-alpn-01* challenge type.
     See `RFC 8737 <https://tools.ietf.org/html/rfc8737>`_"""
+
+
+ChallengeValidationMethod: dict["IdentifierType", frozenset[ChallengeType]] = {
+    IdentifierType.DNS: frozenset(
+        [
+            ChallengeType.HTTP_01,
+            ChallengeType.DNS_01,
+            ChallengeType.TLS_ALPN_01,
+        ]
+    ),
+    IdentifierType.IP: frozenset([ChallengeType.HTTP_01, ChallengeType.TLS_ALPN_01]),
+}
+"""
+https://www.iana.org/assignments/acme/acme.xhtml#acme-validation-methods
+"""
 
 
 class Challenge(Entity, Serializer):
@@ -100,18 +119,28 @@ class Challenge(Entity, Serializer):
         return d
 
     @classmethod
-    def create_types(cls, types: typing.Iterable[ChallengeType]) -> list["Challenge"]:
+    def create_types(
+        cls,
+        identifiertype: "IdentifierType",
+        supported_types: typing.Iterable[ChallengeType],
+    ) -> list["Challenge"]:
         """Returns new pending challenges of the given types.
 
-        :param types: The types of challenges to be created.
+        :param identifiertype: the type of the identifier
+        :param supported_types: The types of challenges to be created.
         :return: The created challenges.
         """
-        return [cls(type=type_, status=ChallengeStatus.PENDING) for type_ in types]
+
+        return [
+            cls(type=type_, status=ChallengeStatus.PENDING)
+            for type_ in set(supported_types)
+            & ChallengeValidationMethod[identifiertype]
+        ]
 
     async def validate(
         self,
-        session,
-        request,
+        session: "AsyncSession",
+        request: "Request",
         validator: "acmetk.server.challenge_validator.ChallengeValidator",
     ) -> ChallengeStatus:
         """Validates the challenge with the given validator.
@@ -120,6 +149,7 @@ class Challenge(Entity, Serializer):
         method and finally returns the new status after validation.
 
         :param session: The open database session.
+        :param request:
         :param validator: The challenge validator to perform the validation with.
         :return: The challenge's status after validation.
         """

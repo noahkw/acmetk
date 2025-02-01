@@ -3,6 +3,7 @@ import base64
 import cProfile
 import contextlib
 import inspect
+import ipaddress
 import logging
 import re
 import typing
@@ -104,7 +105,7 @@ class DNS01ChallengeHelper:
             await asyncio.sleep(1.0)
 
 
-def generate_csr(CN: str, private_key: rsa.RSAPrivateKey, path: Path, names: list[str]):
+def generate_csr(CN: str, private_key: rsa.RSAPrivateKey, path: Path, sans: list[str]):
     """Generates a certificate signing request.
 
     :param CN: The requested common name.
@@ -113,11 +114,22 @@ def generate_csr(CN: str, private_key: rsa.RSAPrivateKey, path: Path, names: lis
     :param names: The requested names in the CSR.
     :return: The generated CSR.
     """
+    addresses = list()
+    names = list()
+    for i in sans:
+        try:
+            addresses.append(ipaddress.ip_address(i))
+        except ValueError:
+            names.append(i)
+
     csr = (
         x509.CertificateSigningRequestBuilder()
         .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, CN)]))
         .add_extension(
-            x509.SubjectAlternativeName([x509.DNSName(name) for name in names]),
+            x509.SubjectAlternativeName(
+                [x509.DNSName(name) for name in names]
+                + [x509.IPAddress(addr) for addr in addresses]
+            ),
             critical=False,
         )
         .sign(private_key, hashes.SHA256())
