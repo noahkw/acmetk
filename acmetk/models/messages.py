@@ -145,7 +145,12 @@ class AccountUpdate(JSONDeSerializableAllowEmpty, acme.messages.Registration):
     """The account's new status."""
 
 
-class NewOrder(josepy.JSONObjectWithFields):
+class NewOrder(acme.messages.NewOrder):
+    profile: str = josepy.Field("profile", omitempty=True)
+    replaces: str = josepy.field("replaces", omitempty=True)
+
+
+class CreateOrder(josepy.JSONObjectWithFields):
     """Message type for new order requests."""
 
     identifiers: list[dict[str, str]] = josepy.Field("identifiers", omitempty=True)
@@ -157,20 +162,35 @@ class NewOrder(josepy.JSONObjectWithFields):
     profile: str = josepy.Field("profile", omitempty=True)
     """TODO https://datatracker.ietf.org/doc/draft-aaron-acme-profiles/"""
 
+    """
+    6.2. ACME Order Object Fields
+
+    https://www.ietf.org/archive/id/draft-aaron-acme-profiles-00.html#name-acme-order-object-fields
+    """
+
+    replaces: str = josepy.field("replaces", omitempty=True)
+    """
+    RFC-ARI -  5. Extensions to the Order Object
+    https://www.ietf.org/archive/id/draft-ietf-acme-ari-07.html#name-extensions-to-the-order-obj
+    """
+
     @classmethod
     def from_data(
         cls,
         identifiers: list[dict[str, str]] | list[str] = None,
         not_before: "datetime.datetime" = None,
         not_after: "datetime.datetime" = None,
+        replaces: str = None,
         profile: str = None,
-    ) -> "NewOrder":
+    ) -> "CreateOrder":
         """Class factory that takes care of parsing the list of *identifiers*.
 
         :param identifiers: Either a :class:`list` of :class:`dict` where each dict consists of the keys *type* \
             and *value*, or a :class:`list` of :class:`str` that represent the DNS names.
         :param not_before: The requested *notBefore* field in the certificate.
         :param not_after: The requested *notAfter* field in the certificate.
+        :param replaces:
+        :param profile:
         :return: The new order object.
         """
         kwargs = {}
@@ -188,6 +208,7 @@ class NewOrder(josepy.JSONObjectWithFields):
         kwargs["not_before"] = not_before
         kwargs["not_after"] = not_after
         kwargs["profile"] = profile
+        kwargs["replaces"] = replaces
 
         return cls(**kwargs)
 
@@ -242,6 +263,20 @@ class Directory(acme.messages.Directory):
 
         https://datatracker.ietf.org/doc/draft-aaron-acme-profiles/
         """
+
+
+class RenewalInfo(josepy.JSONObjectWithFields):
+    """
+    4.2. RenewalInfo Objects
+    https://www.ietf.org/archive/id/draft-ietf-acme-ari-07.html#name-renewalinfo-objects
+    """
+
+    class TimeWindow(josepy.JSONObjectWithFields):
+        start: "datetime.datetime" = acme.messages.fields.RFC3339Field("start")
+        end: "datetime.datetime" = acme.messages.fields.RFC3339Field("end")
+
+    suggestedWindow: TimeWindow = josepy.Field("suggestedWindow")
+    explanationURL: str = josepy.Field("explanationURL", omitempty=True)
 
 
 try:

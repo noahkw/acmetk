@@ -1,4 +1,5 @@
 import enum
+import typing
 import uuid
 
 import cryptography
@@ -11,6 +12,7 @@ from sqlalchemy import (
     Integer,
     Text,
     CheckConstraint,
+    String,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
@@ -28,24 +30,26 @@ class x509Certificate(TypeDecorator):
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(self.impl)
 
-    def process_bind_param(self, value, dialect):
+    def process_bind_param(
+        self, value: typing.Union[cryptography.x509.Certificate, None], dialect
+    ) -> bytes:
         if value is None:
             return value
         return self._adapt(value)
 
-    def process_result_value(self, value, dialect):
+    def process_result_value(self, value: typing.Union[bytes, None], dialect):
         if value is None:
             return value
         return self._convert(value)
 
     @staticmethod
-    def _adapt(cert):
+    def _adapt(cert: cryptography.x509.Certificate) -> bytes:
         if isinstance(cert, cryptography.x509.Certificate):
             return cert.public_bytes(cryptography.hazmat.primitives.serialization.Encoding.PEM)
         raise TypeError(type(cert))
 
     @staticmethod
-    def _convert(s):
+    def _convert(s: bytes):
         return cryptography.x509.load_pem_x509_certificate(s)
 
 
@@ -98,6 +102,16 @@ class Certificate(Entity, Serializer):
     """The :class:`acmetk.models.order.Order` associated with the certificate."""
     cert = Column(x509Certificate, nullable=True, index=True)
     """The actual client certificate (:class:`cryptography.x509.Certificate`)."""
+    certid = Column(String(64), nullable=False, index=True, unique=True)
+    """ARI Certificate Identifier"""
+
+    replaced_by = relationship(
+        "Order",
+        back_populates="replaced_obj",
+        lazy="noload",
+        foreign_keys="Order.replaces",
+    )
+
     full_chain = Column(Text, nullable=True)
     """The full chain of the certificate (:class:`str`)."""
     reason = Column(Enum(RevocationReason), nullable=True)
