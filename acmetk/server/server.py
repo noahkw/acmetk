@@ -119,6 +119,12 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
     better than nothing, but  accepts names ending with -
     """
 
+    AuthorizationLifetimeDays: int = 7
+    PendingAuthorizationLifetimeDays: int = 29
+    """
+    https://github.com/letsencrypt/boulder/blob/3fcaebe934a5f52440976b38a05aa43b743dbe92/cmd/boulder-ra/main.go#L258
+    """
+
     def __init__(
         self,
         *,
@@ -664,7 +670,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             return self._response(request, status=200)
 
     @routes.post("/new-account", name="new-account")
-    async def new_account(self, request: web.Request):
+    async def new_account(self, request: web.Request) -> web.Response:
         """Handler that registers a new account.
 
         `7.3. Account Management <https://tools.ietf.org/html/rfc8555#section-7.3>`_
@@ -755,7 +761,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             )
 
     @routes.post("/accounts/{account_id}", name="accounts")
-    async def accounts(self, request: web.Request):
+    async def accounts(self, request: web.Request) -> web.Response:
         """Handler that updates or queries the given account.
 
         `7.3.2.  Account Update <https://tools.ietf.org/html/rfc8555#section-7.3.2>`_
@@ -796,7 +802,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return self._response(request, serialized)
 
     @routes.post("/new-order", name="new-order")
-    async def new_order(self, request: web.Request):
+    async def new_order(self, request: web.Request) -> web.Response:
         """Handler that creates a new order.
 
         `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
@@ -825,7 +831,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         )
 
     @routes.post("/authz/{id}", name="authz")
-    async def authz(self, request: web.Request):
+    async def authz(self, request: web.Request) -> web.Response:
         """Handler that updates or queries the given authorization.
 
         `7.5. Identifier Authorization <https://tools.ietf.org/html/rfc8555#section-7.5>`_
@@ -863,7 +869,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return self._response(request, serialized)
 
     @routes.post("/challenge/{id}", name="challenge")
-    async def challenge(self, request: web.Request):
+    async def challenge(self, request: web.Request) -> web.Response:
         """Handler that queries the given challenge and initiates its validation.
 
         `7.5.1. Responding to Challenges <https://tools.ietf.org/html/rfc8555#section-7.5.1>`_
@@ -901,7 +907,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return self._response(request, serialized, links=[f'<{authz_url}>; rel="up"'])
 
     @routes.post("/revoke-cert", name="revoke-cert")
-    async def revoke_cert(self, request: web.Request):
+    async def revoke_cert(self, request: web.Request) -> web.Response:
         """Handler that initiates revocation of the given certificate.
 
         `7.6.  Certificate Revocation <https://tools.ietf.org/html/rfc8555#section-7.6>`_
@@ -930,7 +936,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return self._response(request, status=200)
 
     @routes.post("/order/{id}", name="order")
-    async def order(self, request: web.Request):
+    async def order(self, request: web.Request) -> web.Response:
         """Handler that queries the given order.
 
         `7.1.3. Order Objects <https://tools.ietf.org/html/rfc8555#section-7.1.3>`_
@@ -953,7 +959,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             return self._response(request, order.serialize(request))
 
     @routes.post("/orders/{id}", name="orders")
-    async def orders(self, request: web.Request):
+    async def orders(self, request: web.Request) -> web.Response:
         """Handler that retrieves the account's chunked orders list.
 
         `7.1.2.1.  Orders List <https://tools.ietf.org/html/rfc8555#section-7.1.2.1>`_
@@ -1056,7 +1062,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return order, csr
 
     @routes.post("/order/{id}/finalize", name="finalize-order")
-    async def finalize_order(self, request: web.Request):
+    async def finalize_order(self, request: web.Request) -> web.Response:
         """Handler that initiates finalization of the given order.
 
         `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
@@ -1096,7 +1102,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
     @routes.post("/certificate/{id}", name="certificate")
     @abc.abstractmethod
-    async def certificate(self, request: web.Request):
+    async def certificate(self, request: web.Request) -> web.Response:
         """Handler that queries the given certificate.
 
         `7.4.2. Downloading the Certificate <https://tools.ietf.org/html/rfc8555#section-7.4.2>`_
@@ -1222,7 +1228,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
     @abc.abstractmethod
     async def handle_order_finalize(
         self, request: web.Request, account_id: str, order_id: str
-    ):
+    ) -> web.Response:
         """Method that handles the actual finalization of an order.
 
         This method should be called after the order's status has been set
@@ -1390,7 +1396,7 @@ class AcmeCA(AcmeServerBase):
             await session.commit()
 
     # @routes.post("/certificate/{id}", name="certificate")
-    async def certificate(self, request: web.Request):
+    async def certificate(self, request: web.Request) -> web.Response:
         async with self._session(request) as session:
             jws, account = await self._verify_request(
                 request, session, post_as_get=True
@@ -1461,7 +1467,7 @@ class AcmeRelayBase(AcmeServerBase):
         return instance
 
     # @routes.post("/certificate/{id}", name="certificate")
-    async def certificate(self, request: web.Request):
+    async def certificate(self, request: web.Request) -> web.Response:
         """Handler that queries the given certificate.
 
         `7.4.2. Downloading the Certificate <https://tools.ietf.org/html/rfc8555#section-7.4.2>`_
@@ -1491,7 +1497,7 @@ class AcmeRelayBase(AcmeServerBase):
             )
 
     # @routes.post("/revoke-cert", name="revoke-cert")
-    async def revoke_cert(self, request: web.Request):
+    async def revoke_cert(self, request: web.Request) -> web.Response:
         """Handler that initiates revocation of the given certificate.
 
         `7.6.  Certificate Revocation <https://tools.ietf.org/html/rfc8555#section-7.6>`_
@@ -1632,7 +1638,7 @@ class AcmeProxy(AcmeRelayBase):
     """
 
     # @routes.post("/new-order", name="new-order")
-    async def new_order(self, request: web.Request):
+    async def new_order(self, request: web.Request) -> web.Response:
         """Handler that creates a new order.
 
         `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_
@@ -1705,7 +1711,7 @@ class AcmeProxy(AcmeRelayBase):
             await session.commit()
 
     # @routes.post("/order/{id}/finalize", name="finalize-order")
-    async def finalize_order(self, request: web.Request):
+    async def finalize_order(self, request: web.Request) -> web.Response:
         """Handler that initiates finalization of the given order.
 
         `7.4. Applying for Certificate Issuance <https://tools.ietf.org/html/rfc8555#section-7.4>`_

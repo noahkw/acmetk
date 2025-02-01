@@ -44,6 +44,14 @@ class ChallengeType(str, enum.Enum):
     TLS_ALPN_01 = "tls-alpn-01"
     """The ACME *tls-alpn-01* challenge type.
     See `RFC 8737 <https://tools.ietf.org/html/rfc8737>`_"""
+    ONION_CSR_01 = "onion-csr-01"
+    """https://datatracker.ietf.org/doc/draft-ietf-acme-onion/07/"""
+    TKAUTH_01 = "tkauth-01"
+    """https://www.rfc-editor.org/rfc/rfc9447.html"""
+    EMAIL_REPLY_00 = "email-reply-00"
+    """https://www.rfc-editor.org/rfc/rfc8823.html"""
+    DNS_ACCOUNT_01 = "dns-account-01"
+    """https://www.ietf.org/archive/id/draft-ietf-acme-dns-account-label-00.html"""
 
 
 ChallengeValidationMethod: dict["IdentifierType", frozenset[ChallengeType]] = {
