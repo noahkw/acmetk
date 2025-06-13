@@ -307,7 +307,7 @@ class acmetkClient(TestClient):
         r = await self.client.certificate_get(ord_)
         return cryptography.x509.load_pem_x509_certificate(r.encode())
 
-    async def ari(self, aci: str):
+    async def renewalinfo_get(self, aci: str):
         return await self.client.renewalinfo_get(aci)
 
 

@@ -30,6 +30,19 @@ async def service(tmp_path_factory, unused_tcp_port_factory, db):
     return service
 
 
+def test_RenewalInfo():
+    from acmetk.models.messages import RenewalInfo
+    import datetime
+
+    data = {
+        "suggestedWindow": dict(
+            end="2025-03-01T08:53:18Z", start="2025-02-19T08:53:18Z"
+        )
+    }
+    ri = RenewalInfo.from_json(data)
+    assert isinstance(ri.suggestedWindow.start, datetime.datetime)
+
+
 @pytest.mark.asyncio(loop_scope="session")
 async def test_ourclient_ari(tmp_path_factory, service):
 
@@ -54,7 +67,7 @@ async def test_ourclient_ari(tmp_path_factory, service):
 
     crt = await client.order(csr)
 
-    ri, rta = await client.ari(certid := CertID.from_cert(crt).identifier)
+    ri, rta = await client.renewalinfo_get(certid := CertID.from_cert(crt).identifier)
     assert rta
     assert ri
 
