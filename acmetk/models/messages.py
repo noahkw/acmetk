@@ -275,7 +275,9 @@ class RenewalInfo(josepy.JSONObjectWithFields):
         start: "datetime.datetime" = acme.messages.fields.RFC3339Field("start")
         end: "datetime.datetime" = acme.messages.fields.RFC3339Field("end")
 
-    suggestedWindow: TimeWindow = josepy.Field("suggestedWindow")
+    suggestedWindow: TimeWindow = josepy.Field(
+        "suggestedWindow", decoder=TimeWindow.from_json
+    )
     explanationURL: str = josepy.Field("explanationURL", omitempty=True)
 
 
