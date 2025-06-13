@@ -278,6 +278,13 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
         return runner, instance
 
+    def register_challenge_validators(self, validators: list[ChallengeValidator]):
+        """Registers a list of :class:`ChallengeValidator` with the server.
+        :param validators: A list of :class:`ChallengeValidator` instances.
+        """
+        for v in validators:
+            self.register_challenge_validator(v)
+
     def register_challenge_validator(self, validator: ChallengeValidator):
         """Registers a :class:`ChallengeValidator` with the server.
 
