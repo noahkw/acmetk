@@ -63,6 +63,10 @@ def create_challenge_validator(challenge_validator_name):
     return challenge_validator_class()
 
 
+def create_challenge_validators(challenge_validator_names: list[str]):
+    return [create_challenge_validator(name) for name in challenge_validator_names]
+
+
 @click.group()
 @click.pass_context
 def main(ctx):
@@ -149,7 +153,7 @@ def run(config_file: str, bootstrap_port: typing.Optional[int], path: str):
         app_config = config[app_config_name]
 
         app_config["port"] = bootstrap_port
-        app_config["challenge_validator"] = "dummy"  # Do not validate challenges
+        app_config["challenge_validators"] = ["dummy"]  # Do not validate challenges
         app_config["subnets"] = [
             "127.0.0.1/32",
             "10.110.0.0/24",
@@ -181,8 +185,8 @@ def run(config_file: str, bootstrap_port: typing.Optional[int], path: str):
 
 
 async def run_ca(config: dict[str, typing.Any], path: str):
-    challenge_validator = await create_challenge_validator(
-        config["ca"]["challenge_validator"]
+    challenge_validators = create_challenge_validators(
+        config["ca"]["challenge_validators"]
     )
 
     if path:
@@ -192,7 +196,7 @@ async def run_ca(config: dict[str, typing.Any], path: str):
     else:
         raise click.UsageError(PATH_OR_HOST_AND_PORT_MSG)
 
-    ca.register_challenge_validator(challenge_validator)
+    ca.register_challenge_validators(challenge_validators)
 
     return runner, ca
 
@@ -218,8 +222,8 @@ async def run_relay(
             config_section["client"]["challenge_solver"]
         )
 
-        challenge_validator = create_challenge_validator(
-            config_section["challenge_validator"]
+        challenge_validators = create_challenge_validators(
+            config_section["challenge_validators"]
         )
 
     except ValueError as e:
@@ -244,7 +248,7 @@ async def run_relay(
     else:
         raise click.UsageError(PATH_OR_HOST_AND_PORT_MSG)
 
-    relay.register_challenge_validator(challenge_validator)
+    relay.register_challenge_validators(challenge_validators)
 
     return runner, relay
 
