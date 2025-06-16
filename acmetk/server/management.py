@@ -93,6 +93,19 @@ class AcmeManagementMixin:
                 )
             return {"statistics": statistics, "pms": pms}
 
+    @routes.get("/mgmt/httpbin/headers", name="mgmt-httpbin-headers")
+    async def management_httpbin_headers(
+        self, request: aiohttp.web.Request
+    ) -> aiohttp.web.Response:
+        """
+        c.f. https://httpbingo.org/
+
+        :param request:
+        :return:
+        """
+        d = {k: request.headers.getall(k) for k in request.headers.keys()}
+        return aiohttp.web.json_response(d)
+
     @routes.get("/mgmt/changes", name="mgmt-changes")
     @aiohttp_jinja2.template("changes.jinja2")
     async def management_changes(self, request: aiohttp.web.Request):

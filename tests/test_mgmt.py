@@ -5,6 +5,7 @@ import logging
 import logging.config
 import warnings
 import sys
+import json
 
 from yarl import URL
 import aiohttp
@@ -136,3 +137,11 @@ class TestMGMT(TestCertBotBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
                     if r.__class__.__name__ == "PlainResource":
                         u = base.with_path(r.canonical)
                         tg.create_task(self.get(u))
+
+    async def test_httpbin(self):
+        base = URL(self.site.name)
+        url = base.with_path("ca/mgmt/httpbin/headers")
+        v = await self.get(url)
+
+        v = json.loads(v.decode("utf-8"))
+        assert v
