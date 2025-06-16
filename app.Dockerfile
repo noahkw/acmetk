@@ -6,6 +6,8 @@ RUN apt-get update \
 COPY acmetk /app/acmetk
 COPY tpl /app/tpl
 COPY requirements.txt app_entrypoint.sh pyproject.toml README.md /app/
+COPY alembic.ini /app/
+COPY alembic /app/alembic
 
 VOLUME /var/log/supervisor
 

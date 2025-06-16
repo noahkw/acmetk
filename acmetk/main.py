@@ -121,11 +121,29 @@ def generate_account_key(account_key_file, key_type):
         generate_ec_key(account_key_file)
 
 
+def alembic_run(config: dict) -> None:
+    from alembic.config import Config
+    from alembic import command
+    import yarl
+
+    cfg = Config((base := Path(__file__).parent.parent) / "alembic.ini")
+    cfg.set_main_option("script_location", str(base / "alembic"))
+    db = str(yarl.URL(config.get("db")).with_scheme("postgresql+psycopg2"))
+    cfg.set_section_option("alembic", "sqlalchemy.url", db)
+    command.upgrade(cfg, Database.ALEMBIC_REVISION)
+
+
 @main.command()
 @click.option("--config-file", envvar="APP_CONFIG_FILE", type=click.Path())
 @click.option("--bootstrap-port", type=click.INT)
 @click.option("--path", type=click.Path())
-def run(config_file: str, bootstrap_port: typing.Optional[int], path: str):
+@click.option("--alembic-upgrade", type=bool, default=False)
+def run(
+    config_file: str,
+    bootstrap_port: typing.Optional[int],
+    path: str,
+    alembic_upgrade: bool,
+):
     """Starts the app as defined in the config file.
 
     Starts the app in bootstrap mode if the bootstrap port is set via --bootstrap-port.
@@ -140,6 +158,9 @@ def run(config_file: str, bootstrap_port: typing.Optional[int], path: str):
         app_class = server_app_registry.get_plugin(app_config_name)
     except ValueError as e:
         raise click.UsageError(*e.args)
+
+    if alembic_upgrade:
+        alembic_run(config.get(app_config_name))
 
     if bootstrap_port:
         if app_class is AcmeCA:
