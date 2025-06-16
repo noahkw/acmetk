@@ -19,7 +19,7 @@ if typing.TYPE_CHECKING:
 ERROR_CODE_STATUS = {
     "unauthorized": 401,
     "orderNotReady": 403,
-    "accountDoesNotExist": 404,
+    "accountDoesNotExist": 400,
 }
 """ACME error types mapped to HTTP status codes.
 
