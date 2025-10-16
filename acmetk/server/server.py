@@ -702,7 +702,9 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             jws, account = await self._verify_request(request, session, key_auth=True)
             reg = acme.messages.Registration.json_loads(jws.payload)
             jwk = jws.signature.combined.jwk
-            pub_key = jwk.key._wrapped
+            pub_key: typing.Union[RSAPublicKey, EllipticCurvePublicKey] = (
+                jwk.key._wrapped
+            )
 
             self._validate_account_key(pub_key)
 

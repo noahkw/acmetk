@@ -10,12 +10,11 @@ import aiohttp.web
 import aiohttp_jinja2
 import josepy
 from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 
 from acmetk.server.routes import routes
 from acmetk.util import url_for, forwarded_url
-
-if typing.TYPE_CHECKING:
-    import cryptography.hazmat.primitives.asymmetric.rsa
 
 
 class ExternalAccountBinding:
@@ -175,7 +174,7 @@ class AcmeEABMixin:
     def verify_eab(
         self,
         request: aiohttp.web.Request,
-        pub_key: "cryptography.hazmat.primitives.asymmetric.rsa.RSAPublicKey",
+        pub_key: typing.Union[RSAPublicKey, EllipticCurvePublicKey],
         reg: acme.messages.Registration,
     ) -> None:
         """Verifies an ACME Registration request whose payload contains an external account binding JWS.
@@ -218,9 +217,16 @@ class AcmeEABMixin:
         if sig.url != str(forwarded_url(request)):
             raise acme.messages.Error.with_code("unauthorized")
 
-        if josepy.jwk.JWKRSA.from_json(json.loads(jws.payload)) != josepy.jwk.JWKRSA(
-            key=pub_key
-        ):
+        if isinstance(pub_key, RSAPublicKey):
+            pkey_jws = josepy.jwk.JWKRSA.from_json(json.loads(jws.payload))
+            pkey = josepy.jwk.JWKRSA(key=pub_key)
+        elif isinstance(pub_key, EllipticCurvePublicKey):
+            pkey_jws = josepy.jwk.JWKEC.from_json(json.loads(jws.payload))
+            pkey = josepy.jwk.JWKEC(key=pub_key)
+        else:
+            raise TypeError(type(pub_key))
+
+        if pkey_jws != pkey:
             raise acme.messages.Error.with_code(
                 "malformed",
                 detail="The external account binding does not contain the same public key as the request JWS.",
