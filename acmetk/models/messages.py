@@ -242,3 +242,33 @@ class Directory(acme.messages.Directory):
 
         https://datatracker.ietf.org/doc/draft-aaron-acme-profiles/
         """
+
+
+try:
+    from acme.challenges import TLSALPN01
+
+    # https://github.com/certbot/certbot/issues/10274
+except ImportError:
+    from acme.challenges import (
+        ChallengeResponse,
+        Challenge,
+        KeyAuthorizationChallenge,
+        KeyAuthorizationChallengeResponse,
+    )
+    from josepy import JWK
+
+    @ChallengeResponse.register
+    class TLSALPN01Response(KeyAuthorizationChallengeResponse):
+        """ACME tls-alpn-01 challenge response."""
+
+        typ = "tls-alpn-01"
+
+    @Challenge.register  # pylint: disable=too-many-ancestors
+    class TLSALPN01(KeyAuthorizationChallenge):
+        """ACME tls-alpn-01 challenge."""
+
+        response_cls = TLSALPN01Response
+        typ = response_cls.typ
+
+        def validation(self, account_key: JWK, **kwargs: typing.Any):
+            pass
