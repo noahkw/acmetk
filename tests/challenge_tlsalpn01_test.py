@@ -83,9 +83,7 @@ class Service:
             )
             .add_extension(
                 x509.UnrecognizedExtension(
-                    oid=x509.ObjectIdentifier(
-                        TLSALPN01ChallengeValidator.PE_ACMEIDENTIFIER
-                    ),
+                    oid=x509.ObjectIdentifier(TLSALPN01ChallengeValidator.PE_ACMEIDENTIFIER),
                     value=b"\x04\20" + data,
                 ),
                 critical=True,

@@ -24,9 +24,7 @@ depends_on = None
 
 
 def upgrade():
-    op.alter_column(
-        table_name="changes", column_name="data", nullable=False, type_=postgresql.JSONB
-    )
+    op.alter_column(table_name="changes", column_name="data", nullable=False, type_=postgresql.JSONB)
     op.alter_column(
         table_name="challenges",
         column_name="error",
@@ -42,9 +40,7 @@ def upgrade():
 
 
 def downgrade():
-    op.alter_column(
-        table_name="changes", column_name="data", nullable=False, type_=sqlalchemy.JSON
-    )
+    op.alter_column(table_name="changes", column_name="data", nullable=False, type_=sqlalchemy.JSON)
     op.alter_column(
         table_name="challenges",
         column_name="error",

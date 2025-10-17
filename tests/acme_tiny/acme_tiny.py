@@ -44,9 +44,7 @@ def get_crt(
 
     # helper function - run external commands
     def _cmd(cmd_list, stdin=None, cmd_input=None, err_msg="Command Line Error"):
-        proc = subprocess.Popen(
-            cmd_list, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
+        proc = subprocess.Popen(cmd_list, stdin=stdin, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = proc.communicate(cmd_input)
         if proc.returncode != 0:
             raise OSError(f"{err_msg}\n{err}")
@@ -77,18 +75,10 @@ def get_crt(
             resp_data = json.loads(resp_data)  # try to parse json results
         except ValueError:
             pass  # ignore json parsing errors
-        if (
-            depth < 100
-            and code == 400
-            and resp_data["type"] == "urn:ietf:params:acme:error:badNonce"
-        ):
+        if depth < 100 and code == 400 and resp_data["type"] == "urn:ietf:params:acme:error:badNonce":
             raise IndexError(resp_data)  # allow 100 retrys for bad nonces
         if code not in [200, 201, 204]:
-            raise ValueError(
-                "{}:\nUrl: {}\nData: {}\nResponse Code: {}\nResponse: {}".format(
-                    err_msg, url, data, code, resp_data
-                )
-            )
+            raise ValueError(f"{err_msg}:\nUrl: {url}\nData: {data}\nResponse Code: {code}\nResponse: {resp_data}")
         return resp_data, code, headers
 
     # helper function - make signed requests
@@ -96,9 +86,7 @@ def get_crt(
         payload64 = "" if payload is None else _b64(json.dumps(payload).encode("utf8"))
         new_nonce = _do_request(directory["newNonce"])[2]["Replay-Nonce"]
         protected = {"url": url, "alg": alg, "nonce": new_nonce}
-        protected.update(
-            {"jwk": jwk} if acct_headers is None else {"kid": acct_headers["Location"]}
-        )
+        protected.update({"jwk": jwk} if acct_headers is None else {"kid": acct_headers["Location"]})
         protected64 = _b64(json.dumps(protected).encode("utf8"))
         protected_input = f"{protected64}.{payload64}".encode()
         out = _cmd(
@@ -107,13 +95,9 @@ def get_crt(
             cmd_input=protected_input,
             err_msg="OpenSSL Error",
         )
-        data = json.dumps(
-            {"protected": protected64, "payload": payload64, "signature": _b64(out)}
-        )
+        data = json.dumps({"protected": protected64, "payload": payload64, "signature": _b64(out)})
         try:
-            return _do_request(
-                url, data=data.encode("utf8"), err_msg=err_msg, depth=depth
-            )
+            return _do_request(url, data=data.encode("utf8"), err_msg=err_msg, depth=depth)
         except IndexError:  # retry bad nonces (they raise IndexError)
             return _send_signed_request(url, payload, err_msg, depth=(depth + 1))
 
@@ -133,9 +117,7 @@ def get_crt(
         err_msg="OpenSSL Error",
     )
     pub_pattern = r"modulus:[\s]+?00:([a-f0-9\:\s]+?)\npublicExponent: ([0-9]+)"
-    pub_hex, pub_exp = re.search(
-        pub_pattern, out.decode("utf8"), re.MULTILINE | re.DOTALL
-    ).groups()
+    pub_hex, pub_exp = re.search(pub_pattern, out.decode("utf8"), re.MULTILINE | re.DOTALL).groups()
     pub_exp = f"{int(pub_exp):x}"
     pub_exp = f"0{pub_exp}" if len(pub_exp) % 2 else pub_exp
     alg = "RS256"
@@ -179,9 +161,7 @@ def get_crt(
     # create account, update contact details (if any), and set the global key identifier
     log.info("Registering account...")
     reg_payload = {"termsOfServiceAgreed": True}
-    account, code, acct_headers = _send_signed_request(
-        directory["newAccount"], reg_payload, "Error registering"
-    )
+    account, code, acct_headers = _send_signed_request(directory["newAccount"], reg_payload, "Error registering")
     log.info("Registered!" if code == 201 else "Already registered!")
     if contact is not None:
         account, _, _ = _send_signed_request(
@@ -194,23 +174,17 @@ def get_crt(
     # create a new order
     log.info("Creating new order...")
     order_payload = {"identifiers": [{"type": "dns", "value": d} for d in domains]}
-    order, _, order_headers = _send_signed_request(
-        directory["newOrder"], order_payload, "Error creating new order"
-    )
+    order, _, order_headers = _send_signed_request(directory["newOrder"], order_payload, "Error creating new order")
     log.info("Order created!")
 
     # get the authorizations that need to be completed
     for auth_url in order["authorizations"]:
-        authorization, _, _ = _send_signed_request(
-            auth_url, None, "Error getting challenges"
-        )
+        authorization, _, _ = _send_signed_request(auth_url, None, "Error getting challenges")
         domain = authorization["identifier"]["value"]
         log.info(f"Verifying {domain}...")
 
         # find the http-01 challenge and write the challenge file
-        challenge = [c for c in authorization["challenges"] if c["type"] == "http-01"][
-            0
-        ]
+        challenge = [c for c in authorization["challenges"] if c["type"] == "http-01"][0]
         token = re.sub(r"[^A-Za-z0-9_\-]", "_", challenge["token"])
         keyauthorization = f"{token}.{thumbprint}"
         wellknown_path = os.path.join(acme_dir, token)
@@ -219,21 +193,13 @@ def get_crt(
 
         # check that the file is in place
         try:
-            wellknown_url = "http://{}/.well-known/acme-challenge/{}".format(
-                domain, token
-            )
+            wellknown_url = f"http://{domain}/.well-known/acme-challenge/{token}"
             assert disable_check or _do_request(wellknown_url)[0] == keyauthorization
         except (AssertionError, ValueError) as e:
-            raise ValueError(
-                "Wrote file to {}, but couldn't download {}: {}".format(
-                    wellknown_path, wellknown_url, e
-                )
-            )
+            raise ValueError(f"Wrote file to {wellknown_path}, but couldn't download {wellknown_url}: {e}")
 
         # say the challenge is done
-        _send_signed_request(
-            challenge["url"], {}, f"Error submitting challenges: {domain}"
-        )
+        _send_signed_request(challenge["url"], {}, f"Error submitting challenges: {domain}")
         authorization = _poll_until_not(
             auth_url,
             ["pending"],
@@ -246,12 +212,8 @@ def get_crt(
 
     # finalize the order with the csr
     log.info("Signing certificate...")
-    csr_der = _cmd(
-        ["openssl", "req", "-in", csr, "-outform", "DER"], err_msg="DER Export Error"
-    )
-    _send_signed_request(
-        order["finalize"], {"csr": _b64(csr_der)}, "Error finalizing order"
-    )
+    csr_der = _cmd(["openssl", "req", "-in", csr, "-outform", "DER"], err_msg="DER Export Error")
+    _send_signed_request(order["finalize"], {"csr": _b64(csr_der)}, "Error finalizing order")
 
     # poll the order to monitor when it's done
     order = _poll_until_not(
@@ -263,9 +225,7 @@ def get_crt(
         raise ValueError(f"Order failed: {order}")
 
     # download the certificate
-    certificate_pem, _, _ = _send_signed_request(
-        order["certificate"], None, "Certificate download failed"
-    )
+    certificate_pem, _, _ = _send_signed_request(order["certificate"], None, "Certificate download failed")
     log.info("Certificate signed!")
     return certificate_pem
 
@@ -295,9 +255,7 @@ def main(argv=None):
         required=True,
         help="path to your Let's Encrypt account private key",
     )
-    parser.add_argument(
-        "--csr", required=True, help="path to your certificate signing request"
-    )
+    parser.add_argument("--csr", required=True, help="path to your certificate signing request")
     parser.add_argument(
         "--acme-dir",
         required=True,
@@ -320,9 +278,7 @@ def main(argv=None):
         default=DEFAULT_DIRECTORY_URL,
         help="certificate authority directory url, default is Let's Encrypt",
     )
-    parser.add_argument(
-        "--ca", default=DEFAULT_CA, help="DEPRECATED! USE --directory-url INSTEAD!"
-    )
+    parser.add_argument("--ca", default=DEFAULT_CA, help="DEPRECATED! USE --directory-url INSTEAD!")
     parser.add_argument(
         "--contact",
         metavar="CONTACT",

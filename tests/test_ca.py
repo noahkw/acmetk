@@ -122,9 +122,7 @@ class TestCA(TestAcme):
 
         self.ca_data = CAData(ca_key_path, ca_cert_path)
 
-        acmetk.util.generate_root_cert(
-            ca_key_path, "DE", "Lower Saxony", "Hanover", "Acme Toolkit", "ACMETK CA"
-        )
+        acmetk.util.generate_root_cert(ca_key_path, "DE", "Lower Saxony", "Hanover", "Acme Toolkit", "ACMETK CA")
 
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
@@ -215,9 +213,7 @@ WELLKNOWN="{str(self.path / 'wellknown')}"
     async def _run_dehydrated(self, _cmd):
         cmd = f"/tmp/dehydrated/dehydrated --config {self.path}/config {_cmd}"
         log.info(cmd)
-        p = await asyncio.create_subprocess_exec(
-            *shlex.split(cmd), stdout=asyncio.subprocess.PIPE
-        )
+        p = await asyncio.create_subprocess_exec(*shlex.split(cmd), stdout=asyncio.subprocess.PIPE)
 
         def llog(_line, logger):
             if not _line:
@@ -267,9 +263,7 @@ class Testacmesh:
         else:
             cmd = _cmd
         log.info(cmd)
-        p = await asyncio.create_subprocess_exec(
-            *shlex.split(cmd), stdout=asyncio.subprocess.PIPE
-        )
+        p = await asyncio.create_subprocess_exec(*shlex.split(cmd), stdout=asyncio.subprocess.PIPE)
 
         def llog(_line, logger):
             if not _line:
@@ -315,9 +309,7 @@ class TestCertBot:
         if self.CERT_KEY_ALG_BITS[0] == "RSA":
             return "--key-type rsa"
         elif self.CERT_KEY_ALG_BITS[0] == "EC":
-            return (
-                f"--key-type ecdsa --elliptic-curve secp{self.CERT_KEY_ALG_BITS[1]}r1"
-            )
+            return f"--key-type ecdsa --elliptic-curve secp{self.CERT_KEY_ALG_BITS[1]}r1"
 
     async def _register(self):
         await self._run(f"register --no-eff-email --agree-tos  -m {self.contact}")
@@ -335,11 +327,7 @@ class TestCertBot:
                 ],
             )
         )
-        return (
-            "--manual "
-            f'--manual-auth-hook "echo \\"{authhook}\\"" '
-            "--manual-cleanup-hook /bin/true "
-        )
+        return "--manual " f'--manual-auth-hook "echo \\"{authhook}\\"" ' "--manual-cleanup-hook /bin/true "
 
     async def _certonly(self, *argv, names=None, preferred_challenges="dns"):
         domains = " --domain ".join(names or self.domains)
@@ -394,18 +382,12 @@ class TestCertBot:
 
         await self._certonly()
 
-        await self._certonly(
-            "--expand", names=list(map(lambda s: f"dns.{s}", self.domains))
-        )
-        await self._certonly(
-            "--expand", names=list(map(lambda s: f"http.{s}", self.domains))
-        )
+        await self._certonly("--expand", names=list(map(lambda s: f"dns.{s}", self.domains)))
+        await self._certonly("--expand", names=list(map(lambda s: f"http.{s}", self.domains)))
 
         for j in ["", "dns.", "http."]:
             try:
-                await self._run(
-                    f"revoke --cert-path {self.path}/etc/letsencrypt/live/{j}{self.domains[0]}/cert.pem"
-                )
+                await self._run(f"revoke --cert-path {self.path}/etc/letsencrypt/live/{j}{self.domains[0]}/cert.pem")
             except Exception as e:
                 log.exception(e)
 
@@ -452,8 +434,7 @@ class TestCertBot:
                 with self.assertRaisesRegex(
                     acme.messages.Error,
                     r"urn:ietf:params:acme:error:rejectedIdentifier :: "
-                    r"The server will not issue certificates for the identifier :: "
-                    + err,
+                    r"The server will not issue certificates for the identifier :: " + err,
                 ):
                     await self._certonly(names=[i])
 
@@ -511,9 +492,7 @@ class TestOurClient:
 
     async def _run_one(self, client, csr):
         try:
-            self.ca._match_keysize(
-                client._private_key.key._wrapped.public_key(), "account"
-            )
+            self.ca._match_keysize(client._private_key.key._wrapped.public_key(), "account")
         except ValueError:
             with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
                 await client.start()
@@ -546,9 +525,7 @@ class TestOurClient:
 
     async def test_keychange(self):
         try:
-            self.ca._match_keysize(
-                self.client._private_key.key._wrapped.public_key(), "account"
-            )
+            self.ca._match_keysize(self.client._private_key.key._wrapped.public_key(), "account")
         except ValueError:
             with self.assertRaisesRegex(acme.messages.Error, self.BAD_KEY_RE) as e:
                 await self.client.start()
@@ -557,9 +534,7 @@ class TestOurClient:
         else:
             await self.client.start()
 
-        with self.assertRaisesRegex(
-            acme.messages.Error, "The KeyChange object key already in use"
-        ):
+        with self.assertRaisesRegex(acme.messages.Error, "The KeyChange object key already in use"):
             await self.client.key_change(self.client_data.key_path)
 
         kp = self.client_data.key_path.parent / "keychange.key"
@@ -593,9 +568,7 @@ class TestOurClient:
         client = self.client
 
         try:
-            self.ca._match_keysize(
-                client._private_key.key._wrapped.public_key(), "account"
-            )
+            self.ca._match_keysize(client._private_key.key._wrapped.public_key(), "account")
         except ValueError:
             return
 
@@ -641,9 +614,7 @@ class TestOurClientStress(TestOurClient):
                     client_account_key_path := self.path / f"client_{i}_account.key",
                     self.ACCOUNT_KEY_ALG_BITS,
                 )
-                client_cert_key = self._make_key(
-                    self.path / f"client_{i}_cert.key", self.CERT_KEY_ALG_BITS
-                )
+                client_cert_key = self._make_key(self.path / f"client_{i}_cert.key", self.CERT_KEY_ALG_BITS)
 
                 csr = acmetk.util.generate_csr(
                     f"{self.name.lower()}.stress.test.de",
@@ -655,9 +626,7 @@ class TestOurClientStress(TestOurClient):
                     ],
                 )
 
-                client = self._make_client(
-                    client_account_key_path, f"client_{i}_{self.contact}"
-                )
+                client = self._make_client(client_account_key_path, f"client_{i}_{self.contact}")
                 task = tg.create_task(self._run_one(client, csr))
                 assert task
                 # errors as the tg closes before the last clients add_done is run …
@@ -668,9 +637,7 @@ class TestOurClientStress(TestOurClient):
     async def test_revoke(self):
         full_chain = await self._run_one(self.client, self.client_data.csr)
         certs = acmetk.util.pem_split(full_chain)
-        await self.client.certificate_revoke(
-            certs[0], reason=RevocationReason.keyCompromise
-        )
+        await self.client.certificate_revoke(certs[0], reason=RevocationReason.keyCompromise)
 
     async def test_account_update(self):
         await self.client.start()
@@ -725,12 +692,7 @@ class TestOurClientStress(TestOurClient):
 
         N_orders = 21
 
-        await asyncio.gather(
-            *[
-                self.client.order_create(self.config_sec["names"])
-                for _ in range(N_orders)
-            ]
-        )
+        await asyncio.gather(*[self.client.order_create(self.config_sec["names"]) for _ in range(N_orders)])
         orders = await self.client.orders_get()
         self.assertEqual(N_orders, len(set(orders)))
 
@@ -743,9 +705,7 @@ class TestAcmeZ:
     async def _run(self):
         cmd = self.bin
         log.info(cmd)
-        p = await asyncio.create_subprocess_exec(
-            *shlex.split(cmd), stdout=asyncio.subprocess.PIPE
-        )
+        p = await asyncio.create_subprocess_exec(*shlex.split(cmd), stdout=asyncio.subprocess.PIPE)
 
         def llog(_line, logger):
             if not _line:
@@ -794,9 +754,7 @@ class TestCertBotWCCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
 
     async def test_no_wc_run(self):
         self.ca._allow_wildcard = False
-        with self.assertRaisesRegex(
-            acme.messages.Error, "The ACME server can not issue a wildcard certificate"
-        ):
+        with self.assertRaisesRegex(acme.messages.Error, "The ACME server can not issue a wildcard certificate"):
             await super().test_run()
 
 
@@ -826,8 +784,7 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
         for alg, abits in {"EC": (256, 521)}.items():
             for bits in abits:
                 self._make_key(
-                    kp := self.client_data.key_path.parent
-                    / f"keychange-{alg}-{bits}.key",
+                    kp := self.client_data.key_path.parent / f"keychange-{alg}-{bits}.key",
                     (alg, bits),
                 )
                 keys.append(kp)
@@ -876,10 +833,7 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
         )
         key = josepy.jwk.JWKEC.load(open(kp, "rb").read())
 
-        if (
-            math.ceil(key.key._wrapped.public_key().public_numbers().x.bit_length() / 8)
-            != 66
-        ):
+        if math.ceil(key.key._wrapped.public_key().public_numbers().x.bit_length() / 8) != 66:
             print(key)
         alg = josepy.jwa.ES512
         key_change = acmetk.models.messages.KeyChange(
@@ -896,9 +850,7 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
         kwargs = {"nonce": acme.jose.b64decode("nonc"), "url": "http://localhost/test"}
         kwargs["kid"] = "billythekid"
 
-        data = jws.JWS.sign(
-            jobj, key=self.client._private_key, alg=self.client._alg, **kwargs
-        ).json_dumps(indent=2)
+        data = jws.JWS.sign(jobj, key=self.client._private_key, alg=self.client._alg, **kwargs).json_dumps(indent=2)
 
         # verify
         jws = acme.jws.JWS.json_loads(data)
@@ -909,76 +861,56 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
         self.assertTrue(inner_jws.verify(sig.jwk))
 
 
-class TestOurClientEC256EC256CA(
-    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientEC256EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("EC", 256)
     CERT_KEY_ALG_BITS = ("EC", 256)
 
 
-class TestOurClientEC384EC256CA(
-    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientEC384EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("EC", 384)
     CERT_KEY_ALG_BITS = ("EC", 256)
 
 
-class TestOurClientEC521EC256CA(
-    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientEC521EC256CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("EC", 521)
     CERT_KEY_ALG_BITS = ("EC", 256)
 
 
-class TestOurClientEC256EC384CA(
-    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientEC256EC384CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("EC", 256)
     CERT_KEY_ALG_BITS = ("EC", 384)
 
 
-class TestOurClientEC256EC521CA(
-    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientEC256EC521CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("EC", 256)
     CERT_KEY_ALG_BITS = ("EC", 521)
 
     """"Let's Encrypt does not allow EC 521 Key Certificates due to lack of browser support"""
 
     def test_validate_key(self):
-        self.ca._match_keysize(
-            self.client._private_key.key._wrapped.public_key(), "account"
-        )
+        self.ca._match_keysize(self.client._private_key.key._wrapped.public_key(), "account")
 
         with self.assertRaises(ValueError):
             self.ca._match_keysize(self.client_data.csr.public_key(), "csr")
 
 
-class TestOurClientRSA1024RSA2048CA(
-    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientRSA1024RSA2048CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("RSA", 1024)
     CERT_KEY_ALG_BITS = ("RSA", 2048)
 
     def test_validate_key(self):
         with self.assertRaises(ValueError):
-            self.ca._match_keysize(
-                self.client._private_key.key._wrapped.public_key(), "account"
-            )
+            self.ca._match_keysize(self.client._private_key.key._wrapped.public_key(), "account")
 
         self.ca._match_keysize(self.client_data.csr.public_key(), "csr")
 
 
-class TestOurClientRSA2048RSA1024CA(
-    TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientRSA2048RSA1024CA(TestOurClient, TestCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("RSA", 2048)
     CERT_KEY_ALG_BITS = ("RSA", 1024)
 
     def test_validate_key(self):
-        self.ca._match_keysize(
-            self.client._private_key.key._wrapped.public_key(), "account"
-        )
+        self.ca._match_keysize(self.client._private_key.key._wrapped.public_key(), "account")
 
         with self.assertRaises(ValueError):
             self.ca._match_keysize(self.client_data.csr.public_key(), "csr")

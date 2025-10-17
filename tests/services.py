@@ -43,9 +43,7 @@ class CAService(TestService):
         )
 
         aiohttp_jinja2.setup(runner.app, loader=jinja2.FileSystemLoader("./tpl/"))
-        aiohttp_jinja2.get_env(runner.app).globals.update(
-            {"url_for": _url_for, "names_of_csr": acmetk.util.names_of}
-        )
+        aiohttp_jinja2.get_env(runner.app).globals.update({"url_for": _url_for, "names_of_csr": acmetk.util.names_of})
 
         #        await ca._db._recreate()
 

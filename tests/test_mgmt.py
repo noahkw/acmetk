@@ -88,10 +88,7 @@ class TestMGMT(TestCertBotBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
                             continue
 
                         if r.__class__.__name__ == "DynamicResource":
-                            dyn = [
-                                i["name"]
-                                for i in re.finditer(r"{(?P<name>\w+)}", r.canonical)
-                            ]
+                            dyn = [i["name"] for i in re.finditer(r"{(?P<name>\w+)}", r.canonical)]
                             self.assertEqual(len(dyn), 1)
                             n = dyn[0]
 

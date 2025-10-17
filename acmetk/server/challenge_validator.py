@@ -75,9 +75,7 @@ class Http01ChallengeValidator(ChallengeValidator):
         self._port = port
         """Choosing the port is required for unit testing."""
 
-    async def validate_challenge(
-        self, challenge: Challenge, request: aiohttp.web.Request = None
-    ):
+    async def validate_challenge(self, challenge: Challenge, request: aiohttp.web.Request = None):
         """Validates the given challenge.
 
         This method takes a challenge of :class:`ChallengeType` *HTTP_01*
@@ -97,9 +95,7 @@ class Http01ChallengeValidator(ChallengeValidator):
 
         try:
             async with aiohttp.ClientSession() as session:
-                url = yarl.URL(
-                    f"http://{identifier}/.well-known/acme-challenge/{challenge.token}"
-                )
+                url = yarl.URL(f"http://{identifier}/.well-known/acme-challenge/{challenge.token}")
                 if self._port != self.DEFAULT_PORT:
                     url = url.with_port(self._port)
                 logger.info(
@@ -124,9 +120,7 @@ class Http01ChallengeValidator(ChallengeValidator):
             raise
         except Exception as e:
             logger.exception(e)
-            raise CouldNotValidateChallenge(
-                detail=f"Validation of challenge {challenge.challenge_id} failed; {str(e)}"
-            )
+            raise CouldNotValidateChallenge(detail=f"Validation of challenge {challenge.challenge_id} failed; {str(e)}")
 
 
 @PluginRegistry.register_plugin("tlsalpn01")
@@ -142,9 +136,7 @@ class TLSALPN01ChallengeValidator(ChallengeValidator):
         self._port = port
         """Choosing the port is required for unit testing."""
 
-    async def validate_challenge(
-        self, challenge: Challenge, request: aiohttp.web.Request = None
-    ):
+    async def validate_challenge(self, challenge: Challenge, request: aiohttp.web.Request = None):
         """Validates the given challenge.
 
         This method takes a challenge of :class:`ChallengeType` *HTTP_01*
@@ -174,9 +166,7 @@ class TLSALPN01ChallengeValidator(ChallengeValidator):
             ctx.verify_mode = ssl.CERT_NONE
             logger.debug("Connecting to %s:%d", identifier, self._port)
 
-            reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(identifier, self._port, ssl=ctx), 20
-            )
+            reader, writer = await asyncio.wait_for(asyncio.open_connection(identifier, self._port, ssl=ctx), 20)
 
             cert: x509.Certificate = x509.load_der_x509_certificate(
                 writer.get_extra_info("ssl_object").getpeercert(binary_form=True)
@@ -184,18 +174,14 @@ class TLSALPN01ChallengeValidator(ChallengeValidator):
 
             logger.debug("The server certificate is %s", cert.subject.rfc4514_string())
 
-            ext = cert.extensions.get_extension_for_oid(
-                x509.ObjectIdentifier(self.PE_ACMEIDENTIFIER)
-            )
+            ext = cert.extensions.get_extension_for_oid(x509.ObjectIdentifier(self.PE_ACMEIDENTIFIER))
             value: bytes = ext.value.value[2:]
             expect = hashlib.sha256(challenge.keyAuthorization.encode()).digest()
             if value != expect:
                 raise ValueError((expect.hex(sep=":"), value.hex(sep=":")))
         except Exception as e:
             logger.exception(e)
-            raise CouldNotValidateChallenge(
-                detail=f"Validation of challenge {challenge.challenge_id} failed; {e}"
-            )
+            raise CouldNotValidateChallenge(detail=f"Validation of challenge {challenge.challenge_id} failed; {e}")
 
 
 @PluginRegistry.register_plugin("dns01")
@@ -209,9 +195,7 @@ class DNS01ChallengeValidator(DNS01ChallengeHelper, ChallengeValidator):
         self._port = port
         """Choosing the port is required for unit testing."""
 
-    async def validate_challenge(
-        self, challenge: Challenge, request: aiohttp.web.Request = None
-    ):
+    async def validate_challenge(self, challenge: Challenge, request: aiohttp.web.Request = None):
         """Validates the given challenge.
 
         This method takes a challenge of :class:`ChallengeType` *DNS_01*
@@ -254,16 +238,9 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
     async def _query_record(self, name: str, type_: typing.Literal["A", "AAAA"]):
         resolved_ips = []
 
-        with contextlib.suppress(
-            dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer
-        ):
+        with contextlib.suppress(dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer):
             resp = await dns.asyncresolver.resolve(name, type_)
-            resolved_ips.extend(
-                [
-                    ipaddress.ip_address(record.address)
-                    for record in resp.rrset.items.keys()
-                ]
-            )
+            resolved_ips.extend([ipaddress.ip_address(record.address) for record in resp.rrset.items.keys()])
 
         return resolved_ips
 
@@ -273,15 +250,11 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
         :param name: Name of the A/AAAA record to query.
         :return: Set of IPs that the A/AAAA records resolve to.
         """
-        resolved_ips = [
-            await self._query_record(name, type_) for type_ in ("A", "AAAA")
-        ]
+        resolved_ips = [await self._query_record(name, type_) for type_ in ("A", "AAAA")]
 
         return set(itertools.chain.from_iterable(resolved_ips))
 
-    async def validate_challenge(
-        self, challenge: Challenge, request: aiohttp.web.Request = None
-    ):
+    async def validate_challenge(self, challenge: Challenge, request: aiohttp.web.Request = None):
         """Validates the given challenge.
 
         This method takes a challenge of :class:`ChallengeType` *DNS_01* or *HTTP_01*
@@ -306,14 +279,9 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
         if challenge.authorization.wildcard:
             identifier = identifier[2:]
             names = ["www", "mail", "smtp", "gitlab"]
-            rnames = [
-                "".join([random.choice(string.ascii_lowercase) for j in range(i)])
-                for i in range(6)
-            ]
+            rnames = ["".join([random.choice(string.ascii_lowercase) for j in range(i)]) for i in range(6)]
             names.extend(rnames)
-            resolved = await asyncio.gather(
-                *[self.query_records(f"{i}.{identifier}") for i in names]
-            )
+            resolved = await asyncio.gather(*[self.query_records(f"{i}.{identifier}") for i in names])
             resolved_ips = set.intersection(*resolved)
         else:
             resolved_ips = await self.query_records(identifier)

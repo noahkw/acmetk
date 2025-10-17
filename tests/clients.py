@@ -199,18 +199,12 @@ class certbotClient(TestClient):
 
         await self._certonly()
 
-        await self._certonly(
-            "--expand", names=list(map(lambda s: f"dns.{s}", self.domains))
-        )
-        await self._certonly(
-            "--expand", names=list(map(lambda s: f"http.{s}", self.domains))
-        )
+        await self._certonly("--expand", names=list(map(lambda s: f"dns.{s}", self.domains)))
+        await self._certonly("--expand", names=list(map(lambda s: f"http.{s}", self.domains)))
 
         for j in ["", "dns.", "http."]:
             try:
-                await self._run(
-                    f"revoke --cert-path {self.path}/etc/letsencrypt/live/{j}{self.domains[0]}/cert.pem"
-                )
+                await self._run(f"revoke --cert-path {self.path}/etc/letsencrypt/live/{j}{self.domains[0]}/cert.pem")
             except Exception as e:
                 print(e)
 
@@ -229,9 +223,7 @@ class certbotClient(TestClient):
         await self._register()
         await self._certonly()
 
-        await self._run(
-            f"renew --no-random-sleep-on-renew --webroot --webroot-path {self.path}"
-        )
+        await self._run(f"renew --no-random-sleep-on-renew --webroot --webroot-path {self.path}")
 
     async def test_register(self):
         await self._register()
@@ -259,8 +251,7 @@ class certbotClient(TestClient):
                 with self.assertRaisesRegex(
                     acme.messages.Error,
                     r"urn:ietf:params:acme:error:rejectedIdentifier :: "
-                    r"The server will not issue certificates for the identifier :: "
-                    + err,
+                    r"The server will not issue certificates for the identifier :: " + err,
                 ):
                     await self._certonly(names=[i])
 
@@ -268,9 +259,7 @@ class certbotClient(TestClient):
 class acmetkClient(TestClient):
     def __init__(self, account_key, service, directory, tmpdir):
         super().__init__(account_key, service, directory, tmpdir)
-        self.client = self._make_client(
-            self.tmpdir / "account-key.pem", "acmetk@acmetk.example.org"
-        )
+        self.client = self._make_client(self.tmpdir / "account-key.pem", "acmetk@acmetk.example.org")
 
     def _make_client(self, key_path, email):
         from acmetk import AcmeClient
@@ -308,9 +297,7 @@ class acmezClient(TestClient):
     async def _run(self):
         cmd = self.bin
         self.log.info(cmd)
-        p = await asyncio.create_subprocess_exec(
-            *shlex.split(cmd), stdout=asyncio.subprocess.PIPE
-        )
+        p = await asyncio.create_subprocess_exec(*shlex.split(cmd), stdout=asyncio.subprocess.PIPE)
 
         def llog(_line, logger):
             if not _line:
@@ -394,9 +381,7 @@ WELLKNOWN="{str(self.tmpdir / 'wellknown')}"
     async def _run_dehydrated(self, _cmd):
         cmd = f"/tmp/dehydrated/dehydrated --config {self.tmpdir}/config {_cmd}"
         self.log.info(cmd)
-        p = await asyncio.create_subprocess_exec(
-            *shlex.split(cmd), stdout=asyncio.subprocess.PIPE
-        )
+        p = await asyncio.create_subprocess_exec(*shlex.split(cmd), stdout=asyncio.subprocess.PIPE)
 
         def llog(_line, logger):
             if not _line:
@@ -446,9 +431,7 @@ class acmeshClient(TestClient):
         await self._run_exec(cmd)
 
     async def _run_exec(self, cmd):
-        p = await asyncio.create_subprocess_exec(
-            *shlex.split(cmd), stdout=asyncio.subprocess.PIPE
-        )
+        p = await asyncio.create_subprocess_exec(*shlex.split(cmd), stdout=asyncio.subprocess.PIPE)
 
         def llog(_line, logger):
             if not _line:

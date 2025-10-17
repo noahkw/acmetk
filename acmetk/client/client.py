@@ -54,9 +54,7 @@ class ExternalAccountBindingCredentials:
         :return: The JWS representing the external account binding
         """
         if self.kid and self.hmac_key:
-            return acme.messages.ExternalAccountBinding.from_data(
-                public_key, self.kid, self.hmac_key, directory
-            )
+            return acme.messages.ExternalAccountBinding.from_data(public_key, self.kid, self.hmac_key, directory)
         else:
             raise ValueError("Must specify both kid and hmac_key")
 
@@ -96,9 +94,7 @@ class AcmeClient:
             # Add our self-signed server cert for testing purposes.
             self._ssl_context.load_verify_locations(cafile=server_cert)
 
-        self._session = ClientSession(
-            headers={"User-Agent": f"acmetk Client {__version__}"}
-        )
+        self._session = ClientSession(headers={"User-Agent": f"acmetk Client {__version__}"})
 
         self._directory_url = directory_url
 
@@ -140,9 +136,7 @@ class AcmeClient:
         else:
             raise ValueError("A tuple containing the kid and hmac_key is required")
 
-    def _open_key(
-        self, private_key: str
-    ) -> tuple[josepy.jwk.JWK, josepy.jwa.JWASignature]:
+    def _open_key(self, private_key: str) -> tuple[josepy.jwk.JWK, josepy.jwa.JWASignature]:
         with open(private_key, "rb") as pem:
             data = pem.read()
             certs = acmetk.util.pem_split(data.decode())
@@ -179,16 +173,13 @@ class AcmeClient:
         It is advised to register at least one :class:`ChallengeSolver`
         using :meth:`register_challenge_solver` before starting the client.
         """
-        async with self._session.get(
-            self._directory_url, ssl=self._ssl_context
-        ) as resp:
+        async with self._session.get(self._directory_url, ssl=self._ssl_context) as resp:
             data = await resp.json()
             self._directory = messages.Directory.from_json(data)
 
         if not self._challenge_solvers.keys():
             logger.warning(
-                "There is no challenge solver registered with the client. "
-                "Certificate retrieval will likely fail."
+                "There is no challenge solver registered with the client. " "Certificate retrieval will likely fail."
             )
 
         if self._account:
@@ -224,16 +215,10 @@ class AcmeClient:
         :raises: :class:`acme.messages.Error` If the server rejects any of the contact information, the private
             key, or the external account binding.
         """
-        eab_credentials = (
-            ExternalAccountBindingCredentials(kid, hmac_key)
-            if kid and hmac_key
-            else self.eab_credentials
-        )
+        eab_credentials = ExternalAccountBindingCredentials(kid, hmac_key) if kid and hmac_key else self.eab_credentials
 
         try:
-            external_account_binding = eab_credentials.create_eab(
-                self._private_key.public_key(), self._directory
-            )
+            external_account_binding = eab_credentials.create_eab(self._private_key.public_key(), self._directory)
         except ValueError:
             external_account_binding = None
             if self.eab_credentials.kid or self.eab_credentials.hmac_key:
@@ -249,9 +234,7 @@ class AcmeClient:
             external_account_binding=external_account_binding,
         )
 
-        resp, account_obj = await self._signed_request(
-            reg, self._directory["newAccount"]
-        )
+        resp, account_obj = await self._signed_request(reg, self._directory["newAccount"])
         account_obj["kid"] = resp.headers["Location"]
         self._account = messages.Account.from_json(account_obj)
 
@@ -277,14 +260,10 @@ class AcmeClient:
 
         :raises: :class:`acme.messages.Error` If no account associated with the private key exists.
         """
-        reg = acme.messages.Registration.from_data(
-            terms_of_service_agreed=True, only_return_existing=True
-        )
+        reg = acme.messages.Registration.from_data(terms_of_service_agreed=True, only_return_existing=True)
 
         self._account = None  # Otherwise the kid is sent instead of the JWK. Results in the request failing.
-        resp, account_obj = await self._signed_request(
-            reg, self._directory["newAccount"]
-        )
+        resp, account_obj = await self._signed_request(reg, self._directory["newAccount"])
         account_obj["kid"] = resp.headers["Location"]
         self._account = messages.Account.from_json(account_obj)
 
@@ -309,13 +288,9 @@ class AcmeClient:
         profiles = self._directory.meta.get("profiles", dict())
         if profile is not None:
             if not profiles:
-                raise ValueError(
-                    "Profiles are not supported {}".format(", ".join(profiles.keys()))
-                )
+                raise ValueError("Profiles are not supported {}".format(", ".join(profiles.keys())))
             if profile not in profiles:
-                raise ValueError(
-                    "Profile must be one of {}".format(", ".join(profiles.keys()))
-                )
+                raise ValueError("Profile must be one of {}".format(", ".join(profiles.keys())))
 
         order = messages.NewOrder.from_data(identifiers=identifiers, profile=profile)
 
@@ -400,9 +375,7 @@ class AcmeClient:
 
         return orders
 
-    async def authorization_get(
-        self, authorization_url: str
-    ) -> acme.messages.Authorization:
+    async def authorization_get(self, authorization_url: str) -> acme.messages.Authorization:
         """Fetches an authorization given its URL.
 
         :param authorization_url: The authorization's URL.
@@ -421,10 +394,7 @@ class AcmeClient:
         :param order: Order whose authorizations should be completed.
         :raises: :class:`CouldNotCompleteChallenge` If completion of one of the authorizations' challenges failed.
         """
-        authorizations = [
-            await self.authorization_get(authorization_url)
-            for authorization_url in order.authorizations
-        ]
+        authorizations = [await self.authorization_get(authorization_url) for authorization_url in order.authorizations]
 
         challenge_types = {
             ChallengeType(challenge.chall.typ)
@@ -447,9 +417,7 @@ class AcmeClient:
             type(solver).__name__,
         )
 
-        challenges_to_complete: list[
-            tuple[acme.messages.Identifier, acme.messages.ChallengeBody]
-        ] = []
+        challenges_to_complete: list[tuple[acme.messages.Identifier, acme.messages.ChallengeBody]] = []
 
         for authorization in authorizations:
             for challenge in authorization.challenges:
@@ -516,9 +484,7 @@ class AcmeClient:
         )
 
         # Tell the server that we are ready for challenge validation
-        await asyncio.gather(
-            *[self.challenge_validate(challenge.uri) for _, challenge in challenges]
-        )
+        await asyncio.gather(*[self.challenge_validate(challenge.uri) for _, challenge in challenges])
 
         # Poll until all challenges have become valid
         try:
@@ -598,15 +564,9 @@ class AcmeClient:
 
     async def key_change(self, private_key):
         key, alg = self._open_key(private_key)
-        key_change = messages.KeyChange(
-            account=self._account["kid"], oldKey=self._private_key.public_key()
-        )
-        signed_key_change = messages.SignedKeyChange.from_data(
-            key_change, key, alg, url=self._directory["keyChange"]
-        )
-        resp, data = await self._signed_request(
-            signed_key_change, self._directory["keyChange"]
-        )
+        key_change = messages.KeyChange(account=self._account["kid"], oldKey=self._private_key.public_key())
+        signed_key_change = messages.SignedKeyChange.from_data(key_change, key, alg, url=self._directory["keyChange"])
+        resp, data = await self._signed_request(signed_key_change, self._directory["keyChange"])
         #        data["kid"] = resp.headers["Location"]
         #        self._account = messages.Account.from_json(data)
         self._private_key = key
@@ -626,9 +586,7 @@ class AcmeClient:
         """
         for challenge_type in challenge_solver.SUPPORTED_CHALLENGES:
             if self._challenge_solvers.get(challenge_type):
-                raise ValueError(
-                    f"A challenge solver for type {challenge_type} is already registered"
-                )
+                raise ValueError(f"A challenge solver for type {challenge_type} is already registered")
             else:
                 self._challenge_solvers[challenge_type] = challenge_solver
 
@@ -645,9 +603,7 @@ class AcmeClient:
         tries = max_tries
         result = await coro(*args, **kwargs)
         while tries > 0:
-            logger.debug(
-                "Polling %s%s, tries remaining: %d", coro.__name__, args, tries - 1
-            )
+            logger.debug("Polling %s%s, tries remaining: %d", coro.__name__, args, tries - 1)
             if predicate(result):
                 break
 
@@ -661,18 +617,14 @@ class AcmeClient:
             result = await coro(*args, **kwargs)
             tries -= 1
         else:
-            raise PollingException(
-                result, f"Polling unsuccessful: {coro.__name__}{args}"
-            )
+            raise PollingException(result, f"Polling unsuccessful: {coro.__name__}{args}")
 
         return result
 
     async def _get_nonce(self):
         async def fetch_nonce():
             try:
-                async with self._session.head(
-                    self._directory["newNonce"], ssl=self._ssl_context
-                ) as resp:
+                async with self._session.head(self._directory["newNonce"], ssl=self._ssl_context) as resp:
                     logger.debug("Storing new nonce %s", resp.headers["Replay-Nonce"])
                     return resp.headers["Replay-Nonce"]
             except Exception as e:
@@ -683,9 +635,7 @@ class AcmeClient:
         except KeyError:
             return await self._poll_until(fetch_nonce, predicate=lambda x: x, delay=5.0)
 
-    def _wrap_in_jws(
-        self, obj: typing.Optional[josepy.JSONDeSerializable], nonce, url, post_as_get
-    ):
+    def _wrap_in_jws(self, obj: typing.Optional[josepy.JSONDeSerializable], nonce, url, post_as_get):
         if post_as_get:
             jobj = obj.json_dumps(indent=2).encode() if obj else b""
         else:
@@ -693,19 +643,13 @@ class AcmeClient:
         kwargs = {"nonce": acme.jose.b64decode(nonce), "url": url}
         if self._account is not None:
             kwargs["kid"] = self._account["kid"]
-        return jws.JWS.sign(
-            jobj, key=self._private_key, alg=self._alg, **kwargs
-        ).json_dumps(indent=2)
+        return jws.JWS.sign(jobj, key=self._private_key, alg=self._alg, **kwargs).json_dumps(indent=2)
 
-    async def _signed_request(
-        self, obj: typing.Optional[josepy.JSONDeSerializable], url, post_as_get=True
-    ):
+    async def _signed_request(self, obj: typing.Optional[josepy.JSONDeSerializable], url, post_as_get=True):
         tries = self.INVALID_NONCE_RETRIES
         while tries > 0:
             try:
-                payload = self._wrap_in_jws(
-                    obj, await self._get_nonce(), url, post_as_get
-                )
+                payload = self._wrap_in_jws(obj, await self._get_nonce(), url, post_as_get)
                 return await self._make_request(payload, url)
             except acme.messages.Error as e:
                 if e.code == "badNonce" and tries > 1:
@@ -728,9 +672,7 @@ class AcmeClient:
             elif resp.content_type == "application/problem+json":
                 raise acme.messages.Error.from_json(await resp.json())
             elif resp.status < 200 or resp.status >= 300:
-                raise ClientResponseError(
-                    resp.request_info, resp.history, status=resp.status
-                )
+                raise ClientResponseError(resp.request_info, resp.history, status=resp.status)
             else:
                 data = await resp.text()
 

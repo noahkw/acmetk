@@ -153,9 +153,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         }
         self._tos_url = tos_url
         self._mail_suffixes = mail_suffixes
-        self._subnets = (
-            [ipaddress.ip_network(subnet) for subnet in subnets] if subnets else None
-        )
+        self._subnets = [ipaddress.ip_network(subnet) for subnet in subnets] if subnets else None
         self._use_forwarded_header = use_forwarded_header
         self._require_eab = require_eab
         self._allow_wildcard = allow_wildcard
@@ -210,9 +208,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         self.app.router.add_route("GET", "/{tail:.*}", handle_get)
 
     @classmethod
-    async def create_app(
-        cls, config: dict[str, typing.Any], **kwargs
-    ) -> "AcmeServerBase":
+    async def create_app(cls, config: dict[str, typing.Any], **kwargs) -> "AcmeServerBase":
         """A factory that also creates and initializes the database and session objects,
         reading the necessary arguments from the passed config dict.
 
@@ -231,14 +227,10 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return instance
 
     def _session(self, request: web.Request) -> AsyncSession:
-        return self._db_session(
-            info={"remote_host": request.get("actual_ip", "0.0.0.0")}
-        )
+        return self._db_session(info={"remote_host": request.get("actual_ip", "0.0.0.0")})
 
     @classmethod
-    async def runner(
-        cls, config: dict[str, typing.Any], **kwargs
-    ) -> tuple["aiohttp.web.AppRunner", "AcmeServerBase"]:
+    async def runner(cls, config: dict[str, typing.Any], **kwargs) -> tuple["aiohttp.web.AppRunner", "AcmeServerBase"]:
         """A factory that starts the server on the given hostname and port using an AppRunner
         after constructing a server instance using :meth:`.create_app`.
 
@@ -297,9 +289,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         """
         for challenge_type in validator.SUPPORTED_CHALLENGES:
             if self._challenge_validators.get(challenge_type):
-                raise ValueError(
-                    f"A challenge validator for type {challenge_type} is already registered"
-                )
+                raise ValueError(f"A challenge validator for type {challenge_type} is already registered")
             else:
                 self._challenge_validators[challenge_type] = validator
 
@@ -307,9 +297,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
     def _supported_challenges(self):
         return self._challenge_validators.keys()
 
-    def _response(
-        self, request: web.Request, data=None, text=None, *args, **kwargs
-    ) -> web.Response:
+    def _response(self, request: web.Request, data=None, text=None, *args, **kwargs) -> web.Response:
         if data and text:
             raise ValueError("only one of data, text, or body should be specified")
         elif data and (data is not sentinel):
@@ -384,9 +372,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         try:
             jws = acme.jws.JWS.json_loads(data)
         except josepy.errors.DeserializationError:
-            raise acme.messages.Error.with_code(
-                "malformed", detail="The request does not contain a valid JWS."
-            )
+            raise acme.messages.Error.with_code("malformed", detail="The request does not contain a valid JWS.")
 
         if post_as_get and jws.payload != b"":
             raise acme.messages.Error.with_code(
@@ -421,27 +407,17 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         elif sig.kid:
             account_id = yarl.URL(sig.kid).name
 
-            if (
-                acmetk.util.url_for(request, "accounts", account_id=account_id)
-                != sig.kid
-            ):
+            if acmetk.util.url_for(request, "accounts", account_id=account_id) != sig.kid:
                 """Bug in the dehydrated client, accepted by boulder, so we accept it too.
                 Dehydrated puts .../new-account/{kid} into the request signature, instead of
                 .../accounts/{kid}."""
-                kid_new_account_route = yarl.URL(
-                    acmetk.util.url_for(request, "new-account")
-                )
-                kid_new_account_route = kid_new_account_route.with_path(
-                    kid_new_account_route.path + "/" + account_id
-                )
+                kid_new_account_route = yarl.URL(acmetk.util.url_for(request, "new-account"))
+                kid_new_account_route = kid_new_account_route.with_path(kid_new_account_route.path + "/" + account_id)
                 if str(kid_new_account_route) == sig.kid:
                     logger.debug("Buggy client kid account mismatch")
                 else:
                     raise acme.messages.Error.with_code("malformed")
-            elif (
-                "account_id" in request.match_info
-                and request.match_info["account_id"] != account_id
-            ):
+            elif "account_id" in request.match_info and request.match_info["account_id"] != account_id:
                 raise acme.messages.Error.with_code("malformed")
 
             account = await self._db.get_account(session, account_id=account_id)
@@ -480,9 +456,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             try:
                 jws = acme.jws.JWS.json_loads(data)
             except josepy.errors.DeserializationError:
-                raise acme.messages.Error.with_code(
-                    "malformed", detail="The request does not contain a valid JWS."
-                )
+                raise acme.messages.Error.with_code("malformed", detail="The request does not contain a valid JWS.")
             account = None
 
         try:
@@ -508,9 +482,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                 ec.EllipticCurvePublicKeyWithSerialization,
             ):
                 cert_key = josepy.util.ComparableECKey(cert_key)
-            elif isinstance(
-                cert_key := cert.public_key(), rsa.RSAPublicKeyWithSerialization
-            ):
+            elif isinstance(cert_key := cert.public_key(), rsa.RSAPublicKeyWithSerialization):
                 cert_key = josepy.util.ComparableRSAKey(cert_key)
 
             if cert_key != jwk.key:
@@ -529,9 +501,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                     continue
 
                 # The contact URL contains an email address, validate it.
-                if self._mail_suffixes and not any(
-                    [address.endswith(suffix) for suffix in self._mail_suffixes]
-                ):
+                if self._mail_suffixes and not any([address.endswith(suffix) for suffix in self._mail_suffixes]):
                     raise acme.messages.Error.with_code(
                         "invalidContact",
                         detail=f"The contact email '{address}' is not supported.",
@@ -547,9 +517,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             * :class:`acme.messages.Error` If the Order has invalid identifiers.
         """
 
-        identifiers_: dict[str, list[acme.messages.Identifier]] = (
-            collections.defaultdict(list)
-        )
+        identifiers_: dict[str, list[acme.messages.Identifier]] = collections.defaultdict(list)
         for i in obj.identifiers:
             identifiers_[i.typ.name].append(i)
 
@@ -563,9 +531,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                             identifiers,
                         )
                     ):
-                        raise ValueError(
-                            "The ACME server can not issue a wildcard certificate"
-                        )
+                        raise ValueError("The ACME server can not issue a wildcard certificate")
                     if wildcardonly:
                         return
 
@@ -573,9 +539,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                     try:
                         list(
                             map(
-                                lambda identifier: identifier.value.encode(
-                                    "ascii"
-                                ).decode("idna"),
+                                lambda identifier: identifier.value.encode("ascii").decode("idna"),
                                 identifiers,
                             )
                         )
@@ -585,8 +549,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                     # not lowercase
                     r = set(
                         map(
-                            lambda identifier: identifier.value.lower()
-                            == identifier.value,
+                            lambda identifier: identifier.value.lower() == identifier.value,
                             identifiers,
                         )
                     )
@@ -596,10 +559,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                     # regex
                     r = set(
                         map(
-                            lambda identifier: self.VALID_DOMAIN_RE.match(
-                                identifier.value.lstrip("*.")
-                            )
-                            is not None,
+                            lambda identifier: self.VALID_DOMAIN_RE.match(identifier.value.lstrip("*.")) is not None,
                             identifiers,
                         )
                     )
@@ -609,15 +569,12 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                     # ends with a letter
                     r = set(
                         map(
-                            lambda identifier: identifier.value[-1]
-                            in string.ascii_lowercase,
+                            lambda identifier: identifier.value[-1] in string.ascii_lowercase,
                             identifiers,
                         )
                     )
                     if False in r:
-                        raise ValueError(
-                            "Domain name does not end with a valid public suffix (TLD)"
-                        )
+                        raise ValueError("Domain name does not end with a valid public suffix (TLD)")
                 elif k == "ip":
                     try:
                         [ipaddress.ip_address(i.value) for i in identifiers]
@@ -702,9 +659,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             jws, account = await self._verify_request(request, session, key_auth=True)
             reg = acme.messages.Registration.json_loads(jws.payload)
             jwk = jws.signature.combined.jwk
-            pub_key: typing.Union[RSAPublicKey, EllipticCurvePublicKey] = (
-                jwk.key._wrapped
-            )
+            pub_key: typing.Union[RSAPublicKey, EllipticCurvePublicKey] = jwk.key._wrapped
 
             self._validate_account_key(pub_key)
 
@@ -716,9 +671,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                         request,
                         account.serialize(request),
                         headers={
-                            "Location": acmetk.util.url_for(
-                                request, "accounts", account_id=str(account.account_id)
-                            )
+                            "Location": acmetk.util.url_for(request, "accounts", account_id=str(account.account_id))
                         },
                     )
             else:
@@ -747,16 +700,10 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                         request,
                         serialized,
                         status=201,
-                        headers={
-                            "Location": acmetk.util.url_for(
-                                request, "accounts", account_id=str(account_id)
-                            )
-                        },
+                        headers={"Location": acmetk.util.url_for(request, "accounts", account_id=str(account_id))},
                     )
 
-    def _validate_account_key(
-        self, pub_key: typing.Union[RSAPublicKey, EllipticCurvePublicKey]
-    ):
+    def _validate_account_key(self, pub_key: typing.Union[RSAPublicKey, EllipticCurvePublicKey]):
         if isinstance(pub_key, self.SUPPORTED_ACCOUNT_KEYS):
             try:
                 self._match_keysize(pub_key, "account")
@@ -789,9 +736,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         :return: The account object.
         """
         async with self._session(request) as session:
-            jws, account = await self._verify_request(
-                request, session, expunge_account=False
-            )
+            jws, account = await self._verify_request(request, session, expunge_account=False)
             upd = messages.AccountUpdate.json_loads(jws.payload)
 
             if self._require_eab and upd.contact:
@@ -837,9 +782,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             request,
             serialized,
             status=201,
-            headers={
-                "Location": acmetk.util.url_for(request, "order", id=str(order_id))
-            },
+            headers={"Location": acmetk.util.url_for(request, "order", id=str(order_id))},
         )
 
     @routes.post("/authz/{id}", name="authz")
@@ -864,9 +807,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             authz_id = request.match_info["id"]
             upd = messages.AuthorizationUpdate.json_loads(jws.payload)
 
-            authorization = await self._db.get_authz(
-                session, account.account_id, authz_id
-            )
+            authorization = await self._db.get_authz(session, account.account_id, authz_id)
             if not authorization:
                 raise web.HTTPNotFound
 
@@ -896,9 +837,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             jws, account = await self._verify_request(request, session)
             challenge_id = request.match_info["id"]
 
-            challenge = await self._db.get_challenge(
-                session, account.account_id, challenge_id
-            )
+            challenge = await self._db.get_challenge(session, account.account_id, challenge_id)
             if not challenge:
                 raise web.HTTPNotFound
 
@@ -913,9 +852,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             await session.commit()
 
         if validate_challenge:
-            asyncio.ensure_future(
-                self._handle_challenge_validate(request, account_id, challenge_id)
-            )
+            asyncio.ensure_future(self._handle_challenge_validate(request, account_id, challenge_id))
         return self._response(request, serialized, links=[f'<{authz_url}>; rel="up"'])
 
     @routes.post("/revoke-cert", name="revoke-cert")
@@ -957,9 +894,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         :return: The order object.
         """
         async with self._session(request) as session:
-            jws, account = await self._verify_request(
-                request, session, post_as_get=True
-            )
+            jws, account = await self._verify_request(request, session, post_as_get=True)
             order_id = request.match_info["id"]
 
             order = await self._db.get_order(session, account.account_id, order_id)
@@ -979,21 +914,15 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         :return: An object with key *orders* that holds a chunk of the account's orders list.
         """
         async with self._session(request) as session:
-            jws, account = await self._verify_request(
-                request, session, post_as_get=True
-            )
+            jws, account = await self._verify_request(request, session, post_as_get=True)
             try:
                 cursor = int(request.query.get("cursor", 0))
-                orders = await self._db.get_orders_list(
-                    session, account.account_id, self.ORDERS_LIST_CHUNK_LEN, cursor
-                )
+                orders = await self._db.get_orders_list(session, account.account_id, self.ORDERS_LIST_CHUNK_LEN, cursor)
             except ValueError:
                 raise web.HTTPBadRequest(text="Cursor must be an integer >= 0.")
 
             if len(orders) == 0:
-                raise web.HTTPNotFound(
-                    text="No orders found. Try a lower cursor value or create some orders first."
-                )
+                raise web.HTTPNotFound(text="No orders found. Try a lower cursor value or create some orders first.")
 
             """The next two lines ensure that the extra order we query to see if there more orders is not returned
             to the client. If there are no more orders after the current cursor, then return all of them."""
@@ -1002,17 +931,9 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
             return self._response(
                 request,
-                {
-                    "orders": [
-                        order.url(request)
-                        for order in orders
-                        if order.status == models.OrderStatus.PENDING
-                    ]
-                },
+                {"orders": [order.url(request) for order in orders if order.status == models.OrderStatus.PENDING]},
                 links=(
-                    [
-                        f'<{acmetk.util.next_url(account.orders_url(request), cursor)}>; rel="next"'
-                    ]
+                    [f'<{acmetk.util.next_url(account.orders_url(request), cursor)}>; rel="next"']
                     if more_orders
                     else []
                 ),
@@ -1041,9 +962,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
         csr = messages.CertificateRequest.json_loads(jws.payload).csr
         pub_key = csr.public_key()
-        logger.debug(
-            "Received CSR; Type: %s, Key Size: %s bits", type(pub_key), pub_key.key_size
-        )
+        logger.debug("Received CSR; Type: %s, Key Size: %s bits", type(pub_key), pub_key.key_size)
 
         if isinstance(pub_key, self.SUPPORTED_CSR_KEYS):
             try:
@@ -1061,9 +980,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             )
 
         if not csr.is_signature_valid:
-            raise acme.messages.Error.with_code(
-                "badCSR", detail="The CSR's signature is invalid."
-            )
+            raise acme.messages.Error.with_code("badCSR", detail="The CSR's signature is invalid.")
         elif not order.validate_csr(csr):
             raise acme.messages.Error.with_code(
                 "badCSR",
@@ -1124,9 +1041,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         """
         pass
 
-    async def _handle_challenge_validate(
-        self, request: web.Request, account_id, challenge_id
-    ) -> None:
+    async def _handle_challenge_validate(self, request: web.Request, account_id, challenge_id) -> None:
         logger.debug("Validating challenge %s", challenge_id)
 
         async with self._session(request) as session:
@@ -1190,22 +1105,16 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
             key_change = messages.KeyChange.json_loads(inner_jws.payload)
 
-            if key_change.account != acmetk.util.url_for(
-                request, "accounts", account_id=str(account.account_id)
-            ):
+            if key_change.account != acmetk.util.url_for(request, "accounts", account_id=str(account.account_id)):
                 """7.  Check that the "account" field of the keyChange object contains
                 the URL for the account matching the old key (i.e., the "kid"
                 field in the outer JWS)."""
-                raise acme.messages.Error.with_code(
-                    "malformed", detail="The KeyChange object account mismatches"
-                )
+                raise acme.messages.Error.with_code("malformed", detail="The KeyChange object account mismatches")
 
             if key_change.oldKey != account.key:
                 """8.  Check that the "oldKey" field of the keyChange object is the same as the account key for the
                 account in question."""
-                raise acme.messages.Error.with_code(
-                    "malformed", detail="The KeyChange object oldKey mismatches"
-                )
+                raise acme.messages.Error.with_code("malformed", detail="The KeyChange object oldKey mismatches")
 
             kid = account._jwk_kid(sig.jwk)
             in_use = await self._db.get_account(session, kid=kid)
@@ -1213,9 +1122,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             if in_use:
                 """9. Check that no account exists whose account key is the same as the key in the "jwk" header
                 parameter of the inner JWS."""
-                raise acme.messages.Error.with_code(
-                    "malformed", detail="The KeyChange object key already in use"
-                )
+                raise acme.messages.Error.with_code("malformed", detail="The KeyChange object key already in use")
 
             """key size validation"""
             self._validate_account_key(sig.jwk.key._wrapped)
@@ -1230,17 +1137,11 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             return self._response(
                 request,
                 serialized,
-                headers={
-                    "Location": acmetk.util.url_for(
-                        request, "accounts", account_id=str(account.account_id)
-                    )
-                },
+                headers={"Location": acmetk.util.url_for(request, "accounts", account_id=str(account.account_id))},
             )
 
     @abc.abstractmethod
-    async def handle_order_finalize(
-        self, request: web.Request, account_id: str, order_id: str
-    ) -> web.Response:
+    async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str) -> web.Response:
         """Method that handles the actual finalization of an order.
 
         This method should be called after the order's status has been set
@@ -1301,9 +1202,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
     @middleware
     async def aiohttp_jinja2_middleware(self, request: web.Request, handler):
-        if isinstance(handler, functools.partial) and (
-            handler := handler.keywords["handler"]
-        ):
+        if isinstance(handler, functools.partial) and (handler := handler.keywords["handler"]):
             # using subapps -> functools.partial
             # aiohttp_jinja2 context
             request[aiohttp_jinja2.REQUEST_CONTEXT_KEY] = {
@@ -1376,9 +1275,7 @@ class AcmeCA(AcmeServerBase):
 
         return ca
 
-    async def handle_order_finalize(
-        self, request: web.Request, account_id: str, order_id: str
-    ):
+    async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str):
         """Method that handles the actual finalization of an order.
 
         This method is called after the order's status has been set
@@ -1397,12 +1294,8 @@ class AcmeCA(AcmeServerBase):
         async with self._session(request) as session:
             order = await self._db.get_order(session, account_id, order_id)
 
-            cert = acmetk.util.generate_cert_from_csr(
-                order.csr, self._cert, self._private_key
-            )
-            order.certificate = models.Certificate(
-                status=models.CertificateStatus.VALID, cert=cert
-            )
+            cert = acmetk.util.generate_cert_from_csr(order.csr, self._cert, self._private_key)
+            order.certificate = models.Certificate(status=models.CertificateStatus.VALID, cert=cert)
 
             order.status = models.OrderStatus.VALID
             await session.commit()
@@ -1410,14 +1303,10 @@ class AcmeCA(AcmeServerBase):
     # @routes.post("/certificate/{id}", name="certificate")
     async def certificate(self, request: web.Request) -> web.Response:
         async with self._session(request) as session:
-            jws, account = await self._verify_request(
-                request, session, post_as_get=True
-            )
+            jws, account = await self._verify_request(request, session, post_as_get=True)
             certificate_id = request.match_info["id"]
 
-            certificate = await self._db.get_certificate(
-                session, account.account_id, certificate_id
-            )
+            certificate = await self._db.get_certificate(session, account.account_id, certificate_id)
             if not certificate:
                 raise web.HTTPNotFound
 
@@ -1454,9 +1343,7 @@ class AcmeRelayBase(AcmeServerBase):
         return self._response(request, directory)
 
     @classmethod
-    async def create_app(
-        cls, config: dict[str, typing.Any], *, client: AcmeClient, **kwargs
-    ) -> "AcmeRelayBase":
+    async def create_app(cls, config: dict[str, typing.Any], *, client: AcmeClient, **kwargs) -> "AcmeRelayBase":
         """A factory that also creates and initializes the database and session objects,
         reading the necessary arguments from the passed config dict.
 
@@ -1490,14 +1377,10 @@ class AcmeRelayBase(AcmeServerBase):
         :return: The certificate's full chain in PEM format.
         """
         async with self._session(request) as session:
-            jws, account = await self._verify_request(
-                request, session, post_as_get=True
-            )
+            jws, account = await self._verify_request(request, session, post_as_get=True)
             certificate_id = request.match_info["id"]
 
-            certificate = await self._db.get_certificate(
-                session, account.account_id, certificate_id
-            )
+            certificate = await self._db.get_certificate(session, account.account_id, certificate_id)
             if not certificate:
                 raise web.HTTPNotFound
 
@@ -1534,9 +1417,7 @@ class AcmeRelayBase(AcmeServerBase):
         async with self._session(request) as session:
             certificate, revocation = await self._verify_revocation(request, session)
 
-            revocation_succeeded = await self._client.certificate_revoke(
-                certificate.cert, reason=revocation.reason
-            )
+            revocation_succeeded = await self._client.certificate_revoke(certificate.cert, reason=revocation.reason)
             if not revocation_succeeded:
                 raise acme.messages.Error.with_code("unauthorized")
 
@@ -1546,9 +1427,7 @@ class AcmeRelayBase(AcmeServerBase):
 
         return self._response(request, status=200)
 
-    async def obtain_and_store_cert(
-        self, order: models.Order, order_ca: acme.messages.Order
-    ):
+    async def obtain_and_store_cert(self, order: models.Order, order_ca: acme.messages.Order):
         """Method that obtains the certificate for the given order from the remote CA and stores it.
 
         This method should be called after the finalization of the order has been completed
@@ -1586,9 +1465,7 @@ class AcmeBroker(AcmeRelayBase):
     the :class:`AcmeProxy` class should be used instead.
     """
 
-    async def handle_order_finalize(
-        self, request: web.Request, account_id: str, order_id: str
-    ):
+    async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str):
         """Method that handles the actual finalization of an order.
 
         This method is called after the order's status has been set
@@ -1611,9 +1488,7 @@ class AcmeBroker(AcmeRelayBase):
             order = await self._db.get_order(session, account_id, order_id)
 
             try:
-                order_ca = await self._client.order_create(
-                    list(acmetk.util.names_of(order.csr))
-                )
+                order_ca = await self._client.order_create(list(acmetk.util.names_of(order.csr)))
                 await self._client.authorizations_complete(order_ca)
                 finalized = await self._client.order_finalize(order_ca, order.csr)
                 await self.obtain_and_store_cert(order, finalized)
@@ -1627,9 +1502,7 @@ class AcmeBroker(AcmeRelayBase):
                     e.challenge.uri,
                     order_id,
                 )
-                order.proxied_error = e.challenge.error or (
-                    e.args[0] if e.args else None
-                )
+                order.proxied_error = e.challenge.error or (e.args[0] if e.args else None)
                 order.status = models.OrderStatus.INVALID
             except AcmeClientException:
                 logger.exception(
@@ -1665,18 +1538,11 @@ class AcmeProxy(AcmeRelayBase):
             jws, account = await self._verify_request(request, session)
             obj = acme.messages.NewOrder.json_loads(jws.payload)
             self._verify_order(obj, wildcardonly=True)
-            identifiers = [
-                {"type": identifier.typ, "value": identifier.value}
-                for identifier in obj.identifiers
-            ]
+            identifiers = [{"type": identifier.typ, "value": identifier.value} for identifier in obj.identifiers]
 
-            location, order_ca = await self._client.order_create(
-                identifiers, return_location=True
-            )
+            location, order_ca = await self._client.order_create(identifiers, return_location=True)
 
-            order = models.Order.from_obj(
-                account, obj, self._supported_challenges, location
-            )
+            order = models.Order.from_obj(account, obj, self._supported_challenges, location)
             session.add(order)
 
             await session.flush()
@@ -1690,9 +1556,7 @@ class AcmeProxy(AcmeRelayBase):
             request,
             serialized,
             status=201,
-            headers={
-                "Location": acmetk.util.url_for(request, "order", id=str(order_id))
-            },
+            headers={"Location": acmetk.util.url_for(request, "order", id=str(order_id))},
         )
 
     async def _complete_challenges(self, request: web.Request, account_id, order_id):
@@ -1709,9 +1573,7 @@ class AcmeProxy(AcmeRelayBase):
                     e.challenge.uri,
                     order_id,
                 )
-                order.proxied_error = e.challenge.error or (
-                    e.args[0] if e.args else None
-                )
+                order.proxied_error = e.challenge.error or (e.args[0] if e.args else None)
                 order.status = models.OrderStatus.INVALID
             except AcmeClientException:
                 logger.exception(
@@ -1755,9 +1617,7 @@ class AcmeProxy(AcmeRelayBase):
                 """AcmeClient.order_finalize does not return if the order never becomes valid.
                 Thus, we handle that case here and set the order's status to invalid
                 if the CA takes too long."""
-                await asyncio.wait_for(
-                    self._client.order_finalize(order_ca, csr), 120.0
-                )
+                await asyncio.wait_for(self._client.order_finalize(order_ca, csr), 120.0)
             except asyncio.TimeoutError:
                 logger.info(f"finalize_order timeout for order {order.order_id}")
                 order.status = models.OrderStatus.INVALID
@@ -1778,9 +1638,7 @@ class AcmeProxy(AcmeRelayBase):
             await session.commit()
 
         if order_processing:
-            asyncio.ensure_future(
-                self.handle_order_finalize(request, account_id, order_id)
-            )
+            asyncio.ensure_future(self.handle_order_finalize(request, account_id, order_id))
 
         return self._response(
             request,
@@ -1788,9 +1646,7 @@ class AcmeProxy(AcmeRelayBase):
             headers={"Location": acmetk.util.url_for(request, "order", id=order_id)},
         )
 
-    async def handle_order_finalize(
-        self, request: web.Request, account_id: str, order_id: str
-    ):
+    async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str):
         """Method that handles the actual finalization of an order.
 
         This method is called after the order's status has been set

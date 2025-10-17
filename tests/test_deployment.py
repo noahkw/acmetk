@@ -84,16 +84,12 @@ class TestDeployment(TestAcme):
         self.nginx_proc.kill()
 
 
-class TestAcmetinyCADeployment(
-    TestAcmetiny, TestDeployment, unittest.IsolatedAsyncioTestCase
-):
+class TestAcmetinyCADeployment(TestAcmetiny, TestDeployment, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
 
-class TestCertBotCADeployment(
-    TestCertBot, TestDeployment, unittest.IsolatedAsyncioTestCase
-):
+class TestCertBotCADeployment(TestCertBot, TestDeployment, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
@@ -114,9 +110,7 @@ class TestCertBotCADeployment(
         await super().test_unregister()
 
 
-class TestOurClientCADeployment(
-    TestOurClient, TestDeployment, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientCADeployment(TestOurClient, TestDeployment, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 

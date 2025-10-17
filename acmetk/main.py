@@ -28,9 +28,7 @@ server_app_registry = PluginRegistry.get_registry(AcmeServerBase)
 challenge_solver_registry = PluginRegistry.get_registry(ChallengeSolver)
 challenge_validator_registry = PluginRegistry.get_registry(ChallengeValidator)
 
-PATH_OR_HOST_AND_PORT_MSG = (
-    "Must specify either the path of the unix socket or the hostname + port."
-)
+PATH_OR_HOST_AND_PORT_MSG = "Must specify either the path of the unix socket or the hostname + port."
 
 
 def load_config(config_file: str) -> dict:
@@ -57,9 +55,7 @@ def create_challenge_solver(config):
 
 
 def create_challenge_validator(challenge_validator_name):
-    challenge_validator_class = challenge_validator_registry.get_plugin(
-        challenge_validator_name
-    )
+    challenge_validator_class = challenge_validator_registry.get_plugin(challenge_validator_name)
     return challenge_validator_class()
 
 
@@ -164,13 +160,9 @@ def run(
 
     if bootstrap_port:
         if app_class is AcmeCA:
-            raise click.UsageError(
-                f"Bootstrapping is not supported for the {app_class} at this moment."
-            )
+            raise click.UsageError(f"Bootstrapping is not supported for the {app_class} at this moment.")
 
-        click.echo(
-            f"Starting {app_class.__name__} in bootstrap mode on port {bootstrap_port}"
-        )
+        click.echo(f"Starting {app_class.__name__} in bootstrap mode on port {bootstrap_port}")
         app_config = config[app_config_name]
 
         app_config["port"] = bootstrap_port
@@ -186,18 +178,14 @@ def run(
         click.echo(f"Starting {app_class.__name__}")
 
     if issubclass(app_class, AcmeRelayBase):
-        runner, site = loop.run_until_complete(
-            run_relay(config, path, app_class, app_config_name)
-        )
+        runner, site = loop.run_until_complete(run_relay(config, path, app_class, app_config_name))
     elif app_class is AcmeCA:
         runner, site = loop.run_until_complete(run_ca(config, path))
     else:
         raise ValueError(app_class)
 
     aiohttp_jinja2.setup(site.app, loader=jinja2.FileSystemLoader("./tpl/"))
-    aiohttp_jinja2.get_env(site.app).globals.update(
-        {"url_for": _url_for, "names_of_csr": names_of}
-    )
+    aiohttp_jinja2.get_env(site.app).globals.update({"url_for": _url_for, "names_of_csr": names_of})
 
     try:
         loop.run_forever()
@@ -206,9 +194,7 @@ def run(
 
 
 async def run_ca(config: dict[str, typing.Any], path: str):
-    challenge_validators = create_challenge_validators(
-        config["ca"]["challenge_validators"]
-    )
+    challenge_validators = create_challenge_validators(config["ca"]["challenge_validators"])
 
     if path:
         runner, ca = await AcmeCA.unix_socket(config["ca"], path)
@@ -225,27 +211,19 @@ async def run_ca(config: dict[str, typing.Any], path: str):
 @jinja2.pass_context
 def _url_for(context, __route_name, **parts):
     try:
-        return (
-            context["request"].match_info.apps[-1].router[__route_name].url_for(**parts)
-        )
+        return context["request"].match_info.apps[-1].router[__route_name].url_for(**parts)
     except Exception as e:
         print(e)
         return "ERROR GENERATING URL"
 
 
-async def run_relay(
-    config: dict[str, typing.Any], path: str, class_: AcmeRelayBase, config_name: str
-):
+async def run_relay(config: dict[str, typing.Any], path: str, class_: AcmeRelayBase, config_name: str):
     config_section = config[config_name]
 
     try:
-        challenge_solver = create_challenge_solver(
-            config_section["client"]["challenge_solver"]
-        )
+        challenge_solver = create_challenge_solver(config_section["client"]["challenge_solver"])
 
-        challenge_validators = create_challenge_validators(
-            config_section["challenge_validators"]
-        )
+        challenge_validators = create_challenge_validators(config_section["challenge_validators"])
 
     except ValueError as e:
         raise click.UsageError(*e.args)
@@ -261,9 +239,7 @@ async def run_relay(
     await relay_client.start()
 
     if path:
-        runner, relay = await class_.unix_socket(
-            config_section, path, client=relay_client
-        )
+        runner, relay = await class_.unix_socket(config_section, path, client=relay_client)
     elif config_section["hostname"] and config_section["port"]:
         runner, relay = await class_.runner(config_section, client=relay_client)
     else:

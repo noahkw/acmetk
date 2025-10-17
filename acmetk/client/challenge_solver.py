@@ -90,9 +90,7 @@ class DummySolver(ChallengeSolver):
         :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to be completed.
         """
-        logger.debug(
-            f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ}, identifier {identifier}"
-        )
+        logger.debug(f"(not) solving challenge {challenge.uri}, type {challenge.chall.typ}, identifier {identifier}")
         # await asyncio.sleep(1)
 
     async def cleanup_challenge(
@@ -110,6 +108,4 @@ class DummySolver(ChallengeSolver):
         :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to clean up after.
         """
-        logger.debug(
-            f"(not) cleaning up after challenge {challenge.uri}, type {challenge.chall.typ}"
-        )
+        logger.debug(f"(not) cleaning up after challenge {challenge.uri}, type {challenge.chall.typ}")

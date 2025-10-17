@@ -56,9 +56,7 @@ class DNS01ChallengeHelper:
             self._resolvers.append(resolver)
 
     @staticmethod
-    async def _query_txt_record(
-        resolver: dns.asyncresolver.Resolver, name: str
-    ) -> tuple[str, set[str]]:
+    async def _query_txt_record(resolver: dns.asyncresolver.Resolver, name: str) -> tuple[str, set[str]]:
         """Queries a DNS TXT record.
 
         :param resolver: The DNS resolver to use.
@@ -67,9 +65,7 @@ class DNS01ChallengeHelper:
         """
         txt_records = []
 
-        with contextlib.suppress(
-            dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer
-        ):
+        with contextlib.suppress(dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer):
             resp = await resolver.resolve(name, "TXT")
 
             for records in resp.rrset.items.keys():
@@ -99,9 +95,7 @@ class DNS01ChallengeHelper:
             done, missing = await self.query_txt_records(name, text)
             if done is True:
                 return
-            logger.debug(
-                f"{name} does not have TXT {text} yet. Retrying (name servers missing record: {missing})"
-            )
+            logger.debug(f"{name} does not have TXT {text} yet. Retrying (name servers missing record: {missing})")
             await asyncio.sleep(1.0)
 
 
@@ -127,8 +121,7 @@ def generate_csr(CN: str, private_key: rsa.RSAPrivateKey, path: Path, sans: list
         .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, CN)]))
         .add_extension(
             x509.SubjectAlternativeName(
-                [x509.DNSName(name) for name in names]
-                + [x509.IPAddress(addr) for addr in addresses]
+                [x509.DNSName(name) for name in names] + [x509.IPAddress(addr) for addr in addresses]
             ),
             critical=False,
         )
@@ -211,11 +204,7 @@ def url_for(request: aiohttp.web.Request, path: str, **kwargs) -> str:
     :param kwargs: Optional parameters for URL construction, such as an account ID.
     :return: The constructed URL.
     """
-    return str(
-        forwarded_url(request).with_path(
-            str(request.app.router[path].url_for(**kwargs))
-        )
-    )
+    return str(forwarded_url(request).with_path(str(request.app.router[path].url_for(**kwargs))))
 
 
 def next_url(url: str, current_cursor: int) -> str:
@@ -243,9 +232,7 @@ def generate_cert_from_csr(
     """
     names = list(names_of(csr))
 
-    subject = csr.subject or x509.Name(
-        [x509.NameAttribute(NameOID.COMMON_NAME, names[0])]
-    )
+    subject = csr.subject or x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, names[0])])
 
     cert = (
         x509.CertificateBuilder()
@@ -311,23 +298,16 @@ def generate_root_cert(
     return root_cert, root_key
 
 
-def names_of(
-    csr: "cryptography.x509.CertificateSigningRequest", lower: bool = False
-) -> set[str]:
+def names_of(csr: "cryptography.x509.CertificateSigningRequest", lower: bool = False) -> set[str]:
     """Returns all names contained in the given CSR.
 
     :param csr: The CRS whose names to extract.
     :param lower: True if the names should be returned in lowercase.
     :return: Set of the contained identifier strings.
     """
-    names = [
-        v.value
-        for v in csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)
-    ]
+    names = [v.value for v in csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)]
     names.extend(
-        csr.extensions.get_extension_for_class(
-            x509.SubjectAlternativeName
-        ).value.get_values_for_type(x509.DNSName)
+        csr.extensions.get_extension_for_class(x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
     )
 
     return {name.lower() if lower else name for name in names}
@@ -346,11 +326,7 @@ class base64url:
 
 def pem_split(
     pem: str,
-) -> list[
-    typing.Union[
-        "cryptography.x509.CertificateSigningRequest", "cryptography.x509.Certificate"
-    ]
-]:
+) -> list[typing.Union["cryptography.x509.CertificateSigningRequest", "cryptography.x509.Certificate"]]:
     """Parses a PEM encoded string and returns all contained CSRs and certificates.
 
     :param pem: The concatenated PEM encoded CSRs and certificates.
@@ -359,12 +335,8 @@ def pem_split(
     _PEM_TO_CLASS = {
         b"CERTIFICATE": x509.load_pem_x509_certificate,
         b"CERTIFICATE REQUEST": x509.load_pem_x509_csr,
-        b"EC PRIVATE KEY": lambda x: serialization.load_pem_private_key(
-            x, password=None
-        ),
-        b"RSA PRIVATE KEY": lambda x: serialization.load_pem_private_key(
-            x, password=None
-        ),
+        b"EC PRIVATE KEY": lambda x: serialization.load_pem_private_key(x, password=None),
+        b"RSA PRIVATE KEY": lambda x: serialization.load_pem_private_key(x, password=None),
     }
 
     _PEM_RE = re.compile(
@@ -377,10 +349,7 @@ def pem_split(
         re.DOTALL,
     )
 
-    return [
-        _PEM_TO_CLASS[match.groupdict()["cls"]](match.group(0))
-        for match in _PEM_RE.finditer(pem.encode())
-    ]
+    return [_PEM_TO_CLASS[match.groupdict()["cls"]](match.group(0)) for match in _PEM_RE.finditer(pem.encode())]
 
 
 class PerformanceMeasure:

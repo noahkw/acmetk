@@ -32,9 +32,7 @@ class AcmeManagementMixin:
     GROUPS_HEADER = "x-forwarded-groups"
     _mgmt_auth = False
 
-    async def _session(
-        self, request: aiohttp.web.Request
-    ) -> sqlalchemy.ext.asyncio.AsyncSession:
+    async def _session(self, request: aiohttp.web.Request) -> sqlalchemy.ext.asyncio.AsyncSession:
         pass
 
     @aiohttp.web.middleware
@@ -47,9 +45,7 @@ class AcmeManagementMixin:
         if self._mgmt_auth is False or not request.path.startswith("/mgmt"):
             return await handler(request)
 
-        if (
-            groups := request.headers.get(self.GROUPS_HEADER)
-        ) is None or self.MGMT_GROUP not in groups.split(","):
+        if (groups := request.headers.get(self.GROUPS_HEADER)) is None or self.MGMT_GROUP not in groups.split(","):
             return aiohttp.web.Response(
                 status=403,
                 text=f"{type(self).__name__}: This service requires {self.GROUPS_HEADER} & {self.MGMT_GROUP}"
@@ -59,9 +55,7 @@ class AcmeManagementMixin:
 
     @routes.get("/mgmt", name="mgmt-index")
     @aiohttp_jinja2.template("index.jinja2")
-    async def management_index(
-        self, request: aiohttp.web.Request
-    ) -> aiohttp.web.Response:
+    async def management_index(self, request: aiohttp.web.Request) -> aiohttp.web.Response:
         import datetime
 
         pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
@@ -72,9 +66,7 @@ class AcmeManagementMixin:
                 select(
                     sqlalchemy.func.date_trunc("day", Change.timestamp).label("dateof"),
                     sqlalchemy.func.count(Change.change).label("totalof"),
-                    sqlalchemy.func.count(sqlalchemy.distinct(Change._entity)).label(
-                        "uniqueof"
-                    ),
+                    sqlalchemy.func.count(sqlalchemy.distinct(Change._entity)).label("uniqueof"),
                     Entity.identity.label("actionof"),
                 )
                 .select_from(Change)
@@ -120,9 +112,7 @@ class AcmeManagementMixin:
             return {"statistics": statistics, "pms": pms}
 
     @routes.get("/mgmt/httpbin/headers", name="mgmt-httpbin-headers")
-    async def management_httpbin_headers(
-        self, request: aiohttp.web.Request
-    ) -> aiohttp.web.Response:
+    async def management_httpbin_headers(self, request: aiohttp.web.Request) -> aiohttp.web.Response:
         """
         c.f. https://httpbingo.org/
 
@@ -141,17 +131,9 @@ class AcmeManagementMixin:
             for value in request.query.getall("q", []):
                 # JSON Patch query for value regex like
                 # FIXME … though ' is taken care of " in q still breaks it but everything below does not work either
-                v = sqlalchemy.String().literal_processor(
-                    dialect=session._proxied.bind.dialect
-                )(value=value)
+                v = sqlalchemy.String().literal_processor(dialect=session._proxied.bind.dialect)(value=value)
                 v = v.replace('"', ".")
-                f.append(
-                    Change.data.op("@@")(
-                        sqlalchemy.text(
-                            f"'$[*].value like_regex \"{v[1:-1]}\"'::jsonpath"
-                        )
-                    )
-                )
+                f.append(Change.data.op("@@")(sqlalchemy.text(f"'$[*].value like_regex \"{v[1:-1]}\"'::jsonpath")))
 
                 # This text() construct doesn't define a bound parameter named 'n'
                 #                f.append(Change.data.op('@@')(
@@ -170,11 +152,7 @@ class AcmeManagementMixin:
                     import ipaddress
 
                     ipaddress.ip_interface(value)
-                    f.append(
-                        Change.remote_host.op("<<=")(
-                            sqlalchemy.cast(value, sqlalchemy.dialects.postgresql.INET)
-                        )
-                    )
+                    f.append(Change.remote_host.op("<<=")(sqlalchemy.cast(value, sqlalchemy.dialects.postgresql.INET)))
                 except ValueError:
                     pass
 
@@ -247,9 +225,7 @@ class AcmeManagementMixin:
             q = (
                 select(Account)
                 .options(
-                    selectinload(Account.orders)
-                    .joinedload(Order.identifiers)
-                    .joinedload(Identifier.authorization),
+                    selectinload(Account.orders).joinedload(Order.identifiers).joinedload(Identifier.authorization),
                     selectinload(Account.changes).joinedload(Change.entity),
                 )
                 .filter(Account.account_id == account)
@@ -304,22 +280,16 @@ class AcmeManagementMixin:
                     selectinload(Order.identifiers).options(
                         defaultload(Identifier.value),
                         selectinload(Identifier.authorization).options(
-                            selectinload(Authorization.identifier).defaultload(
-                                Identifier.value
-                            ),
+                            selectinload(Authorization.identifier).defaultload(Identifier.value),
                             selectinload(Authorization.challenges)
                             .selectinload(Challenge.changes)
                             .selectinload(Change.entity),
-                            selectinload(Authorization.changes).selectinload(
-                                Change.entity
-                            ),
+                            selectinload(Authorization.changes).selectinload(Change.entity),
                         ),
                         selectinload(Identifier.changes).selectinload(Change.entity),
                     ),
                     selectinload(Order.changes).selectinload(Change.entity),
-                    selectinload(Order.certificate)
-                    .selectinload(Certificate.changes)
-                    .selectinload(Change.entity),
+                    selectinload(Order.certificate).selectinload(Certificate.changes).selectinload(Change.entity),
                 )
                 .filter(Order.order_id == order)
             )
@@ -394,9 +364,7 @@ class AcmeManagementMixin:
             r = await session.execute(q)
             a = r.scalars().first()
             context = {"certificate": a.cert, "cryptography": cryptography}
-            response = aiohttp_jinja2.render_template(
-                "certificate.jinja2", request, context
-            )
+            response = aiohttp_jinja2.render_template("certificate.jinja2", request, context)
             response.content_type = "text"
             response.charset = "utf-8"
             return response
@@ -405,11 +373,7 @@ class AcmeManagementMixin:
     async def management_csr(self, request: aiohttp.web.Request):
         order = request.match_info["order"]
         async with self._session(request) as session:
-            q = (
-                select(Order)
-                .options(defaultload(Order.csr))
-                .filter(Order.order_id == order)
-            )
+            q = select(Order).options(defaultload(Order.csr)).filter(Order.order_id == order)
 
             r = await session.execute(q)
             a = r.scalars().first()

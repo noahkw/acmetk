@@ -58,10 +58,7 @@ def versioned_session(session):
             def change(op, path, value):
                 return {"op": op, "path": path, "value": value}
 
-            changed = obj.__diff__ - (
-                set(obj._sa_instance_state.unmodified_intersection(obj.__diff__))
-                & obj.__diff__
-            )
+            changed = obj.__diff__ - (set(obj._sa_instance_state.unmodified_intersection(obj.__diff__)) & obj.__diff__)
 
             def value(v):
                 if isinstance(v, (str, int, type(None))):
@@ -119,9 +116,7 @@ class Database:
             **kwargs,
         )
 
-        self.session: sessionmaker = versioned_sessionmaker(
-            bind=self.engine, class_=AsyncSession
-        )
+        self.session: sessionmaker = versioned_sessionmaker(bind=self.engine, class_=AsyncSession)
 
     async def begin(self) -> None:
         """Creates the database's tables according to the models defined in :mod:`acmetk.models`."""
@@ -152,15 +147,9 @@ class Database:
         statement = (
             select(Account)
             .options(
-                selectinload(Account.orders)
-                .selectinload(Order.identifiers)
-                .selectinload(Identifier.authorization)
+                selectinload(Account.orders).selectinload(Order.identifiers).selectinload(Identifier.authorization)
             )
-            .filter(
-                (Account.key == key)
-                | (Account.kid == kid)
-                | (Account.account_id == account_id)
-            )
+            .filter((Account.key == key) | (Account.kid == kid) | (Account.account_id == account_id))
         )
 
         result = (await session.execute(statement)).first()
@@ -178,9 +167,7 @@ class Database:
             select(Order)
             .filter(Order.account_id == account_id)
             .offset(cursor * limit)
-            .limit(
-                limit + 1
-            )  # read one more row to know whether there are more to be queried later
+            .limit(limit + 1)  # read one more row to know whether there are more to be queried later
         )
 
         result = (await session.execute(statement)).all()
@@ -188,27 +175,20 @@ class Database:
         return [r for (r,) in result]
 
     @staticmethod
-    async def get_authz(
-        session: AsyncSession, account_id, authz_id
-    ) -> typing.Optional[models.Authorization]:
+    async def get_authz(session: AsyncSession, account_id, authz_id) -> typing.Optional[models.Authorization]:
         order = aliased(Order, flat=True)
         account = aliased(Account, flat=True)
         identifier = aliased(Identifier, flat=True)
         statement = (
             select(Authorization)
             .options(
-                selectinload(Authorization.identifier)
-                .selectinload(Identifier.order)
-                .selectinload(Order.account),
+                selectinload(Authorization.identifier).selectinload(Identifier.order).selectinload(Order.account),
                 selectinload(Authorization.challenges),
             )
             .join(identifier, Authorization.identifier_id == identifier.identifier_id)
             .join(order, identifier.order_id == order.order_id)
             .join(account, order.account_id == account.account_id)
-            .filter(
-                (account_id == account.account_id)
-                & (Authorization.authorization_id == authz_id)
-            )
+            .filter((account_id == account.account_id) & (Authorization.authorization_id == authz_id))
         )
         try:
             result = (await session.execute(statement)).first()
@@ -219,9 +199,7 @@ class Database:
         return result[0] if result else None
 
     @staticmethod
-    async def get_challenge(
-        session: AsyncSession, account_id, challenge_id
-    ) -> typing.Optional[models.Challenge]:
+    async def get_challenge(session: AsyncSession, account_id, challenge_id) -> typing.Optional[models.Challenge]:
         authorization = aliased(Authorization, flat=True)
         identifier = aliased(Identifier, flat=True)
         order = aliased(Order, flat=True)
@@ -235,9 +213,7 @@ class Database:
                     selectinload(Authorization.identifier).options(
                         selectinload(Identifier.order).options(
                             selectinload(Order.account),
-                            selectinload(Order.identifiers).selectinload(
-                                Identifier.authorization
-                            ),
+                            selectinload(Order.identifiers).selectinload(Identifier.authorization),
                         ),
                         selectinload(Identifier.authorization),
                     ),
@@ -250,10 +226,7 @@ class Database:
             .join(identifier, authorization.identifier_id == identifier.identifier_id)
             .join(order, identifier.order_id == order.order_id)
             .join(account, order.account_id == account.account_id)
-            .filter(
-                (account_id == account.account_id)
-                & (Challenge.challenge_id == challenge_id)
-            )
+            .filter((account_id == account.account_id) & (Challenge.challenge_id == challenge_id))
         )
         try:
             result = (await session.execute(statement)).first()
@@ -267,9 +240,7 @@ class Database:
         return v
 
     @staticmethod
-    async def get_order(
-        session: AsyncSession, account_id, order_id
-    ) -> typing.Optional[models.Order]:
+    async def get_order(session: AsyncSession, account_id, order_id) -> typing.Optional[models.Order]:
         account = aliased(Account, flat=True)
         statement = (
             select(Order)
@@ -301,10 +272,7 @@ class Database:
                 .options(selectinload(Certificate.order).selectinload(Order.account))
                 .join(order, Certificate.order_id == order.order_id)
                 .join(account, order.account_id == account.account_id)
-                .filter(
-                    (account_id == account.account_id)
-                    & (Certificate.certificate_id == certificate_id)
-                )
+                .filter((account_id == account.account_id) & (Certificate.certificate_id == certificate_id))
             )
         elif certificate:
             statement = (
@@ -315,9 +283,7 @@ class Database:
                 .join(account, order.account_id == account.account_id)
             )
         else:
-            raise ValueError(
-                "Either kid and certificate_id OR certificate should be specified"
-            )
+            raise ValueError("Either kid and certificate_id OR certificate should be specified")
 
         try:
             result = (await session.execute(statement)).first()
