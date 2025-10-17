@@ -29,9 +29,7 @@ class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
     DEFAULT_VIEWS = ["Extern"]
     """The views to use if none are specified during initialization."""
 
-    def __init__(
-        self, *, host: str, username: str, password: str, dns_servers=None, views=None
-    ):
+    def __init__(self, *, host: str, username: str, password: str, dns_servers=None, views=None):
         self._creds = {
             "host": host,
             "username": username,
@@ -49,9 +47,7 @@ class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
         This method must be called before attempting to complete challenges.
         """
         if not self._conn:
-            self._conn = await self._loop.run_in_executor(
-                None, connector.Connector, self._creds
-            )
+            self._conn = await self._loop.run_in_executor(None, connector.Connector, self._creds)
 
     async def set_txt_record(self, name: str, text: str, views=None, ttl: int = 60):
         """Sets a DNS TXT record.
@@ -95,15 +91,11 @@ class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
         # Fetch all TXT records of the given name that contain the given text.
         records = await self._loop.run_in_executor(
             None,
-            functools.partial(
-                objects.TXTRecord.search_all, self._conn, name=name, text=text
-            ),
+            functools.partial(objects.TXTRecord.search_all, self._conn, name=name, text=text),
         )
 
         # De-provision those TXT records
-        await asyncio.gather(
-            *[self._loop.run_in_executor(None, record.delete) for record in records]
-        )
+        await asyncio.gather(*[self._loop.run_in_executor(None, record.delete) for record in records])
 
     async def complete_challenge(
         self,
@@ -130,9 +122,7 @@ class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
             await self._connect()
             await self.set_txt_record(name, text)
         except Exception as e:
-            logger.exception(
-                "Could not set TXT record to solve challenge: %s = %s", name, text
-            )
+            logger.exception("Could not set TXT record to solve challenge: %s = %s", name, text)
             raise CouldNotCompleteChallenge(
                 challenge,
                 acme.messages.Error(typ="infoblox", title="error", detail=str(e)),
@@ -140,9 +130,7 @@ class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
 
         # Poll the DNS until the correct record is available
         try:
-            await asyncio.wait_for(
-                self._query_until_completed(name, text), self.POLLING_TIMEOUT
-            )
+            await asyncio.wait_for(self._query_until_completed(name, text), self.POLLING_TIMEOUT)
         except asyncio.TimeoutError:
             raise CouldNotCompleteChallenge(
                 challenge,

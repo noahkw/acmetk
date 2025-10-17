@@ -33,9 +33,7 @@ class TestBroker(TestCA):
     def setUp(self) -> None:
         super().setUp()
 
-        self.brokerclient_account_key_path = (
-            self.path / self.config_sec["broker"]["client"]["private_key"]
-        )
+        self.brokerclient_account_key_path = self.path / self.config_sec["broker"]["client"]["private_key"]
 
         if not self.brokerclient_account_key_path.exists():
             acmetk.util.generate_rsa_key(self.brokerclient_account_key_path)
@@ -49,9 +47,7 @@ class TestBroker(TestCA):
             contact=self.config_sec["broker"]["client"]["contact"],
         )
 
-        broker = await self._cls.create_app(
-            self.config_sec["broker"], client=broker_client
-        )
+        broker = await self._cls.create_app(self.config_sec["broker"], client=broker_client)
         broker.register_challenge_validator(DummyValidator())
 
         await broker._db._recreate()
@@ -104,16 +100,12 @@ class TestBrokerLocalCA(TestBroker):
         )
 
         if "challenge_solver" in self.config_sec["broker"]["client"]:
-            solver = create_challenge_solver(
-                self.config_sec["broker"]["client"]["challenge_solver"]
-            )
+            solver = create_challenge_solver(self.config_sec["broker"]["client"]["challenge_solver"])
             broker_client.register_challenge_solver(solver)
         else:
             broker_client.register_challenge_solver(DummySolver())
 
-        broker = await self._cls.create_app(
-            self.config_sec["broker"], client=broker_client
-        )
+        broker = await self._cls.create_app(self.config_sec["broker"], client=broker_client)
 
         broker.register_challenge_validator(DummyValidator())
 
@@ -141,16 +133,12 @@ class TestBrokerLocalCA(TestBroker):
         self._ca = ca
 
 
-class TestAcmetinyBrokerLocalCA(
-    TestAcmetiny, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestAcmetinyBrokerLocalCA(TestAcmetiny, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
 
-class TestCertBotBrokerLocalCA(
-    TestCertBot, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestCertBotBrokerLocalCA(TestCertBot, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
@@ -170,9 +158,7 @@ class TestCertBotBrokerLocalCA(
         await super().test_renewal()
 
 
-class TestOurClientBrokerLocalCA(
-    TestOurClientStress, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientBrokerLocalCA(TestOurClientStress, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
@@ -192,9 +178,7 @@ class TestOurClientBrokerLocalCA(
         await super().test_certificate_content_type()
 
 
-class TestDehydratedCA(
-    TestDehydrated, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestDehydratedCA(TestDehydrated, TestBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
     @property
     def key_algo(self):
         return "secp384r1"
@@ -220,9 +204,7 @@ class TestBrokerLE(TestBroker):
         self.broker_client.register_challenge_solver(self.infoblox_client)
 
 
-class TestAcmetinyBrokerLE(
-    TestAcmetiny, TestBrokerLE, unittest.IsolatedAsyncioTestCase
-):
+class TestAcmetinyBrokerLE(TestAcmetiny, TestBrokerLE, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 
@@ -247,9 +229,7 @@ class TestCertBotBrokerLE(TestCertBot, TestBrokerLE, unittest.IsolatedAsyncioTes
         await super().test_renewal()
 
 
-class TestOurClientBrokerLE(
-    TestOurClientStress, TestBrokerLE, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientBrokerLE(TestOurClientStress, TestBrokerLE, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 

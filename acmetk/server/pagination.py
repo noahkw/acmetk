@@ -61,9 +61,7 @@ async def paginate(session, request, query, by="limit", total=-1, pms=None) -> P
     # min page is 1
 
     if not (0 < page <= page_count):
-        raise web.HTTPBadRequest(
-            body=f"page ({page}) must be between > 0 and <= {page_count}"
-        )
+        raise web.HTTPBadRequest(body=f"page ({page}) must be between > 0 and <= {page_count}")
 
     if by != "limit":
         # BETWEEN on indexed values is way faster …

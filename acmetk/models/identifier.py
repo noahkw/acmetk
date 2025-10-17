@@ -67,9 +67,7 @@ class Identifier(Entity, Serializer):
     value = Column(String)
     """The identifier's value. In the case of a *dns* type identifier: the FQDN."""
     order_id = Column(UUID(as_uuid=True), ForeignKey("orders.order_id"), nullable=False)
-    order = relationship(
-        "Order", back_populates="identifiers", lazy="joined", foreign_keys=order_id
-    )
+    order = relationship("Order", back_populates="identifiers", lazy="joined", foreign_keys=order_id)
     """The :class:`~acmetk.models.order.Order` associated with the identifier."""
     authorization = relationship(
         "Authorization",

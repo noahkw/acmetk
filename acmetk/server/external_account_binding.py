@@ -110,23 +110,17 @@ class ExternalAccountBindingStore:
             if nl := cert.subject.get_attributes_for_oid(x509.NameOID.EMAIL_ADDRESS):
                 mails |= set(map(lambda x: x.value, nl))
 
-            ext = cert.extensions.get_extension_for_oid(
-                x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME
-            )
+            ext = cert.extensions.get_extension_for_oid(x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
             value: x509.SubjectAlternativeName = ext.value
             mails |= set(value.get_values_for_type(x509.RFC822Name))
 
             if len(mails) != 1:
-                raise ValueError(
-                    f"{len(mails)} mail addresses in cert, expecting 1 ({mails})"
-                )
+                raise ValueError(f"{len(mails)} mail addresses in cert, expecting 1 ({mails})")
 
             mail = mails.pop()
 
         if (pending_eab := self._pending.get(mail)) is None or pending_eab.expired():
-            pending_eab = self._pending[mail] = ExternalAccountBinding(
-                mail, url_for(request, "new-account")
-            )
+            pending_eab = self._pending[mail] = ExternalAccountBinding(mail, url_for(request, "new-account"))
 
         return pending_eab.kid, pending_eab.hmac_key
 
@@ -193,16 +187,12 @@ class AcmeEABMixin:
                 * The EAB JWS' signature is invalid
         """
         if not reg.external_account_binding:
-            raise acme.messages.Error.with_code(
-                "externalAccountRequired", detail=f"Visit {url_for(request, 'eab')}"
-            )
+            raise acme.messages.Error.with_code("externalAccountRequired", detail=f"Visit {url_for(request, 'eab')}")
 
         try:
             jws = acme.jws.JWS.from_json(dict(reg.external_account_binding))
         except josepy.errors.DeserializationError:
-            raise acme.messages.Error.with_code(
-                "malformed", detail="The request does not contain a valid JWS."
-            )
+            raise acme.messages.Error.with_code("malformed", detail="The request does not contain a valid JWS.")
 
         if jws.signature.combined.alg not in self.SUPPORTED_EAB_JWS_ALGORITHMS:
             raise acme.messages.Error.with_code(
@@ -240,9 +230,7 @@ class AcmeEABMixin:
             )
 
         if not self._eab_store.verify(kid, jws):
-            raise acme.messages.Error.with_code(
-                "unauthorized", detail="The external account binding is invalid."
-            )
+            raise acme.messages.Error.with_code("unauthorized", detail="The external account binding is invalid.")
 
     @routes.get("/eab", name="eab")
     @aiohttp_jinja2.template("eab.jinja2")

@@ -40,9 +40,7 @@ class TestInfobloxClient(unittest.IsolatedAsyncioTestCase):
     async def test_delete_txt_record(self):
         test_name = self.config["infoblox_test"]["name"]
         text_value = uuid.uuid4().hex
-        await self.infoblox_client.set_txt_record(
-            test_name, text_value, views=["Intern", "Extern"]
-        )
+        await self.infoblox_client.set_txt_record(test_name, text_value, views=["Intern", "Extern"])
 
         # Poll the DNS until the correct record is available
         try:

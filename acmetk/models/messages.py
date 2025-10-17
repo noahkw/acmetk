@@ -69,9 +69,7 @@ class RevocationReason(enum.Enum):
 class Revocation(josepy.JSONObjectWithFields):
     """Message type for certificate revocation requests."""
 
-    certificate: "cryptography.x509.Certificate" = josepy.Field(
-        "certificate", decoder=decode_cert, encoder=encode_cert
-    )
+    certificate: "cryptography.x509.Certificate" = josepy.Field("certificate", decoder=decode_cert, encoder=encode_cert)
     """The certificate to be revoked."""
     reason: RevocationReason = josepy.Field(
         "reason",
@@ -98,9 +96,7 @@ class CertificateRequest(josepy.JSONObjectWithFields):
     :meth:`~acmetk.server.AcmeServerBase.finalize_order`.
     """
 
-    csr: "cryptography.x509.CertificateSigningRequest" = josepy.Field(
-        "csr", decoder=decode_csr, encoder=encode_csr
-    )
+    csr: "cryptography.x509.CertificateSigningRequest" = josepy.Field("csr", decoder=decode_csr, encoder=encode_csr)
     """The certificate signing request."""
 
 
@@ -135,9 +131,7 @@ class AuthorizationUpdate(JSONDeSerializableAllowEmpty, josepy.JSONObjectWithFie
     Inherits from :class:`JSONDeSerializableAllowEmpty` so that POST-as-GET requests don't result in a parsing error.
     """
 
-    status: AuthorizationStatus = josepy.Field(
-        "status", decoder=AuthorizationStatus, omitempty=True
-    )
+    status: AuthorizationStatus = josepy.Field("status", decoder=AuthorizationStatus, omitempty=True)
     """The authorization's new status."""
 
 
@@ -147,9 +141,7 @@ class AccountUpdate(JSONDeSerializableAllowEmpty, acme.messages.Registration):
     Inherits from :class:`JSONDeSerializableAllowEmpty` so that POST-as-GET requests don't result in a parsing error.
     """
 
-    status: AccountStatus = josepy.Field(
-        "status", decoder=AccountStatus, omitempty=True
-    )
+    status: AccountStatus = josepy.Field("status", decoder=AccountStatus, omitempty=True)
     """The account's new status."""
 
 
@@ -158,13 +150,9 @@ class NewOrder(josepy.JSONObjectWithFields):
 
     identifiers: list[dict[str, str]] = josepy.Field("identifiers", omitempty=True)
     """The requested identifiers."""
-    not_before: "datetime.datetime" = acme.messages.fields.RFC3339Field(
-        "notBefore", omitempty=True
-    )
+    not_before: "datetime.datetime" = acme.messages.fields.RFC3339Field("notBefore", omitempty=True)
     """The requested *notBefore* field in the certificate."""
-    not_after: "datetime.datetime" = acme.messages.fields.RFC3339Field(
-        "notAfter", omitempty=True
-    )
+    not_after: "datetime.datetime" = acme.messages.fields.RFC3339Field("notAfter", omitempty=True)
     """The requested *notAfter* field in the certificate."""
     profile: str = josepy.Field("profile", omitempty=True)
     """TODO https://datatracker.ietf.org/doc/draft-aaron-acme-profiles/"""
@@ -190,9 +178,7 @@ class NewOrder(josepy.JSONObjectWithFields):
         if type(identifiers[0]) is dict:
             kwargs["identifiers"] = identifiers
         elif type(identifiers[0]) is str:
-            kwargs["identifiers"] = [
-                dict(type="dns", value=identifier) for identifier in identifiers
-            ]
+            kwargs["identifiers"] = [dict(type="dns", value=identifier) for identifier in identifiers]
         else:
             raise ValueError(
                 "Could not decode identifiers list. Must be either List(str) or List(dict) where "
@@ -239,12 +225,8 @@ class SignedKeyChange(josepy.JSONObjectWithFields):
     signature = josepy.Field("signature")
 
     @classmethod
-    def from_data(
-        cls, kc: KeyChange, key: josepy.jwk.JWK, alg: josepy.jwa.JWASignature, **kwargs
-    ) -> "SignedKeyChange":
-        data = acme.jws.JWS.sign(
-            kc.json_dumps().encode(), key=key, alg=alg, nonce=None, **kwargs
-        )
+    def from_data(cls, kc: KeyChange, key: josepy.jwk.JWK, alg: josepy.jwa.JWASignature, **kwargs) -> "SignedKeyChange":
+        data = acme.jws.JWS.sign(kc.json_dumps().encode(), key=key, alg=alg, nonce=None, **kwargs)
 
         signature = josepy.b64.b64encode(data.signature.signature).decode()
         payload = josepy.b64.b64encode(data.payload).decode()

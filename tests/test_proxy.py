@@ -32,21 +32,15 @@ class TestProxyLocalCA(TestProxy, TestBrokerLocalCA):
         return self._config["tests"]["ProxyLocalCA"]
 
 
-class TestAcmetinyProxyLocalCA(
-    TestAcmetiny, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestAcmetinyProxyLocalCA(TestAcmetiny, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase):
     pass
 
 
-class TestCertBotProxyLocalCA(
-    TestCertBot, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestCertBotProxyLocalCA(TestCertBot, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase):
     pass
 
 
-class TestCertBotWCProxyLocalCA(
-    TestCertBot, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestCertBotWCProxyLocalCA(TestCertBot, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase):
     @property
     def names(self):
         return ["*.test.de"]
@@ -60,21 +54,15 @@ class TestCertBotWCProxyLocalCA(
 
     async def test_no_wc_run(self):
         self.relay._allow_wildcard = False
-        with self.assertRaisesRegex(
-            acme.messages.Error, "The ACME server can not issue a wildcard certificate"
-        ):
+        with self.assertRaisesRegex(acme.messages.Error, "The ACME server can not issue a wildcard certificate"):
             await super().test_run()
 
 
-class TestOurClientProxyLocalCA(
-    TestOurClientStress, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientProxyLocalCA(TestOurClientStress, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase):
     pass
 
 
-class TestOurClientProxyLocalCALexicon(
-    TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientProxyLocalCALexicon(TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase):
     from lexicon.providers.base import Provider as BaseProvider
 
     class FakeProvider(BaseProvider):
@@ -93,10 +81,7 @@ class TestOurClientProxyLocalCALexicon(
             # require .test.de
             if len(self.domain.split(".")) != 2:
                 raise AuthenticationError(f"No domain found {self.domain}")
-            if (
-                self._get_provider_option("auth_user") != "user"
-                or self._get_provider_option("auth_psw") != "password"
-            ):
+            if self._get_provider_option("auth_user") != "user" or self._get_provider_option("auth_psw") != "password":
                 raise AuthenticationError("Invalid login")
 
         def _create_record(self, rtype, name, content):
@@ -158,9 +143,7 @@ class TestOurClientProxyLocalCALexicon(
                 from types import ModuleType
 
                 module = ModuleType("lexicon.providers.fakeprovider")
-                setattr(
-                    module, "Provider", TestOurClientProxyLocalCALexicon.FakeProvider
-                )
+                setattr(module, "Provider", TestOurClientProxyLocalCALexicon.FakeProvider)
                 return module
             return original_import(module_name)
 
@@ -193,15 +176,11 @@ class TestOurClientProxyLocalCALexicon(
         await super().test_run()
 
 
-class TestOurClientEC384EC384ProxyLocalCA(
-    TestOurClientStress, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientEC384EC384ProxyLocalCA(TestOurClientStress, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = CERT_KEY_ALG_BITS = ("EC", 384)
 
 
-class TestOurClientEC521EC521ProxyLocalCA(
-    TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientEC521EC521ProxyLocalCA(TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("EC", 521)
     CERT_KEY_ALG_BITS = ("EC", 521)
 
@@ -211,16 +190,12 @@ class TestOurClientEC521EC521ProxyLocalCA(
         self.assertBadKey(e, "csr")
 
 
-class TestOurClientRSA1024EC384ProxyLocalCA(
-    TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientRSA1024EC384ProxyLocalCA(TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("RSA", 1024)
     CERT_KEY_ALG_BITS = ("EC", 521)
 
 
-class TestOurClientRSA2048RSA1024ProxyLocalCA(
-    TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientRSA2048RSA1024ProxyLocalCA(TestOurClient, TestProxyLocalCA, unittest.IsolatedAsyncioTestCase):
     ACCOUNT_KEY_ALG_BITS = ("RSA", 2048)
     CERT_KEY_ALG_BITS = ("RSA", 1024)
 
@@ -241,9 +216,7 @@ class TestCertBotProxyLE(TestCertBot, TestProxyLE, unittest.IsolatedAsyncioTestC
         pass
 
 
-class TestOurClientProxyLE(
-    TestOurClientStress, TestProxyLE, unittest.IsolatedAsyncioTestCase
-):
+class TestOurClientProxyLE(TestOurClientStress, TestProxyLE, unittest.IsolatedAsyncioTestCase):
     async def test_run(self):
         await super().test_run()
 

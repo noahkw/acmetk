@@ -68,9 +68,7 @@ class Order(Entity, Serializer):
 
     __tablename__ = "orders"
     __serialize__ = frozenset(["status", "expires", "notBefore", "notAfter"])
-    __diff__ = frozenset(
-        ["status", "expires", "notBefore", "notAfter", "proxied_url", "proxied_error"]
-    )
+    __diff__ = frozenset(["status", "expires", "notBefore", "notAfter", "proxied_url", "proxied_error"])
     __mapper_args__ = {
         "polymorphic_identity": "order",
     }
@@ -98,12 +96,8 @@ class Order(Entity, Serializer):
     """The requested *notBefore* field in the certificate."""
     notAfter = Column(DateTime(timezone=True))
     """The requested *notAfter* field in the certificate."""
-    account_id = Column(
-        UUID(as_uuid=True), ForeignKey("accounts.account_id"), nullable=False
-    )
-    account = relationship(
-        "Account", back_populates="orders", lazy="noload", foreign_keys=account_id
-    )
+    account_id = Column(UUID(as_uuid=True), ForeignKey("accounts.account_id"), nullable=False)
+    account = relationship("Account", back_populates="orders", lazy="noload", foreign_keys=account_id)
     """The :class:`~acmetk.models.account.Account` that created the order."""
     certificate = relationship(
         "Certificate",
@@ -193,10 +187,7 @@ class Order(Entity, Serializer):
             if self.status in (OrderStatus.VALID, OrderStatus.INVALID):
                 return authorization.is_valid()
             else:  # self.status in (OrderStatus.PENDING, OrderStatus.PROCESSING, OrderStatus.READY):
-                return (
-                    authorization.status == AuthorizationStatus.PENDING
-                    or authorization.is_valid()
-                )
+                return authorization.status == AuthorizationStatus.PENDING or authorization.is_valid()
 
         d["authorizations"] = [
             identifier.authorization.url(request)
@@ -239,15 +230,11 @@ class Order(Entity, Serializer):
         :param challenge_types: The types of challenges to create.
         :return: The constructed order.
         """
-        identifiers = [
-            Identifier.from_obj(identifier) for identifier in obj.identifiers
-        ]
+        identifiers = [Identifier.from_obj(identifier) for identifier in obj.identifiers]
 
         for identifier in identifiers:
             identifier.authorization = Authorization.for_identifier(identifier)
-            identifier.authorization.challenges = Challenge.create_types(
-                identifier.type, challenge_types
-            )
+            identifier.authorization.challenges = Challenge.create_types(identifier.type, challenge_types)
 
         order = Order(
             expires=datetime.now(timezone.utc) + timedelta(days=7),

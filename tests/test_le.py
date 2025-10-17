@@ -97,9 +97,7 @@ class TestLE(TestAcme, unittest.IsolatedAsyncioTestCase):
         self._make_key(kp, ("RSA", 1024 * 8))
         with self.assertRaises(acme.messages.Error) as e:
             await self.client.key_change(kp)
-        assert e.exception.detail in [
-            "key size not supported: 8192"
-        ], e.exception.detail
+        assert e.exception.detail in ["key size not supported: 8192"], e.exception.detail
 
         self._make_key(kp, ("EC", 256))
         await self.client.key_change(kp)

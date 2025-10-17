@@ -119,9 +119,7 @@ class Authorization(Entity, Serializer):
         :param expired: Reports an otherwise valid but expired authorization as valid if set to *True*.
         :return: *True* iff the authorization is valid.
         """
-        return self.status == AuthorizationStatus.VALID and (
-            not self.is_expired() or expired
-        )
+        return self.status == AuthorizationStatus.VALID and (not self.is_expired() or expired)
 
     def is_expired(self) -> bool:
         """Returns whether the authorization has expired.
@@ -137,10 +135,7 @@ class Authorization(Entity, Serializer):
         """
 
         # the only allowed state transition is VALID -> DEACTIVATED if requested by the client
-        if (
-            self.status == AuthorizationStatus.VALID
-            and upd.status == AuthorizationStatus.DEACTIVATED
-        ):
+        if self.status == AuthorizationStatus.VALID and upd.status == AuthorizationStatus.DEACTIVATED:
             self.status = AuthorizationStatus.DEACTIVATED
         elif upd.status:
             raise ValueError(f"Cannot set an authorizations's status to {upd.status}")
@@ -163,11 +158,7 @@ class Authorization(Entity, Serializer):
             else:
                 return False
 
-        d["challenges"] = [
-            challenge.serialize(request)
-            for challenge in self.challenges
-            if show_chall(challenge)
-        ]
+        d["challenges"] = [challenge.serialize(request) for challenge in self.challenges if show_chall(challenge)]
 
         d["identifier"] = self.identifier.serialize()
 
@@ -194,9 +185,7 @@ class Authorization(Entity, Serializer):
         return d
 
     @classmethod
-    def for_identifier(
-        cls, identifier: "acmetk.models.identifier.Identifier"
-    ) -> "Authorization":
+    def for_identifier(cls, identifier: "acmetk.models.identifier.Identifier") -> "Authorization":
         """A factory that constructs a new authorization given an
         :class:`~acmetk.models.identifier.Identifier`.
 

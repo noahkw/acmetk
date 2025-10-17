@@ -71,9 +71,7 @@ class RFC2136Client(DNS01ChallengeHelper, ChallengeSolver):
         try:
             await self.set_txt_record(name, text)
         except Exception as e:
-            logger.exception(
-                "Could not set TXT record to solve challenge: %s = %s", name, text
-            )
+            logger.exception("Could not set TXT record to solve challenge: %s = %s", name, text)
             raise CouldNotCompleteChallenge(
                 challenge,
                 acme.messages.Error(typ="rfc2136", title="error", detail=str(e)),
@@ -81,9 +79,7 @@ class RFC2136Client(DNS01ChallengeHelper, ChallengeSolver):
 
         # Poll the DNS until the correct record is available
         try:
-            await asyncio.wait_for(
-                self._query_until_completed(name, text), self.POLLING_TIMEOUT
-            )
+            await asyncio.wait_for(self._query_until_completed(name, text), self.POLLING_TIMEOUT)
         except asyncio.TimeoutError:
             raise CouldNotCompleteChallenge(
                 challenge,

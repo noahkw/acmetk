@@ -38,9 +38,7 @@ def main():
     c = pem_split(CERT_PEM)[0]
 
     loader = FileSystemLoader("../tpl/")
-    env = Environment(
-        loader=loader, extensions=["jinja2.ext.loopcontrols"]
-    )  # , trim_blocks=True, lstrip_blocks=True)
+    env = Environment(loader=loader, extensions=["jinja2.ext.loopcontrols"])  # , trim_blocks=True, lstrip_blocks=True)
     template = env.get_template("certificate.jinja2")
 
     print(template.render(certificate=c, cryptography=cryptography))

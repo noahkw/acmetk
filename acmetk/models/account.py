@@ -97,11 +97,7 @@ class Account(Entity, Serializer):
         :param request: The client request needed to build the list of URLs.
         :return: A list of URLs of the account's orders.
         """
-        return [
-            order.url(request)
-            for order in self.orders
-            if order.status == OrderStatus.PENDING
-        ]
+        return [order.url(request) for order in self.orders if order.status == OrderStatus.PENDING]
 
     def authorized_identifiers(self, lower: bool = False) -> set[str]:
         """Returns the identifiers that the account holds valid authorizations for.
@@ -119,10 +115,7 @@ class Account(Entity, Serializer):
             if identifier.authorization.is_valid(expired=True)
         ]
 
-        return {
-            identifier.value.lower() if lower else identifier.value
-            for identifier in identifiers
-        }
+        return {identifier.value.lower() if lower else identifier.value for identifier in identifiers}
 
     def validate_cert(self, cert: "cryptography.x509.Certificate") -> bool:
         """Validates whether the account holds authorizations for all names present in the certificate.
@@ -130,9 +123,7 @@ class Account(Entity, Serializer):
         :param cert: The certificate to validate.
         :return: *True* iff the account holds authorizations for all names present in the certificate.
         """
-        return names_of(cert, lower=True).issubset(
-            self.authorized_identifiers(lower=True)
-        )
+        return names_of(cert, lower=True).issubset(self.authorized_identifiers(lower=True))
 
     def update(self, upd: "acmetk.models.messages.AccountUpdate"):
         """Updates the account with new information.
@@ -157,9 +148,7 @@ class Account(Entity, Serializer):
         return d
 
     @classmethod
-    def from_obj(
-        cls, jwk: josepy.jwk.JWK, obj: acme.messages.Registration
-    ) -> "Account":
+    def from_obj(cls, jwk: josepy.jwk.JWK, obj: acme.messages.Registration) -> "Account":
         """A factory that constructs a new :class:`Account` from a message object.
 
         The *kid* is set to the passed JWK's SHA-256 hex digest and the *status* is set to *valid*.

@@ -141,8 +141,7 @@ class Challenge(Entity, Serializer):
 
         return [
             cls(type=type_, status=ChallengeStatus.PENDING)
-            for type_ in set(supported_types)
-            & ChallengeValidationMethod[identifiertype]
+            for type_ in set(supported_types) & ChallengeValidationMethod[identifiertype]
         ]
 
     async def validate(
@@ -165,9 +164,7 @@ class Challenge(Entity, Serializer):
         try:
             await validator.validate_challenge(self, request=request)
         except acmetk.server.challenge_validator.CouldNotValidateChallenge as e:
-            logger.info(
-                f"Failed to validate challenge {self.challenge_id}/{self.type}: {e.detail}"
-            )
+            logger.info(f"Failed to validate challenge {self.challenge_id}/{self.type}: {e.detail}")
             self.error = e.to_acme_error()
             self.status = ChallengeStatus.INVALID
 

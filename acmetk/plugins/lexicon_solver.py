@@ -42,9 +42,7 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
     async def _config_for(self, name: str) -> ConfigResolver:
         zone = await dns.asyncresolver.zone_for_name(name)
         cfg = ConfigResolver().with_dict(self.config)
-        cfg.add_config_source(
-            DictConfigSource({"domain": name, "ddns": {"domain": zone.to_text()}}), 0
-        )
+        cfg.add_config_source(DictConfigSource({"domain": name, "ddns": {"domain": zone.to_text()}}), 0)
         return cfg
 
     @asyncache.cached(
@@ -60,16 +58,11 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
         """
 
         name = dns.name.from_text(domain)
-        domain_name_guesses = [
-            name.split(i)[1].to_text(omit_final_dot=1)
-            for i in range(2, len(name.labels) + 1)
-        ]
+        domain_name_guesses = [name.split(i)[1].to_text(omit_final_dot=1) for i in range(2, len(name.labels) + 1)]
         for domain_name in domain_name_guesses:
             provider.domain = domain_name
             try:
-                await asyncio.gather(
-                    *[self._loop.run_in_executor(None, provider.authenticate)]
-                )
+                await asyncio.gather(*[self._loop.run_in_executor(None, provider.authenticate)])
                 return domain_name
             except AuthenticationError:
                 # Authentication failed … continue guessing
@@ -80,11 +73,7 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
             except Exception as e1:
                 logger.warning("lexicon failed with %s", str(e1))
                 raise e1
-        raise ValueError(
-            "Unable to determine zone identifier for {} using zone names: {}".format(
-                domain, domain_name_guesses
-            )
-        )
+        raise ValueError(f"Unable to determine zone identifier for {domain} using zone names: {domain_name_guesses}")
 
     async def set_txt_record(
         self,
@@ -109,9 +98,7 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
                 *[
                     self._loop.run_in_executor(
                         None,
-                        functools.partial(
-                            ops.create_record, rtype="TXT", name=name, content=text
-                        ),
+                        functools.partial(ops.create_record, rtype="TXT", name=name, content=text),
                     )
                 ]
             )
@@ -119,9 +106,7 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
             logger.debug("Encountered error adding TXT record: %s", e, exc_info=True)
             raise ValueError(f"Error adding TXT record: {e}")
 
-    async def delete_txt_record(
-        self, ops: lexicon.client._ClientOperations, name: str, text: str
-    ):
+    async def delete_txt_record(self, ops: lexicon.client._ClientOperations, name: str, text: str):
         """Deletes a DNS TXT record.
 
         :param ops: The Lexicon Client operations.
@@ -173,9 +158,7 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
             with lexicon.client.Client(cfg) as ops:
                 await self.set_txt_record(ops, name, text)
         except Exception as e:
-            logger.exception(
-                "Could not set TXT record to solve challenge: %s = %s", name, text
-            )
+            logger.exception("Could not set TXT record to solve challenge: %s = %s", name, text)
             raise CouldNotCompleteChallenge(
                 challenge,
                 acme.messages.Error(typ="lexicon", title="error", detail=str(e)),
@@ -183,9 +166,7 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
 
         # Poll the DNS until the correct record is available
         try:
-            await asyncio.wait_for(
-                self._query_until_completed(name, text), self.POLLING_TIMEOUT
-            )
+            await asyncio.wait_for(self._query_until_completed(name, text), self.POLLING_TIMEOUT)
         except asyncio.TimeoutError:
             raise CouldNotCompleteChallenge(
                 challenge,

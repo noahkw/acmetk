@@ -30,9 +30,7 @@ def upgrade():
         sa.PrimaryKeyConstraint("entity"),
     )
     op.create_index(op.f("ix_entities_entity"), "entities", ["entity"], unique=False)
-    op.create_index(
-        op.f("ix_entities_identity"), "entities", ["identity"], unique=False
-    )
+    op.create_index(op.f("ix_entities_identity"), "entities", ["identity"], unique=False)
     op.create_table(
         "accounts",
         sa.Column("_entity", sa.Integer(), nullable=False),
@@ -67,12 +65,8 @@ def upgrade():
     )
     op.create_index(op.f("ix_changes__entity"), "changes", ["_entity"], unique=False)
     op.create_index(op.f("ix_changes_change"), "changes", ["change"], unique=False)
-    op.create_index(
-        op.f("ix_changes_remote_host"), "changes", ["remote_host"], unique=False
-    )
-    op.create_index(
-        op.f("ix_changes_timestamp"), "changes", ["timestamp"], unique=False
-    )
+    op.create_index(op.f("ix_changes_remote_host"), "changes", ["remote_host"], unique=False)
+    op.create_index(op.f("ix_changes_timestamp"), "changes", ["timestamp"], unique=False)
     op.create_table(
         "orders",
         sa.Column("_entity", sa.Integer(), nullable=False),
@@ -81,9 +75,7 @@ def upgrade():
         sa.Column("proxied_error", acmetk.models.base.AcmeErrorType(), nullable=True),
         sa.Column(
             "status",
-            sa.Enum(
-                "PENDING", "READY", "PROCESSING", "VALID", "INVALID", name="orderstatus"
-            ),
+            sa.Enum("PENDING", "READY", "PROCESSING", "VALID", "INVALID", name="orderstatus"),
             nullable=False,
         ),
         sa.Column("expires", sa.DateTime(timezone=True), nullable=False),
@@ -145,15 +137,9 @@ def upgrade():
         ),
         sa.PrimaryKeyConstraint("certificate_id"),
     )
-    op.create_index(
-        op.f("ix_certificates__entity"), "certificates", ["_entity"], unique=False
-    )
-    op.create_index(
-        op.f("ix_certificates_cert"), "certificates", ["cert"], unique=False
-    )
-    op.create_index(
-        op.f("ix_certificates_order_id"), "certificates", ["order_id"], unique=True
-    )
+    op.create_index(op.f("ix_certificates__entity"), "certificates", ["_entity"], unique=False)
+    op.create_index(op.f("ix_certificates_cert"), "certificates", ["cert"], unique=False)
+    op.create_index(op.f("ix_certificates_order_id"), "certificates", ["order_id"], unique=True)
     op.create_table(
         "identifiers",
         sa.Column("_entity", sa.Integer(), nullable=False),
@@ -171,9 +157,7 @@ def upgrade():
         ),
         sa.PrimaryKeyConstraint("identifier_id"),
     )
-    op.create_index(
-        op.f("ix_identifiers__entity"), "identifiers", ["_entity"], unique=False
-    )
+    op.create_index(op.f("ix_identifiers__entity"), "identifiers", ["_entity"], unique=False)
     op.create_table(
         "authorizations",
         sa.Column("_entity", sa.Integer(), nullable=False),
@@ -204,9 +188,7 @@ def upgrade():
         ),
         sa.PrimaryKeyConstraint("authorization_id"),
     )
-    op.create_index(
-        op.f("ix_authorizations__entity"), "authorizations", ["_entity"], unique=False
-    )
+    op.create_index(op.f("ix_authorizations__entity"), "authorizations", ["_entity"], unique=False)
     op.create_index(
         op.f("ix_authorizations_identifier_id"),
         "authorizations",
@@ -225,9 +207,7 @@ def upgrade():
         ),
         sa.Column(
             "status",
-            sa.Enum(
-                "PENDING", "PROCESSING", "VALID", "INVALID", name="challengestatus"
-            ),
+            sa.Enum("PENDING", "PROCESSING", "VALID", "INVALID", name="challengestatus"),
             nullable=False,
         ),
         sa.Column("validated", sa.DateTime(timezone=True), nullable=True),
@@ -244,9 +224,7 @@ def upgrade():
         sa.PrimaryKeyConstraint("challenge_id"),
         sa.UniqueConstraint("token"),
     )
-    op.create_index(
-        op.f("ix_challenges__entity"), "challenges", ["_entity"], unique=False
-    )
+    op.create_index(op.f("ix_challenges__entity"), "challenges", ["_entity"], unique=False)
     # ### end Alembic commands ###
 
 

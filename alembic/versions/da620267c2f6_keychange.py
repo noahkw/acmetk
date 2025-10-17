@@ -48,25 +48,17 @@ def upgrade():
     result = connection.execute(sa.select(t_account.c.kid)).fetchall()
 
     for a in result:
-        connection.execute(
-            sa.update(t_account)
-            .where(t_account.c.kid == a["kid"])
-            .values(account_id=uuid.uuid4())
-        )
+        connection.execute(sa.update(t_account).where(t_account.c.kid == a["kid"]).values(account_id=uuid.uuid4()))
 
     # update orders
     connection.execute(
-        sa.update(t_order)
-        .where(t_order.c.account_kid == t_account.c.kid)
-        .values(account_id=t_account.c.account_id)
+        sa.update(t_order).where(t_order.c.account_kid == t_account.c.kid).values(account_id=t_account.c.account_id)
     )
 
     op.alter_column("accounts", "account_id", nullable=False)
     op.alter_column("orders", "account_id", nullable=False)
 
-    op.create_index(
-        op.f("ix_accounts_account_id"), "accounts", ["account_id"], unique=True
-    )
+    op.create_index(op.f("ix_accounts_account_id"), "accounts", ["account_id"], unique=True)
     op.create_index(op.f("ix_accounts_kid"), "accounts", ["kid"], unique=True)
 
     op.create_foreign_key(None, "orders", "accounts", ["account_id"], ["account_id"])
@@ -84,15 +76,11 @@ def downgrade():
 
     # update orders
     connection.execute(
-        sa.update(t_order)
-        .where(t_order.c.account_id == t_account.c.account_id)
-        .values(account_kid=t_account.c.kid)
+        sa.update(t_order).where(t_order.c.account_id == t_account.c.account_id).values(account_kid=t_account.c.kid)
     )
 
     op.drop_constraint("orders_account_id_fkey", "orders", type_="foreignkey")
-    op.create_foreign_key(
-        "orders_account_kid_fkey", "orders", "accounts", ["account_kid"], ["kid"]
-    )
+    op.create_foreign_key("orders_account_kid_fkey", "orders", "accounts", ["account_kid"], ["kid"])
     op.drop_column("orders", "account_id")
     op.drop_index(op.f("ix_accounts_kid"), table_name="accounts")
     op.drop_index(op.f("ix_accounts_account_id"), table_name="accounts")

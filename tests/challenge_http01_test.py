@@ -26,9 +26,7 @@ class HTTP01Service:
         self.app = web.Application()
         self.app.add_routes(
             [
-                web.get(
-                    "/.well-known/acme-challenge/{token}", self.handle_acme_challenge
-                ),
+                web.get("/.well-known/acme-challenge/{token}", self.handle_acme_challenge),
             ]
         )
         self.sessions: dict[str, bytes] = dict()
