@@ -136,7 +136,7 @@ def alembic_run(config: dict) -> None:
 @click.option("--alembic-upgrade", type=bool, default=False)
 def run(
     config_file: str,
-    bootstrap_port: typing.Optional[int],
+    bootstrap_port: int | None,
     path: str,
     alembic_upgrade: bool,
 ):

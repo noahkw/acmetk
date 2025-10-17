@@ -269,10 +269,10 @@ class AcmeClient:
 
     async def order_create(
         self,
-        identifiers: typing.Union[list[dict], list[str]],
-        profile: typing.Union[str, None] = None,
+        identifiers: list[dict] | list[str],
+        profile: str | None = None,
         return_location=False,
-    ) -> typing.Union[messages.Order, tuple[str, messages.Order]]:
+    ) -> messages.Order | tuple[str, messages.Order]:
         """Creates a new order with the given identifiers.
 
         :param identifiers: :class:`list` of identifiers that the order should contain. May either be a list of
@@ -635,7 +635,7 @@ class AcmeClient:
         except KeyError:
             return await self._poll_until(fetch_nonce, predicate=lambda x: x, delay=5.0)
 
-    def _wrap_in_jws(self, obj: typing.Optional[josepy.JSONDeSerializable], nonce, url, post_as_get):
+    def _wrap_in_jws(self, obj: josepy.JSONDeSerializable | None, nonce, url, post_as_get):
         if post_as_get:
             jobj = obj.json_dumps(indent=2).encode() if obj else b""
         else:
@@ -645,7 +645,7 @@ class AcmeClient:
             kwargs["kid"] = self._account["kid"]
         return jws.JWS.sign(jobj, key=self._private_key, alg=self._alg, **kwargs).json_dumps(indent=2)
 
-    async def _signed_request(self, obj: typing.Optional[josepy.JSONDeSerializable], url, post_as_get=True):
+    async def _signed_request(self, obj: josepy.JSONDeSerializable | None, url, post_as_get=True):
         tries = self.INVALID_NONCE_RETRIES
         while tries > 0:
             try:

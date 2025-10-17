@@ -177,7 +177,7 @@ class Order(Entity, Serializer):
 
         return self.status
 
-    def serialize(self, request: typing.Optional[aiohttp.web.Request] = None) -> dict:
+    def serialize(self, request: aiohttp.web.Request | None = None) -> dict:
         d = super().serialize(request)
         d["identifiers"] = super().serialize_list(self.identifiers)
 

@@ -1,6 +1,5 @@
 import datetime
 import uuid
-import typing
 
 import acme
 from aiohttp import web
@@ -141,9 +140,7 @@ class Database:
         await self.begin()
 
     @staticmethod
-    async def get_account(
-        session: AsyncSession, key=None, kid=None, account_id=None
-    ) -> typing.Optional[models.Account]:
+    async def get_account(session: AsyncSession, key=None, kid=None, account_id=None) -> models.Account | None:
         statement = (
             select(Account)
             .options(
@@ -175,7 +172,7 @@ class Database:
         return [r for (r,) in result]
 
     @staticmethod
-    async def get_authz(session: AsyncSession, account_id, authz_id) -> typing.Optional[models.Authorization]:
+    async def get_authz(session: AsyncSession, account_id, authz_id) -> models.Authorization | None:
         order = aliased(Order, flat=True)
         account = aliased(Account, flat=True)
         identifier = aliased(Identifier, flat=True)
@@ -199,7 +196,7 @@ class Database:
         return result[0] if result else None
 
     @staticmethod
-    async def get_challenge(session: AsyncSession, account_id, challenge_id) -> typing.Optional[models.Challenge]:
+    async def get_challenge(session: AsyncSession, account_id, challenge_id) -> models.Challenge | None:
         authorization = aliased(Authorization, flat=True)
         identifier = aliased(Identifier, flat=True)
         order = aliased(Order, flat=True)
@@ -240,7 +237,7 @@ class Database:
         return v
 
     @staticmethod
-    async def get_order(session: AsyncSession, account_id, order_id) -> typing.Optional[models.Order]:
+    async def get_order(session: AsyncSession, account_id, order_id) -> models.Order | None:
         account = aliased(Account, flat=True)
         statement = (
             select(Order)
@@ -263,7 +260,7 @@ class Database:
     @staticmethod
     async def get_certificate(
         session: AsyncSession, account_id=None, certificate_id=None, certificate=None
-    ) -> typing.Optional[models.Certificate]:
+    ) -> models.Certificate | None:
         order = aliased(Order, flat=True)
         account = aliased(Account, flat=True)
         if account_id and certificate_id:

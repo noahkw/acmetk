@@ -1,7 +1,6 @@
 import datetime
 import json
 import secrets
-import typing
 import urllib.parse
 
 import acme.jws
@@ -168,7 +167,7 @@ class AcmeEABMixin:
     def verify_eab(
         self,
         request: aiohttp.web.Request,
-        pub_key: typing.Union[RSAPublicKey, EllipticCurvePublicKey],
+        pub_key: RSAPublicKey | EllipticCurvePublicKey,
         reg: acme.messages.Registration,
     ) -> None:
         """Verifies an ACME Registration request whose payload contains an external account binding JWS.
