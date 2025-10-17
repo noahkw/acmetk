@@ -265,10 +265,12 @@ class acmetkClient(TestClient):
         from acmetk.client import DummySolver
 
         client = AcmeClient(
-            directory_url=self.DIRECTORY,
-            private_key=key_path,
-            contact={"email": email},
-            server_cert=None,
+            AcmeClient.Config(
+                directory=self.DIRECTORY,
+                private_key=key_path,
+                contact={"email": email},
+                server_cert=None,
+            )
         )
 
         client.register_challenge_solver(DummySolver())
