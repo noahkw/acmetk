@@ -10,6 +10,7 @@ from yarl import URL
 import acmetk.util
 from acmetk.client.challenge_solver import ChallengeSolver, ChallengeType
 from acmetk.server.challenge_validator import Http01ChallengeValidator
+from acmetk.server import AcmeCA
 
 from .services import CAService
 from .clients import acmetkClient
@@ -67,16 +68,15 @@ async def test_ourclient_http01(tmp_path_factory, unused_tcp_port_factory, http0
     tmpdir = tmp_path_factory.mktemp("CA")
     service = CAService(tmpdir)
     await service.run(
-        port=unused_tcp_port_factory(),
-        db=db,
-        rsa_min_keysize=2048,
-        ec_min_keysize=256,
-        tos_url=None,
-        mail_suffixes=None,
-        subnets=None,
-        use_forwarded_header=False,
-        require_eab=False,
-        allow_wildcard=False,
+        unused_tcp_port_factory(),
+        db,
+        AcmeCA.Config(
+            rsa_min_keysize=2048,
+            ec_min_keysize=256,
+            use_forwarded_header=False,
+            require_eab=False,
+            allow_wildcard=False,
+        ),
     )
 
     await service.ca._db._recreate()
