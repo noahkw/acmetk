@@ -127,7 +127,7 @@ class TestCA(TestAcme):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
 
-        runner, ca = await AcmeCA.runner(self.config_sec["ca"])
+        runner, ca = await AcmeCA.runner(AcmeCA.Config(**self.config_sec["ca"]))
         ca.register_challenge_validator(DummyValidator())
 
         await ca._db._recreate()

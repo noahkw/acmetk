@@ -88,15 +88,17 @@ class TestBrokerLocalCA(TestBroker):
 
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
-        ca = await AcmeCA.create_app(self.config_sec["ca"])
+        ca = await AcmeCA.create_app(AcmeCA.Config(**self.config_sec["ca"]))
         ca.register_challenge_validator(DummyValidator())
 
         await ca._db._recreate()
 
+        del self.config_sec["broker"]["client"]["private_key"]
         broker_client = AcmeClient(
-            directory_url=self.config_sec["broker"]["client"]["directory"],
-            private_key=self.brokerclient_account_key_path,
-            contact=self.config_sec["broker"]["client"]["contact"],
+            AcmeClient.Config(
+                **self.config_sec["broker"]["client"],
+                private_key=self.brokerclient_account_key_path,
+            )
         )
 
         if "challenge_solver" in self.config_sec["broker"]["client"]:
@@ -105,7 +107,7 @@ class TestBrokerLocalCA(TestBroker):
         else:
             broker_client.register_challenge_solver(DummySolver())
 
-        broker = await self._cls.create_app(self.config_sec["broker"], client=broker_client)
+        broker = await self._cls.create_app(self._cls.Config(**self.config_sec["broker"]), client=broker_client)
 
         broker.register_challenge_validator(DummyValidator())
 

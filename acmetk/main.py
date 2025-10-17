@@ -2,7 +2,6 @@ import asyncio
 import logging
 import logging.config
 import subprocess
-import typing
 from pathlib import Path
 
 import aiohttp_jinja2
@@ -117,14 +116,14 @@ def generate_account_key(account_key_file, key_type):
         generate_ec_key(account_key_file)
 
 
-def alembic_run(config: dict) -> None:
+def alembic_run(config: AcmeServerBase.Config) -> None:
     from alembic.config import Config
     from alembic import command
     import yarl
 
     cfg = Config((base := Path(__file__).parent.parent) / "alembic.ini")
     cfg.set_main_option("script_location", str(base / "alembic"))
-    db = str(yarl.URL(config.get("db")).with_scheme("postgresql+psycopg2"))
+    db = str(yarl.URL(config.db).with_scheme("postgresql+psycopg2"))
     cfg.set_section_option("alembic", "sqlalchemy.url", db)
     command.upgrade(cfg, Database.ALEMBIC_REVISION)
 
@@ -151,36 +150,38 @@ def run(
     app_config_name = list(config.keys())[0]
 
     try:
-        app_class = server_app_registry.get_plugin(app_config_name)
+        app_class: AcmeServerBase = server_app_registry.get_plugin(app_config_name)
     except ValueError as e:
         raise click.UsageError(*e.args)
 
+    app_config = config.get(app_config_name)
+    app_cfg = app_class.Config(**app_config)
+
     if alembic_upgrade:
-        alembic_run(config.get(app_config_name))
+        alembic_run(app_cfg)
 
     if bootstrap_port:
         if app_class is AcmeCA:
             raise click.UsageError(f"Bootstrapping is not supported for the {app_class} at this moment.")
 
         click.echo(f"Starting {app_class.__name__} in bootstrap mode on port {bootstrap_port}")
-        app_config = config[app_config_name]
 
-        app_config["port"] = bootstrap_port
-        app_config["challenge_validators"] = ["dummy"]  # Do not validate challenges
-        app_config["subnets"] = [
+        app_cfg.port = bootstrap_port
+        app_cfg.challenge_validators = ["dummy"]  # Do not validate challenges
+        app_cfg.subnets = [
             "127.0.0.1/32",
             "10.110.0.0/24",
         ]  # Only allow localhost and the docker bridge network
         # Bootstrap app does not run behind a reverse proxy:
-        app_config["use_forwarded_header"] = False
-        app_config["require_eab"] = False
+        app_cfg.use_forwarded_header = False
+        app_cfg.require_eab = False
     else:
         click.echo(f"Starting {app_class.__name__}")
 
     if issubclass(app_class, AcmeRelayBase):
-        runner, site = loop.run_until_complete(run_relay(config, path, app_class, app_config_name))
+        runner, site = loop.run_until_complete(run_relay(app_cfg, path, app_class))
     elif app_class is AcmeCA:
-        runner, site = loop.run_until_complete(run_ca(config, path))
+        runner, site = loop.run_until_complete(run_ca(app_cfg, path))
     else:
         raise ValueError(app_class)
 
@@ -193,13 +194,13 @@ def run(
         loop.run_until_complete(runner.cleanup())
 
 
-async def run_ca(config: dict[str, typing.Any], path: str):
-    challenge_validators = create_challenge_validators(config["ca"]["challenge_validators"])
+async def run_ca(config: AcmeCA.Config, path: str):
+    challenge_validators = create_challenge_validators(config.challenge_validators)
 
     if path:
-        runner, ca = await AcmeCA.unix_socket(config["ca"], path)
-    elif config["ca"]["hostname"] and config["ca"]["port"]:
-        runner, ca = await AcmeCA.runner(config["ca"])
+        runner, ca = await AcmeCA.unix_socket(config, path)
+    elif config.hostname and config.port:
+        runner, ca = await AcmeCA.runner(config)
     else:
         raise click.UsageError(PATH_OR_HOST_AND_PORT_MSG)
 
@@ -217,31 +218,24 @@ def _url_for(context, __route_name, **parts):
         return "ERROR GENERATING URL"
 
 
-async def run_relay(config: dict[str, typing.Any], path: str, class_: AcmeRelayBase, config_name: str):
-    config_section = config[config_name]
-
+async def run_relay(config: AcmeRelayBase.Config, path: str, class_: AcmeRelayBase):
     try:
-        challenge_solver = create_challenge_solver(config_section["client"]["challenge_solver"])
-
-        challenge_validators = create_challenge_validators(config_section["challenge_validators"])
+        challenge_solver = create_challenge_solver(config.client.challenge_solver)
+        challenge_validators = create_challenge_validators(config.challenge_validators)
 
     except ValueError as e:
         raise click.UsageError(*e.args)
 
-    relay_client = AcmeClient(
-        directory_url=config_section["client"]["directory"],
-        private_key=config_section["client"]["private_key"],
-        contact=config_section["client"]["contact"],
-    )
+    relay_client = AcmeClient(config.client)
 
     relay_client.register_challenge_solver(challenge_solver)
 
     await relay_client.start()
 
     if path:
-        runner, relay = await class_.unix_socket(config_section, path, client=relay_client)
-    elif config_section["hostname"] and config_section["port"]:
-        runner, relay = await class_.runner(config_section, client=relay_client)
+        runner, relay = await class_.unix_socket(config, path, client=relay_client)
+    elif config.hostname and config.port:
+        runner, relay = await class_.runner(config, client=relay_client)
     else:
         raise click.UsageError(PATH_OR_HOST_AND_PORT_MSG)
 

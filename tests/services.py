@@ -30,17 +30,14 @@ class TestService:
 
 class CAService(TestService):
 
-    async def run(self, port, db, **kwargs):
-        runner, ca = await AcmeCA.runner(
-            config=dict(
-                port=port,
-                hostname="localhost",
-                db=db.format(database="acme-ca"),
-                cert=self.tmpdir / "root.crt",
-                private_key=self.tmpdir / "root.key",
-                **kwargs,
-            )
-        )
+    async def run(self, port, db, config: AcmeCA.Config):
+        config.port = port
+        config.hostname = "localhost"
+        config.db = db.format(database="acme-ca")
+        config.cert = self.tmpdir / "root.crt"
+        config.private_key = self.tmpdir / "root.key"
+
+        runner, ca = await AcmeCA.runner(config)
 
         aiohttp_jinja2.setup(runner.app, loader=jinja2.FileSystemLoader("./tpl/"))
         aiohttp_jinja2.get_env(runner.app).globals.update({"url_for": _url_for, "names_of_csr": acmetk.util.names_of})

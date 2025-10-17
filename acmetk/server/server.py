@@ -2,6 +2,7 @@ import abc
 import asyncio
 import collections
 import cProfile
+import dataclasses
 import functools
 import ipaddress
 import json
@@ -125,39 +126,47 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
     https://github.com/letsencrypt/boulder/blob/3fcaebe934a5f52440976b38a05aa43b743dbe92/cmd/boulder-ra/main.go#L258
     """
 
+    @dataclasses.dataclass
+    class Config:
+        rsa_min_keysize: int = 2048
+        ec_min_keysize: int = 256
+        tos_url: str = (None,)
+        mail_suffixes: list[str] = dataclasses.field(default_factory=list)
+        subnets: list[str] = dataclasses.field(default_factory=list)
+        use_forwarded_header: bool = (False,)
+        require_eab: bool = False
+        allow_wildcard: bool = False
+        mgmt_auth: bool = False
+        challenge_validators: list[str] = dataclasses.field(default_factory=list)
+        hostname: str = None
+        port: int = None
+        db: str = ""
+
     def __init__(
         self,
-        *,
-        rsa_min_keysize=2048,
-        ec_min_keysize=256,
-        tos_url=None,
-        mail_suffixes=None,
-        subnets=None,
-        use_forwarded_header=False,
-        require_eab=False,
-        allow_wildcard=False,
-        mgmt_auth=False,
-        **kwargs,
+        cfg: Config,
     ):
         super().__init__()
 
-        self._keysize = {
+        self._keysize: dict[str, dict[type, tuple[int, int]]] = {
             "csr": {
-                rsa.RSAPublicKey: (rsa_min_keysize, 4096),
-                ec.EllipticCurvePublicKey: (ec_min_keysize, 384),
+                rsa.RSAPublicKey: (cfg.rsa_min_keysize, 4096),
+                ec.EllipticCurvePublicKey: (cfg.ec_min_keysize, 384),
             },
             "account": {
-                rsa.RSAPublicKey: (rsa_min_keysize, 4096),
-                ec.EllipticCurvePublicKey: (ec_min_keysize, 521),
+                rsa.RSAPublicKey: (cfg.rsa_min_keysize, 4096),
+                ec.EllipticCurvePublicKey: (cfg.ec_min_keysize, 521),
             },
         }
-        self._tos_url = tos_url
-        self._mail_suffixes = mail_suffixes
-        self._subnets = [ipaddress.ip_network(subnet) for subnet in subnets] if subnets else None
-        self._use_forwarded_header = use_forwarded_header
-        self._require_eab = require_eab
-        self._allow_wildcard = allow_wildcard
-        self._mgmt_auth = mgmt_auth
+        self._tos_url: str = cfg.tos_url
+        self._mail_suffixes: list[str] = cfg.mail_suffixes
+        self._subnets: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = (
+            [ipaddress.ip_network(subnet) for subnet in cfg.subnets] if cfg.subnets else []
+        )
+        self._use_forwarded_header: bool = cfg.use_forwarded_header
+        self._require_eab: bool = cfg.require_eab
+        self._allow_wildcard: bool = cfg.allow_wildcard
+        self._mgmt_auth: bool = cfg.mgmt_auth
 
         self.app = web.Application(
             middlewares=[
@@ -175,7 +184,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         self._db: Database | None = None
         self._db_session: sessionmaker = None
 
-        self._challenge_validators = {}
+        self._challenge_validators: dict[str, ChallengeValidator] = {}
 
     def _match_keysize(self, public_key, what):
         for key_type, key_size in self._keysize[what].items():
@@ -208,19 +217,16 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         self.app.router.add_route("GET", "/{tail:.*}", handle_get)
 
     @classmethod
-    async def create_app(cls, config: dict[str, typing.Any], **kwargs) -> "AcmeServerBase":
+    async def create_app(cls, config: Config) -> "AcmeServerBase":
         """A factory that also creates and initializes the database and session objects,
         reading the necessary arguments from the passed config dict.
 
-        :param config: A dictionary holding the configuration. See :doc:`configuration` for supported options.
+        :param config: A Config object holding the configuration. See :doc:`configuration` for supported options.
         :return: The server instance
         """
-        db = Database(config["db"])
+        db = Database(config.db)
 
-        instance = cls(
-            **config,
-            **kwargs,
-        )
+        instance = cls(config)
         instance._db = db
         instance._db_session = db.session
 
@@ -230,7 +236,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         return self._db_session(info={"remote_host": request.get("actual_ip", "0.0.0.0")})
 
     @classmethod
-    async def runner(cls, config: dict[str, typing.Any], **kwargs) -> tuple["aiohttp.web.AppRunner", "AcmeServerBase"]:
+    async def runner(cls, config: Config) -> tuple["aiohttp.web.AppRunner", "AcmeServerBase"]:
         """A factory that starts the server on the given hostname and port using an AppRunner
         after constructing a server instance using :meth:`.create_app`.
 
@@ -238,19 +244,21 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         :param kwargs: Additional kwargs are passed to the :meth:`.create_app` call.
         :return: A tuple containing the app runner as well as the server instance.
         """
-        instance = await cls.create_app(config, **kwargs)
+        instance = await cls.create_app(config)
 
         runner = web.AppRunner(instance.app)
         await runner.setup()
 
-        site = web.TCPSite(runner, config["hostname"], config["port"])
+        site = web.TCPSite(runner, config.hostname, config.port)
         await site.start()
 
         return runner, instance
 
     @classmethod
     async def unix_socket(
-        cls, config: dict[str, typing.Any], path: str, **kwargs
+        cls,
+        config: Config,
+        path: str,
     ) -> tuple["aiohttp.web.AppRunner", "AcmeServerBase"]:
         """A factory that starts the server on a Unix socket bound to the given path using an AppRunner
         after constructing a server instance using :meth:`.create_app`.
@@ -260,7 +268,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         :param kwargs: Additional kwargs are passed to the :meth:`.create_app` call.
         :return: A tuple containing the app runner as well as the server instance.
         """
-        instance = await cls.create_app(config, **kwargs)
+        instance = await cls.create_app(config)
 
         runner = web.AppRunner(instance.app)
         await runner.setup()
@@ -1253,23 +1261,25 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 class AcmeCA(AcmeServerBase):
     """ACME compliant Certificate Authority."""
 
-    def __init__(self, *, cert, private_key, **kwargs):
-        super().__init__(**kwargs)
+    @dataclasses.dataclass
+    class Config(AcmeServerBase.Config):
+        cert: str = ""
+        private_key: str = ""
 
-        with open(cert, "rb") as pem:
+    def __init__(self, cfg: Config):
+        super().__init__(cfg)
+
+        with open(cfg.cert, "rb") as pem:
             self._cert = x509.load_pem_x509_certificate(pem.read())
 
-        with open(private_key, "rb") as pem:
+        with open(cfg.private_key, "rb") as pem:
             self._private_key = serialization.load_pem_private_key(pem.read(), None)
 
     @classmethod
-    async def create_app(cls, config, **kwargs):
-        db = Database(config["db"])
+    async def create_app(cls, config: Config) -> "AcmeCA":
+        db = Database(config.db)
 
-        ca = cls(
-            **config,
-            **kwargs,
-        )
+        ca = cls(config)
         ca._db = db
         ca._db_session = db.session
 
@@ -1329,37 +1339,26 @@ class AcmeRelayBase(AcmeServerBase):
     are valid before applying for certificate issuance.
     """
 
-    def __init__(self, *, client, **kwargs):
-        super().__init__(**kwargs)
+    @dataclasses.dataclass
+    class Config(AcmeServerBase.Config):
+        client: AcmeClient.Config = dataclasses.field(default_factory=AcmeClient.Config)
+
+    def __init__(self, cfg: Config, client: AcmeClient):
+        super().__init__(cfg)
         self._client: AcmeClient = client
 
-    async def directory(self, request: web.Request) -> web.Response:
-        directory = self._directory_data(request)
-
-        if self._client._directory.meta.profiles:
-            # profiles is a frozendict, … is not JSON serializeable
-            directory["meta"]["profiles"] = dict(self._client._directory.meta.profiles)
-
-        return self._response(request, directory)
-
     @classmethod
-    async def create_app(cls, config: dict[str, typing.Any], *, client: AcmeClient, **kwargs) -> "AcmeRelayBase":
+    async def create_app(cls, config: Config, client: AcmeClient) -> "AcmeRelayBase":
         """A factory that also creates and initializes the database and session objects,
         reading the necessary arguments from the passed config dict.
 
-        :param config: A dictionary holding the configuration. See :doc:`configuration` for supported options.
+        :param config: A Config object holding the configuration. See :doc:`configuration` for supported options.
         :param client: The internal started :class:`AcmeClient` instance
         :return: The server instance
         """
-        db = Database(config["db"])
+        db = Database(config.db)
 
-        config.pop("client")
-
-        instance = cls(
-            **config,
-            client=client,
-            **kwargs,
-        )
+        instance = cls(config, client=client)
         instance._db = db
         instance._db_session = db.session
 

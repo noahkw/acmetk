@@ -2,7 +2,7 @@ import asyncio
 import logging
 import ssl
 import typing
-from dataclasses import dataclass
+import dataclasses
 
 import acme.messages
 import josepy
@@ -35,7 +35,7 @@ def is_invalid(obj):
     return obj.status in [acme.messages.STATUS_INVALID, STATUS_EXPIRED]
 
 
-@dataclass
+@dataclasses.dataclass
 class ExternalAccountBindingCredentials:
     """Stores external account binding credentials to later create a binding JWS using
     :class:`~acme.messages.ExternalAccountBinding`.
@@ -60,6 +60,16 @@ class ExternalAccountBindingCredentials:
 
 
 class AcmeClient:
+    @dataclasses.dataclass
+    class Config:
+        directory: str
+        private_key: str
+        challenge_solver: list[str] = dataclasses.field(default_factory=list)
+        contact: dict[str, str] = (None,)
+        server_cert: str = None
+        kid: str = None
+        hmac_key: str = None
+
     """ACME compliant client."""
 
     FINALIZE_DELAY = 3.0
@@ -67,16 +77,7 @@ class AcmeClient:
     INVALID_NONCE_RETRIES = 5
     """The number of times the client should retry when the server returns the error *badNonce*."""
 
-    def __init__(
-        self,
-        *,
-        directory_url: str,
-        private_key: str,
-        contact: dict[str, str] = None,
-        server_cert: str = None,
-        kid: str = None,
-        hmac_key: str = None,
-    ):
+    def __init__(self, cfg: "AcmeClient.Config"):
         """Creates an :class:`AcmeClient` instance.
 
         :param directory_url: The ACME server's directory
@@ -90,24 +91,24 @@ class AcmeClient:
         """
         self._ssl_context = ssl.create_default_context()
 
-        if server_cert:
+        if cfg.server_cert:
             # Add our self-signed server cert for testing purposes.
-            self._ssl_context.load_verify_locations(cafile=server_cert)
+            self._ssl_context.load_verify_locations(cafile=cfg.server_cert)
 
         self._session = ClientSession(headers={"User-Agent": f"acmetk Client {__version__}"})
 
-        self._directory_url = directory_url
+        self._directory_url = cfg.directory
 
-        self._private_key, self._alg = self._open_key(private_key)
+        self._private_key, self._alg = self._open_key(cfg.private_key)
         # Filter empty strings
-        self._contact = {k: v for k, v in contact.items() if len(v) > 0}
+        self._contact = {k: v for k, v in cfg.contact.items() if len(v) > 0}
 
         self._directory: acme.messages.Directory = None
         self._nonces = set()
         self._account = None
 
         self._challenge_solvers = dict()
-        self.eab_credentials = (kid, hmac_key)
+        self.eab_credentials = (cfg.kid, cfg.hmac_key)
 
     @property
     def eab_credentials(self) -> ExternalAccountBindingCredentials:
