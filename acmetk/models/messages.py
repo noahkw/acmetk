@@ -160,7 +160,7 @@ class NewOrder(josepy.JSONObjectWithFields):
     @classmethod
     def from_data(
         cls,
-        identifiers: typing.Union[list[dict[str, str]], list[str]] = None,
+        identifiers: list[dict[str, str]] | list[str] = None,
         not_before: "datetime.datetime" = None,
         not_after: "datetime.datetime" = None,
         profile: str = None,

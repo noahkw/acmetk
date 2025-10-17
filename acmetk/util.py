@@ -46,7 +46,7 @@ class DNS01ChallengeHelper:
     DEFAULT_DNS_SERVERS = ["1.1.1.1", "8.8.8.8"]
     """The DNS servers to use if none are specified during initialization."""
 
-    def __init__(self, dns_servers: typing.Optional[list[str]] = None):
+    def __init__(self, dns_servers: list[str] | None = None):
         self._loop = asyncio.get_event_loop()
         self._resolvers = []
 

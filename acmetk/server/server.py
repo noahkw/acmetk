@@ -172,7 +172,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
         self._nonces: set[str] = set()
 
-        self._db: typing.Optional[Database] = None
+        self._db: Database | None = None
         self._db_session: sessionmaker = None
 
         self._challenge_validators = {}
@@ -659,7 +659,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             jws, account = await self._verify_request(request, session, key_auth=True)
             reg = acme.messages.Registration.json_loads(jws.payload)
             jwk = jws.signature.combined.jwk
-            pub_key: typing.Union[RSAPublicKey, EllipticCurvePublicKey] = jwk.key._wrapped
+            pub_key: RSAPublicKey | EllipticCurvePublicKey = jwk.key._wrapped
 
             self._validate_account_key(pub_key)
 
@@ -703,7 +703,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                         headers={"Location": acmetk.util.url_for(request, "accounts", account_id=str(account_id))},
                     )
 
-    def _validate_account_key(self, pub_key: typing.Union[RSAPublicKey, EllipticCurvePublicKey]):
+    def _validate_account_key(self, pub_key: RSAPublicKey | EllipticCurvePublicKey):
         if isinstance(pub_key, self.SUPPORTED_ACCOUNT_KEYS):
             try:
                 self._match_keysize(pub_key, "account")
