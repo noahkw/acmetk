@@ -36,9 +36,9 @@ jobs:
         services:
           db:
             container_name: acmetk_db
-            image: postgres
+            image: postgres:18
             volumes:
-              - ./db_data:/var/lib/postgresql/data
+              - ./db_data:/var/lib/postgresql/18/docker
             environment:
               POSTGRES_PASSWORD: \${ACME_TESTS_PG_PW}
               POSTGRES_USER: acme-broker
