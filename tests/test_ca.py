@@ -472,10 +472,12 @@ class TestOurClient:
 
     def _make_client(self, key_path, email):
         client = AcmeClient(
-            directory_url=self.DIRECTORY,
-            private_key=key_path,
-            contact={"email": email},
-            server_cert=self.config_sec.get("client", {}).get("server_cert", None),
+            AcmeClient.Config(
+                directory=self.DIRECTORY,
+                private_key=key_path,
+                contact={"email": email},
+                server_cert=self.config_sec.get("client", {}).get("server_cert", None),
+            )
         )
 
         client.register_challenge_solver(DummySolver())
