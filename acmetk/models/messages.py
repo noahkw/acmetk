@@ -16,6 +16,17 @@ if typing.TYPE_CHECKING:
     import cryptography
     import datetime
 
+ERROR_CODES = {
+    "alreadyReplaced": "The request specified a predecessor certificate that has already been marked as replaced ",
+    "invalidProfile": "The request specified a profile which this server does not support",
+}
+
+for code, desc in ERROR_CODES.items():
+    if code in acme.messages.ERROR_CODES:
+        continue
+    acme.messages.ERROR_CODES[code] = desc
+    acme.messages.ERROR_TYPE_DESCRIPTIONS[acme.messages.ERROR_PREFIX + code] = desc
+
 ERROR_CODE_STATUS = {
     "unauthorized": 401,
     "orderNotReady": 403,

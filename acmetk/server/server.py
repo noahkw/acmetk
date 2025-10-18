@@ -828,8 +828,8 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                     and that the identified certificate has not already been marked as replaced by a different Order
                     that is not "invalid"
                     """
-                    raise acme.messages.Error(
-                        typ=f"{acme.messages.ERROR_PREFIX}alreadyReplaced",
+                    raise acme.messages.Error.with_code(
+                        "alreadyReplaced",
                         detail=(
                             "The request specified a predecessor certificate which has already been"
                             "marked as replaced."
