@@ -60,22 +60,19 @@
 {% endif %}
         </td>
     </tr>
-
+    <tr>
+        <td>Replaced_by:</td>
+        <td>
+{% for replaced_by in order.certificate.replaced_by or []%}
+            <a href="{{ url_for('mgmt-order', order=replaced_by.order_id|string)}}">{{ replaced_by.order_id }}</a>
+{% endfor %}
+        </td>
+    </tr>
     <tr>
         <td>Replaces:</td>
         <td>
 {% if order.replaces %}
             <a href="{{ url_for('mgmt-order', order=order.replaced_obj.order_id|string)}}">{{ order.replaced_obj.order_id }}</a>
-{% else %}
-            -
-{% endif %}
-        </td>
-    </tr>
-    <tr>
-        <td>Replaced_by:</td>
-        <td>
-{% if order.certificate.replaced_by %}
-            <a href="{{ url_for('mgmt-order', order=order.certificate.replaced_by.order_id|string)}}">{{ order.certificate.replaced_by.order_id }}</a>
 {% else %}
             -
 {% endif %}

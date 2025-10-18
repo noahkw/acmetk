@@ -107,8 +107,6 @@ class Certificate(Entity, Serializer):
         back_populates="replaced_obj",
         lazy="noload",
         foreign_keys="Order.replaces",
-        single_parent=True,
-        uselist=False,
     )
 
     full_chain = Column(Text, nullable=True)
