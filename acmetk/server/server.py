@@ -780,6 +780,11 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             obj = messages.NewOrder.json_loads(jws.payload)
             self._verify_order(obj)
             if obj.replaces:
+                """
+                https://www.rfc-editor.org/rfc/rfc9773.html#name-extensions-to-the-order-obj
+
+                Servers SHOULD check that …
+                """
                 repl: models.Certificate
                 import sqlalchemy
 
@@ -802,7 +807,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                     )
 
                 if repl.account_of.account_id != account.account_id:
-                    """the identified certificate and the New Order request correspond to the same ACME Account,"""
+                    """the identified certificate and the newOrder request correspond to the same ACME Account,"""
                     raise acme.messages.Error.with_code(
                         "unauthorized",
                         detail="requester account did not request the certificate being replaced by this order",
@@ -820,8 +825,8 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
                 if repl.replaced_by and any(i.status != models.OrderStatus.INVALID for i in repl.replaced_by):
                     """
-                    and that the identified certificate has not already been marked as replaced by
-                    a different Order that is not "invalid".
+                    and that the identified certificate has not already been marked as replaced by a different Order
+                    that is not "invalid"
                     """
                     raise acme.messages.Error(
                         typ=f"{acme.messages.ERROR_PREFIX}alreadyReplaced",
@@ -1209,9 +1214,9 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
     @routes.get("/renewal-info/{aci}", name="renewal-info")
     async def renewal_info(self, request: web.Request) -> web.Response:
         """
-        4.1. The "renewalInfo" Resource
+        4.1. The RenewalInfo Resource
 
-        https://www.ietf.org/archive/id/draft-ietf-acme-ari-07.html#name-the-renewalinfo-resource
+        https://www.rfc-editor.org/rfc/rfc9773.html#name-the-renewalinfo-resource
         """
         aci = acmetk.util.CertID.from_identifier(request.match_info["aci"])
         import datetime
@@ -1233,9 +1238,15 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         end = cert.not_valid_before_utc + (tw / 3) * 2
 
         r = messages.RenewalInfo(suggestedWindow=messages.RenewalInfo.TimeWindow(start=start, end=end))
-        rtrya: datetime.timedelta = start - now
 
-        return self._response(request, r.to_json(), headers={"Retry-After": str(rtrya.seconds)})
+        rtrya: int = min((start - now).seconds, 24 * 3600)
+        """
+        4.3.1. Server Choice of Retry-After
+
+        https://www.rfc-editor.org/rfc/rfc9773.html#section-4.3.1
+        """
+
+        return self._response(request, r.to_json(), headers={"Retry-After": str(rtrya)})
 
     @abc.abstractmethod
     async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str) -> web.Response:
