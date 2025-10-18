@@ -272,7 +272,7 @@ class AcmeClient:
         self,
         identifiers: list[dict] | list[str],
         profile: str | None = None,
-        replaces: typing.Union[str, None] = None,
+        replaces: str | None = None,
         return_location=False,
     ) -> messages.Order | tuple[str, messages.Order]:
         """Creates a new order with the given identifiers.
@@ -299,9 +299,7 @@ class AcmeClient:
             logger.warning("Order with renewalInfo - not supported")
             replaces = None
 
-        order = messages.CreateOrder.from_data(
-            identifiers=identifiers, replaces=replaces, profile=profile
-        )
+        order = messages.CreateOrder.from_data(identifiers=identifiers, replaces=replaces, profile=profile)
 
         resp, order_obj = await self._signed_request(order, self._directory["newOrder"])
 

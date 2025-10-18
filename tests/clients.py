@@ -90,8 +90,8 @@ class TestClient:
     async def order(
         self,
         csr,
-        profile: typing.Union[str, None] = None,
-        replaces: typing.Union[str, None] = None,
+        profile: str | None = None,
+        replaces: str | None = None,
     ):
         try:
             self.service.ca._match_keysize(csr.public_key(), "csr")
@@ -107,8 +107,8 @@ class TestClient:
     async def _order(
         self,
         csr,
-        profile: typing.Union[str, None] = None,
-        replaces: typing.Union[str, None] = None,
+        profile: str | None = None,
+        replaces: str | None = None,
     ):
         raise NotImplementedError()
 
@@ -294,14 +294,12 @@ class acmetkClient(TestClient):
     async def _order(
         self,
         csr,
-        profile: typing.Union[str, None] = None,
-        replaces: typing.Union[str, None] = None,
+        profile: str | None = None,
+        replaces: str | None = None,
     ):
         domains = self.domains_of_csr(csr)
         identifiers = self.identifiers_from_names(domains)
-        ord_ = await self.client.order_create(
-            identifiers, profile=profile, replaces=replaces
-        )
+        ord_ = await self.client.order_create(identifiers, profile=profile, replaces=replaces)
         await self.client.authorizations_complete(ord_)
         ord_ = await self.client.order_finalize(ord_, csr)
         r = await self.client.certificate_get(ord_)

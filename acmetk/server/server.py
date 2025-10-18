@@ -818,9 +818,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                         detail="at least one identifier in the new order and existing order must match",
                     )
 
-                if repl.replaced_by and any(
-                    i.status != models.OrderStatus.INVALID for i in repl.replaced_by
-                ):
+                if repl.replaced_by and any(i.status != models.OrderStatus.INVALID for i in repl.replaced_by):
                     """
                     and that the identified certificate has not already been marked as replaced by
                     a different Order that is not "invalid".
@@ -1234,14 +1232,10 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         start = cert.not_valid_before_utc + (tw / 3)
         end = cert.not_valid_before_utc + (tw / 3) * 2
 
-        r = messages.RenewalInfo(
-            suggestedWindow=messages.RenewalInfo.TimeWindow(start=start, end=end)
-        )
+        r = messages.RenewalInfo(suggestedWindow=messages.RenewalInfo.TimeWindow(start=start, end=end))
         rtrya: datetime.timedelta = start - now
 
-        return self._response(
-            request, r.to_json(), headers={"Retry-After": str(rtrya.seconds)}
-        )
+        return self._response(request, r.to_json(), headers={"Retry-After": str(rtrya.seconds)})
 
     @abc.abstractmethod
     async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str) -> web.Response:
@@ -1402,9 +1396,7 @@ class AcmeCA(AcmeServerBase):
         async with self._session(request) as session:
             order = await self._db.get_order(session, account_id, order_id)
 
-            cert = acmetk.util.generate_cert_from_csr(
-                order.csr, self._cert, self._private_key
-            )
+            cert = acmetk.util.generate_cert_from_csr(order.csr, self._cert, self._private_key)
             order.certificate = models.Certificate(
                 status=models.CertificateStatus.VALID,
                 cert=cert,
