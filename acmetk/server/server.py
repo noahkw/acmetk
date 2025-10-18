@@ -3,6 +3,7 @@ import asyncio
 import collections
 import cProfile
 import dataclasses
+import datetime
 import functools
 import ipaddress
 import json
@@ -33,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 import acmetk.util
+from acmetk.util import CertID
 from acmetk import models
 from acmetk.client import CouldNotCompleteChallenge, AcmeClientException, AcmeClient
 from acmetk.database import Database
@@ -786,20 +788,8 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                 Servers SHOULD check that …
                 """
                 repl: models.Certificate
-                import sqlalchemy
 
-                q = (
-                    sqlalchemy.select(models.Certificate)
-                    .options(
-                        sqlalchemy.orm.joinedload(models.Certificate.order).options(
-                            sqlalchemy.orm.joinedload(models.Order.account),
-                            sqlalchemy.orm.joinedload(models.Order.identifiers),
-                        ),
-                        sqlalchemy.orm.joinedload(models.Certificate.replaced_by),
-                    )
-                    .filter(models.Certificate.certid == obj.replaces)
-                )
-                (repl,) = (await session.execute(q)).first()
+                repl = await self._db.get_certificate(session, certid=obj.replaces)
                 if repl is None:
                     raise acme.messages.Error.with_code(
                         "serverInternal",
@@ -1218,19 +1208,13 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
         https://www.rfc-editor.org/rfc/rfc9773.html#name-the-renewalinfo-resource
         """
-        aci = acmetk.util.CertID.from_identifier(request.match_info["aci"])
-        import datetime
-        import cryptography.x509
+        aci = CertID.from_identifier(request.match_info["aci"])
 
         async with self._session(request) as session:
-            from sqlalchemy import select
-            from ..models.certificate import Certificate
-
-            q = select(Certificate).filter(Certificate.certid == aci.identifier)
-            (c,) = (await session.execute(q)).first()
+            c = await self._db.get_certificate(session, certid=aci.identifier)
             if c is None:
                 raise ValueError("Not found")
-            cert: cryptography.x509.Certificate = c.cert
+            cert: x509.Certificate = c.cert
 
         tw = cert.not_valid_after_utc - cert.not_valid_before_utc
         now = datetime.datetime.now(datetime.timezone.utc)
@@ -1411,7 +1395,7 @@ class AcmeCA(AcmeServerBase):
             order.certificate = models.Certificate(
                 status=models.CertificateStatus.VALID,
                 cert=cert,
-                certid=acmetk.util.CertID.from_cert(cert).identifier,
+                certid=CertID.from_cert(cert).identifier,
             )
 
             order.status = models.OrderStatus.VALID
@@ -1568,7 +1552,7 @@ class AcmeRelayBase(AcmeServerBase):
                 status=models.CertificateStatus.VALID,
                 cert=certs[0],
                 full_chain=full_chain,
-                certid=acmetk.util.CertID.from_cert(certs[0]).identifier,
+                certid=CertID.from_cert(certs[0]).identifier,
             )
 
             order.status = models.OrderStatus.VALID

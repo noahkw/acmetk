@@ -6,7 +6,7 @@ from aiohttp import web
 from sqlalchemy import select, event
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, selectinload, aliased
+from sqlalchemy.orm import sessionmaker, selectinload, aliased, joinedload
 
 from acmetk import models
 from acmetk.models import (
@@ -259,7 +259,7 @@ class Database:
 
     @staticmethod
     async def get_certificate(
-        session: AsyncSession, account_id=None, certificate_id=None, certificate=None
+        session: AsyncSession, account_id=None, certificate_id=None, certificate=None, certid=None
     ) -> models.Certificate | None:
         order = aliased(Order, flat=True)
         account = aliased(Account, flat=True)
@@ -279,8 +279,21 @@ class Database:
                 .join(order, Certificate.order_id == order.order_id)
                 .join(account, order.account_id == account.account_id)
             )
+        elif certid:
+            statement = (
+                select(models.Certificate)
+                .options(
+                    joinedload(models.Certificate.order).options(
+                        joinedload(models.Order.account),
+                        joinedload(models.Order.identifiers),
+                    ),
+                    joinedload(models.Certificate.replaced_by),
+                )
+                .filter(models.Certificate.certid == certid)
+            )
+
         else:
-            raise ValueError("Either kid and certificate_id OR certificate should be specified")
+            raise ValueError("Either kid and certificate_id OR certificate OR certid should be specified")
 
         try:
             result = (await session.execute(statement)).first()
