@@ -4,7 +4,7 @@ import pytest_asyncio
 
 import acme.messages
 
-from acmetk.server import DummyValidator
+from acmetk.server import DummyValidator, AcmeCA
 from acmetk.util import CertID
 from .services import CAService
 from .clients import acmetkClient
@@ -15,18 +15,7 @@ async def service(tmp_path_factory, unused_tcp_port_factory, db):
 
     tmpdir = tmp_path_factory.mktemp("acmetk")
     service = CAService(tmpdir)
-    await service.run(
-        port=unused_tcp_port_factory(),
-        db=db,
-        rsa_min_keysize=2048,
-        ec_min_keysize=256,
-        tos_url=None,
-        mail_suffixes=None,
-        subnets=None,
-        use_forwarded_header=False,
-        require_eab=False,
-        allow_wildcard=False,
-    )
+    await service.run(unused_tcp_port_factory(), db, AcmeCA.Config())
     return service
 
 
