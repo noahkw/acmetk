@@ -289,7 +289,11 @@ class AcmeManagementMixin:
                         selectinload(Identifier.changes).selectinload(Change.entity),
                     ),
                     selectinload(Order.changes).selectinload(Change.entity),
-                    selectinload(Order.certificate).selectinload(Certificate.changes).selectinload(Change.entity),
+                    selectinload(Order.certificate).options(
+                        selectinload(Certificate.replaced_by),
+                        selectinload(Certificate.changes).selectinload(Change.entity),
+                    ),
+                    selectinload(Order.replaced_obj),
                 )
                 .filter(Order.order_id == order)
             )

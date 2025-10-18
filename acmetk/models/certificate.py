@@ -100,13 +100,15 @@ class Certificate(Entity, Serializer):
     cert = Column(x509Certificate, nullable=True, index=True)
     """The actual client certificate (:class:`cryptography.x509.Certificate`)."""
     certid = Column(String(64), nullable=False, index=True, unique=True)
-    """ARI Certificate Identifier"""
+    """RFC 9773 - ARI Certificate Identifier"""
 
     replaced_by = relationship(
         "Order",
         back_populates="replaced_obj",
         lazy="noload",
         foreign_keys="Order.replaces",
+        single_parent=True,
+        uselist=False,
     )
 
     full_chain = Column(Text, nullable=True)
