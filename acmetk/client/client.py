@@ -295,7 +295,7 @@ class AcmeClient:
             if profile not in profiles:
                 raise ValueError("Profile must be one of {}".format(", ".join(profiles.keys())))
 
-        if self._directory["renewalInfo"] is None and replaces is not None:
+        if self._directory._jobj.get("renewalInfo") is None and replaces is not None:
             logger.warning("Order with renewalInfo - not supported")
             replaces = None
 

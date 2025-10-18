@@ -1461,7 +1461,7 @@ class AcmeRelayBase(AcmeServerBase):
             # profiles is a frozendict, … is not JSON serializeable
             directory["meta"]["profiles"] = dict(self._client._directory.meta.profiles)
 
-        if "renewalInfo" not in self._client._directory:
+        if self._client._directory._jobj.get("renewalInfo"):
             del directory["renewalInfo"]
 
         return self._response(request, directory)
