@@ -2,7 +2,7 @@
 {% from "csr.jinja2" import csr,alginfo_of with context %}
 
 {%  block body %}
-<h1>Order {{ order.order }}</h1>
+<h1>Order <code>{{ order.order_id }}</code></h1>
 <p>
 
 <table>
@@ -50,6 +50,38 @@
 {% endif %}
         </td>
     </tr>
+    <tr>
+        <td>CertId:</td>
+        <td>
+{% if order.certificate %}
+            {{ order.certificate.certid }}
+{% else %}
+            -
+{% endif %}
+        </td>
+    </tr>
+
+    <tr>
+        <td>Replaces:</td>
+        <td>
+{% if order.replaces %}
+            <a href="{{ url_for('mgmt-order', order=order.replaced_obj.order_id|string)}}">{{ order.replaced_obj.order_id }}</a>
+{% else %}
+            -
+{% endif %}
+        </td>
+    </tr>
+    <tr>
+        <td>Replaced_by:</td>
+        <td>
+{% if order.certificate.replaced_by %}
+            <a href="{{ url_for('mgmt-order', order=order.certificate.replaced_by.order_id|string)}}">{{ order.certificate.replaced_by.order_id }}</a>
+{% else %}
+            -
+{% endif %}
+        </td>
+    </tr>
+
 </table>
 </p>
 <h2>Authorizations & Challenges</h2>
