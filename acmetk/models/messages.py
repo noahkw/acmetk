@@ -160,18 +160,15 @@ class CreateOrder(josepy.JSONObjectWithFields):
     not_after: "datetime.datetime" = acme.messages.fields.RFC3339Field("notAfter", omitempty=True)
     """The requested *notAfter* field in the certificate."""
     profile: str = josepy.Field("profile", omitempty=True)
-    """TODO https://datatracker.ietf.org/doc/draft-aaron-acme-profiles/"""
-
     """
-    6.2. ACME Order Object Fields
-
-    https://www.ietf.org/archive/id/draft-aaron-acme-profiles-00.html#name-acme-order-object-fields
+    RFC XXXX - 4. Extensions to the Order Resource
+    https://www.ietf.org/archive/id/draft-ietf-acme-profiles-00.html#name-extensions-to-the-order-res
     """
 
     replaces: str = josepy.field("replaces", omitempty=True)
     """
-    RFC-ARI -  5. Extensions to the Order Object
-    https://www.ietf.org/archive/id/draft-ietf-acme-ari-07.html#name-extensions-to-the-order-obj
+    RFC 9773 - 5. Extensions to the Order Object
+    https://www.rfc-editor.org/rfc/rfc9773.html#name-extensions-to-the-order-obj
     """
 
     @classmethod
@@ -268,7 +265,7 @@ class Directory(acme.messages.Directory):
 class RenewalInfo(josepy.JSONObjectWithFields):
     """
     4.2. RenewalInfo Objects
-    https://www.ietf.org/archive/id/draft-ietf-acme-ari-07.html#name-renewalinfo-objects
+    https://www.rfc-editor.org/rfc/rfc9773.html#name-renewalinfo-objects
     """
 
     class TimeWindow(josepy.JSONObjectWithFields):
