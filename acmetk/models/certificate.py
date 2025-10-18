@@ -1,5 +1,4 @@
 import enum
-import typing
 import uuid
 
 import cryptography
@@ -30,14 +29,12 @@ class x509Certificate(TypeDecorator):
     def load_dialect_impl(self, dialect):
         return dialect.type_descriptor(self.impl)
 
-    def process_bind_param(
-        self, value: typing.Union[cryptography.x509.Certificate, None], dialect
-    ) -> bytes:
+    def process_bind_param(self, value: cryptography.x509.Certificate | None, dialect) -> bytes:
         if value is None:
             return value
         return self._adapt(value)
 
-    def process_result_value(self, value: typing.Union[bytes, None], dialect):
+    def process_result_value(self, value: bytes | None, dialect):
         if value is None:
             return value
         return self._convert(value)

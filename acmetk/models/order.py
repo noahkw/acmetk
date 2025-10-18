@@ -113,9 +113,7 @@ class Order(Entity, Serializer):
 
     profile = Column(String, nullable=True)
 
-    replaces = Column(
-        String, ForeignKey("certificates.certid"), nullable=True, index=True
-    )
+    replaces = Column(String, ForeignKey("certificates.certid"), nullable=True, index=True)
 
     replaced_obj = relationship(
         "Certificate",
