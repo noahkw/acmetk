@@ -51,7 +51,7 @@ def upgrade():
 
     op.alter_column("certificates", "certid", nullable=False)
     op.create_index(op.f("ix_certificates_certid"), "certificates", ["certid"], unique=True)
-    op.add_column("orders", sa.Column("replaces", sa.String(), nullable=True))
+    op.add_column("orders", sa.Column("replaces", sa.String(255), nullable=True))
     op.create_index(op.f("ix_orders_account_id"), "orders", ["account_id"], unique=False)
     op.create_index(op.f("ix_orders_replaces"), "orders", ["replaces"], unique=False)
     op.create_foreign_key(
