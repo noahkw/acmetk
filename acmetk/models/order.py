@@ -111,7 +111,7 @@ class Order(Entity, Serializer):
     csr = Column(CSRType)
     """The :class:`cryptography.x509.CertificateSigningRequest` that was submitted by the client."""
 
-    profile = Column(String, nullable=True)
+    profile = Column(String(32), nullable=True)
 
     replaces = Column(String(255), ForeignKey("certificates.certid"), nullable=True, index=True)
     """
