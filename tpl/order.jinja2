@@ -24,6 +24,11 @@
         </td>
     </tr>
     <tr>
+        <td>Profile</td>
+        <td>{{ order.profile or "-" }}</td>
+    </tr>
+
+    <tr>
         <td>Alg/Bits</td>
         <td>{{ alginfo_of(order.csr.public_key()) }}</td>
     </tr>
