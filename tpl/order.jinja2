@@ -69,7 +69,7 @@
         </td>
     </tr>
     <tr>
-        <td>Replaces:</td>
+        <td  valign="top">Replaces:</td>
         <td>
 {% if order.replaces %}
             <a href="{{ url_for('mgmt-order', order=order.replaced_obj.order_id|string)}}">{{ order.replaced_obj.order_id }}</a>

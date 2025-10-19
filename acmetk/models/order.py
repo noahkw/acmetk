@@ -113,7 +113,11 @@ class Order(Entity, Serializer):
 
     profile = Column(String, nullable=True)
 
-    replaces = Column(String, ForeignKey("certificates.certid"), nullable=True, index=True)
+    replaces = Column(String(255), ForeignKey("certificates.certid"), nullable=True, index=True)
+    """
+    RFC 9773 - 5. Extensions to the Order Object
+    https://www.rfc-editor.org/rfc/rfc9773.html#name-extensions-to-the-order-obj
+    """
 
     replaced_obj = relationship(
         "Certificate",
