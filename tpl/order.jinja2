@@ -138,7 +138,7 @@
 {% else %}
 <td></td>
 {% endif %}
-<td>{{ c.entity.identity }}/{{ c.entity|attr(c.entity.identity + '_id') }}</td>
+<td>{{ shorten(c.entity.identity, 7) }}/{{ shorten(c.entity|attr(c.entity.identity + '_id')|string, 9) }}</td>
 <td>
     <ul class="data">
 {% for i in c.data %}
