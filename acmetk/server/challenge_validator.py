@@ -155,7 +155,6 @@ class TLSALPN01ChallengeValidator(ChallengeValidator):
         )
 
         try:
-
             ctx = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
             ctx.set_alpn_protocols(["acme-tls/1"])
             ctx.minimum_version, ctx.maximum_version = (

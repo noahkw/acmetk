@@ -1,4 +1,5 @@
 import collections
+import dataclasses
 
 import aiohttp_jinja2
 import cryptography
@@ -8,6 +9,7 @@ import sqlalchemy.dialects.postgresql
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, defer, defaultload
 from sqlalchemy.sql import text
+import jinja2
 
 import aiohttp.web
 
@@ -23,14 +25,35 @@ from acmetk.models import (
 )
 from acmetk.models.base import Entity
 from acmetk.server.routes import routes
-from acmetk.util import PerformanceMeasurementSystem
+from acmetk.util import PerformanceMeasurementSystem, names_of
+
 from .pagination import paginate
+
+
+@jinja2.pass_context
+def _url_for(context: jinja2.runtime.Context, __route_name, **parts):
+    try:
+        return context["request"].match_info.apps[-1].router[__route_name].url_for(**parts)
+    except Exception:
+        return "ERROR GENERATING URL"
 
 
 class AcmeManagementMixin:
     MGMT_GROUP = "it-admins"
     GROUPS_HEADER = "x-forwarded-groups"
-    _mgmt_auth = False
+
+    _mgmt: "Config"
+
+    @dataclasses.dataclass
+    class Config:
+        authentication: bool = dataclasses.field(default=False)
+        header: str | None = None
+        group: str | None = None
+
+    @staticmethod
+    async def on_run(app: aiohttp.web.Application):
+        aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader("./tpl/"))
+        aiohttp_jinja2.get_env(app).globals.update({"url_for": _url_for, "names_of_csr": names_of})
 
     async def _session(self, request: aiohttp.web.Request) -> sqlalchemy.ext.asyncio.AsyncSession:
         pass
@@ -42,13 +65,13 @@ class AcmeManagementMixin:
             * HTTP status code *403* if the header is missing
         """
 
-        if self._mgmt_auth is False or not request.path.startswith("/mgmt"):
+        if self._mgmt.authentication is False or not request.path.startswith("/mgmt"):
             return await handler(request)
 
-        if (groups := request.headers.get(self.GROUPS_HEADER)) is None or self.MGMT_GROUP not in groups.split(","):
+        if (groups := request.headers.get(self._mgmt.header)) is None or self._mgmt.group not in groups.split(","):
             return aiohttp.web.Response(
                 status=403,
-                text=f"{type(self).__name__}: This service requires {self.GROUPS_HEADER} & {self.MGMT_GROUP}"
+                text=f"{type(self).__name__}: This service requires {self._mgmt.header} & {self._mgmt.group}"
                 " Please contact your system administrator.\n",
             )
         return await handler(request)

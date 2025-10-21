@@ -100,7 +100,6 @@ class ExternalAccountBindingStore:
         if mail := request.headers.get(AcmeEABMixin.CLIENT_EMAIL_HEADER):
             pass
         elif qpem := request.headers.get(AcmeEABMixin.CLIENT_CERT_HEADER):
-
             # The client certificate in the PEM format (urlencoded) for an established SSL connection (1.13.5);
             cert = x509.load_pem_x509_certificate(urllib.parse.unquote(qpem).encode())
 

@@ -65,9 +65,9 @@ def versioned_session(session):
                 elif isinstance(v, datetime.datetime):
                     return v.isoformat()
                 elif isinstance(v, models.Identifier):
-                    return v.identifier
+                    return v.identifier_id
                 elif isinstance(v, models.Authorization):
-                    return v.authorization
+                    return v.authorization_id
                 elif isinstance(v, acme.messages.Status):
                     return v.name
                 elif isinstance(v, acme.messages.Error):
@@ -259,7 +259,11 @@ class Database:
 
     @staticmethod
     async def get_certificate(
-        session: AsyncSession, account_id=None, certificate_id=None, certificate=None, certid=None
+        session: AsyncSession,
+        account_id=None,
+        certificate_id=None,
+        certificate=None,
+        certid=None,
     ) -> models.Certificate | None:
         order = aliased(Order, flat=True)
         account = aliased(Account, flat=True)

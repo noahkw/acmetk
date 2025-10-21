@@ -2,12 +2,9 @@ import asyncio
 import unittest
 from pathlib import Path
 
-import aiohttp_jinja2
-import jinja2
 import trustme
 
 from acmetk import AcmeCA
-from acmetk.main import _url_for
 from acmetk.server import RequestIPDNSChallengeValidator
 from tests.test_ca import TestAcmetiny, TestAcme, TestOurClient, TestCertBot
 
@@ -72,9 +69,6 @@ class TestDeployment(TestAcme):
         ca.register_challenge_validator(RequestIPDNSChallengeValidator())
 
         await ca._db._recreate()
-
-        aiohttp_jinja2.setup(ca.app, loader=jinja2.FileSystemLoader("../tpl/"))
-        aiohttp_jinja2.get_env(ca.app).globals.update({"url_for": _url_for})
 
         self.runner = runner
 
