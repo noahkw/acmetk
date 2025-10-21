@@ -153,7 +153,6 @@ async def alpn(ca, unused_tcp_port):
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_ourclient_tlsalpn01(tmp_path_factory, unused_tcp_port_factory, alpn, db):
-
     cipher, length = "RSA", 4096
 
     name = "acmetk"

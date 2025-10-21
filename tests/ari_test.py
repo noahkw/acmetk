@@ -12,7 +12,6 @@ from .clients import acmetkClient
 
 @pytest_asyncio.fixture
 async def service(tmp_path_factory, unused_tcp_port_factory, db):
-
     tmpdir = tmp_path_factory.mktemp("acmetk")
     service = CAService(tmpdir)
     await service.run(unused_tcp_port_factory(), db, AcmeCA.Config())
@@ -30,7 +29,6 @@ def test_RenewalInfo():
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_ourclient_ari(tmp_path_factory, service):
-
     cipher, length = "RSA", 4096
     name = "acmetk"
 

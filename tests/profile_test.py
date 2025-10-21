@@ -9,7 +9,6 @@ from .clients import acmetkClient
 
 @pytest_asyncio.fixture
 async def service(tmp_path_factory, unused_tcp_port_factory, db):
-
     tmpdir = tmp_path_factory.mktemp("acmetk")
     service = CAService(tmpdir)
     await service.run(
@@ -31,7 +30,6 @@ async def service(tmp_path_factory, unused_tcp_port_factory, db):
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_ourclient_profile(tmp_path_factory, service):
-
     cipher, length = "RSA", 4096
     name = "acmetk"
 

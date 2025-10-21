@@ -141,7 +141,12 @@ class certbotClient(TestClient):
         await self._run(f"register --no-eff-email --agree-tos  -m {self.contact}")
         return True
 
-    async def _order(self, csr):
+    async def _order(
+        self,
+        csr,
+        profile: str | None = None,
+        replaces: str | None = None,
+    ):
         await self._certonly(csr)
         return True
 
@@ -334,7 +339,12 @@ class acmezClient(TestClient):
     async def register(self):
         return True
 
-    async def order(self, csr):
+    async def order(
+        self,
+        csr,
+        profile: str | None = None,
+        replaces: str | None = None,
+    ):
         self._run()
 
 
@@ -355,7 +365,12 @@ class acmetinyClient(TestClient):
     async def register(self):
         return True
 
-    async def order(self, csr):
+    async def order(
+        self,
+        csr,
+        profile: str | None = None,
+        replaces: str | None = None,
+    ):
         try:
             self.service.ca._match_keysize(csr.public_key(), "csr")
         except ValueError:
@@ -388,34 +403,37 @@ CA={self.DIRECTORY}
 CONTACT_EMAIL={self.contact}
 IP_VERSION=4
 CHALLENGETYPE="http-01"
-#DOMAINS_D={str(self.tmpdir / 'domains_d')}
+#DOMAINS_D={str(self.tmpdir / "domains_d")}
 #BASEDIR=$SCRIPTDIR
 #DOMAINS_TXT="${{BASEDIR}}/domains.txt"
 #CERTDIR="${{BASEDIR}}/certs"
 #ALPNCERTDIR="${{BASEDIR}}/alpn-certs"
 #ACCOUNTDIR="${{BASEDIR}}/accounts"
-WELLKNOWN="{str(self.tmpdir / 'wellknown')}"
+WELLKNOWN="{str(self.tmpdir / "wellknown")}"
 """
         )
 
     async def _run_dehydrated(self, _cmd):
         cmd = f"/tmp/dehydrated/dehydrated --config {self.tmpdir}/config {_cmd}"
         self.log.info(cmd)
-        p = await asyncio.create_subprocess_exec(*shlex.split(cmd), stdout=asyncio.subprocess.PIPE)
+        #        while True:
+        #            await asyncio.sleep(1)
+        proc = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE)
 
-        def llog(_line, logger):
-            if not _line:
-                return
-            args = _line.decode().strip()
-            logger(args)
+        stdout, stderr = await proc.communicate()
 
-        while r := await p.stdout.readline():
-            llog(r, self.log.info)
+        for r in stdout.splitlines():
+            self.log.info(r.decode().strip())
 
     async def register(self):
         await self._run_dehydrated("--register --accept-terms")
 
-    async def order(self, csr):
+    async def order(
+        self,
+        csr,
+        profile: str | None = None,
+        replaces: str | None = None,
+    ):
         names = acmetk.util.names_of(csr)
         (domains := self.tmpdir / "domains.txt").write_text("\n".join(names))
         await self._run_dehydrated(f"--cron --force  --domains-txt {domains}")
@@ -469,7 +487,12 @@ class acmeshClient(TestClient):
         await self._run(f"""--register-account --accountemail {self.contact}""")
         return True
 
-    async def order(self, csr):
+    async def order(
+        self,
+        csr,
+        profile: str | None = None,
+        replaces: str | None = None,
+    ):
         await self.register()
         domains = " ".join([f"--domain {d}" for d in acmetk.util.names_of(csr)])
         await self._run(f"""--issue {domains} --webroot {self.tmpdir}/www/ --force""")

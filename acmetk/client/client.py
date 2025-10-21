@@ -15,6 +15,7 @@ from acmetk.client.challenge_solver import ChallengeSolver
 from acmetk.client.exceptions import PollingException, CouldNotCompleteChallenge
 from acmetk.models import messages, ChallengeType
 from acmetk.version import __version__
+from acmetk.plugin_base import PluginRegistry
 
 if typing.TYPE_CHECKING:
     import cryptography.x509
@@ -22,6 +23,7 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
 
+ChallengeSolverRegistry = PluginRegistry.get_registry(ChallengeSolver)
 
 # Monkey patch acme's status codes to allow 'expired' for authorizations
 STATUS_EXPIRED = acme.messages.Status("expired")
@@ -65,7 +67,7 @@ class AcmeClient:
         directory: str
         private_key: str
         challenge_solver: list[str] = dataclasses.field(default_factory=list)
-        contact: dict[str, str] = (None,)
+        contact: dict[str, str] = dataclasses.field(default_factory=dict)
         server_cert: str = None
         kid: str = None
         hmac_key: str = None
@@ -109,6 +111,15 @@ class AcmeClient:
 
         self._challenge_solvers = dict()
         self.eab_credentials = (cfg.kid, cfg.hmac_key)
+
+        for name in cfg.challenge_solver:
+            solver_cfg = getattr(cfg, name, None)
+            solver_cls = ChallengeSolverRegistry.get_plugin(name)
+            if solver_cfg:
+                solver = solver_cls(solver_cfg)
+            else:
+                solver = solver_cls()
+            self.register_challenge_solver(solver)
 
     @property
     def eab_credentials(self) -> ExternalAccountBindingCredentials:
@@ -180,7 +191,7 @@ class AcmeClient:
 
         if not self._challenge_solvers.keys():
             logger.warning(
-                "There is no challenge solver registered with the client. " "Certificate retrieval will likely fail."
+                "There is no challenge solver registered with the client. Certificate retrieval will likely fail."
             )
 
         if self._account:
@@ -580,7 +591,7 @@ class AcmeClient:
         self._alg = alg
 
     async def renewalinfo_get(self, aci: str) -> tuple[messages.RenewalInfo, int]:
-        url = f'{self._directory["renewalInfo"]}/{aci}'
+        url = f"{self._directory['renewalInfo']}/{aci}"
         r = await self._session.get(url)
         data = await r.read()
         return messages.RenewalInfo.json_loads(data), int(r.headers.get("Retry-After"))

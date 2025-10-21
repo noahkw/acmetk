@@ -19,7 +19,6 @@ from acmetk.client import (
 )
 from acmetk.main import load_config
 from acmetk.models.messages import RevocationReason
-from acmetk.server import DummyValidator
 
 log = logging.getLogger("acmetk.test_ca")
 
@@ -127,10 +126,8 @@ class TestCA(TestAcme):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
 
-        runner, ca = await AcmeCA.runner(AcmeCA.Config(**self.config_sec["ca"]))
-        ca.register_challenge_validator(DummyValidator())
-
-        await ca._db._recreate()
+        runner, ca = await AcmeCA.runner(AcmeCA.Config(**self.config_sec["ca"], challenge_validators=["dummy"]))
+        #        await ca._db._recreate()
 
         self.runner = runner
         self.ca = ca
@@ -200,13 +197,13 @@ CA={self.DIRECTORY}
 CONTACT_EMAIL={self.contact}
 IP_VERSION=4
 CHALLENGETYPE="http-01"
-#DOMAINS_D={str(self.path / 'domains_d')}
+#DOMAINS_D={str(self.path / "domains_d")}
 #BASEDIR=$SCRIPTDIR
 #DOMAINS_TXT="${{BASEDIR}}/domains.txt"
 #CERTDIR="${{BASEDIR}}/certs"
 #ALPNCERTDIR="${{BASEDIR}}/alpn-certs"
 #ACCOUNTDIR="${{BASEDIR}}/accounts"
-WELLKNOWN="{str(self.path / 'wellknown')}"
+WELLKNOWN="{str(self.path / "wellknown")}"
 """
             )
 
@@ -327,7 +324,7 @@ class TestCertBot:
                 ],
             )
         )
-        return "--manual " f'--manual-auth-hook "echo \\"{authhook}\\"" ' "--manual-cleanup-hook /bin/true "
+        return f'--manual --manual-auth-hook "echo \\"{authhook}\\"" --manual-cleanup-hook /bin/true '
 
     async def _certonly(self, *argv, names=None, preferred_challenges="dns"):
         domains = " --domain ".join(names or self.domains)

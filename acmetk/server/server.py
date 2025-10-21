@@ -51,6 +51,8 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+ChallengeValidatorRegistry = PluginRegistry.get_registry(ChallengeValidator)
+
 
 async def handle_get(request: web.Request) -> web.Response:
     return web.Response(status=405)
@@ -81,6 +83,8 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
     :meth:`~acmetk.plugin_base.PluginRegistry.register_plugin`, so that the CLI script knows which configuration
     option corresponds to which server class.
     """
+
+    ServerKey: web.AppKey
 
     ORDERS_LIST_CHUNK_LEN = 10
     """Number of order links to include per request."""
@@ -142,7 +146,14 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         challenge_validators: list[str] = dataclasses.field(default_factory=list)
         hostname: str = None
         port: int = None
+        path: str = None
+        """
+        unix domain socket - exclusive with host,port
+        """
         db: str = ""
+        mgmt: AcmeManagementMixin.Config = dataclasses.field(
+            default_factory=lambda: AcmeManagementMixin.Config(authentication=False)
+        )
 
     def __init__(
         self,
@@ -168,7 +179,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         self._use_forwarded_header: bool = cfg.use_forwarded_header
         self._require_eab: bool = cfg.require_eab
         self._allow_wildcard: bool = cfg.allow_wildcard
-        self._mgmt_auth: bool = cfg.mgmt_auth
+        self._mgmt: AcmeManagementMixin.Config = cfg.mgmt
 
         self.app = web.Application(
             middlewares=[
@@ -183,10 +194,31 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
         self._nonces: set[str] = set()
 
-        self._db: Database | None = None
-        self._db_session: sessionmaker = None
+        self._db: Database = Database(cfg.db)
+        self._db_session: sessionmaker = self._db.session
 
         self._challenge_validators: dict[str, ChallengeValidator] = {}
+
+        self.register_challenge_validators(
+            ChallengeValidatorRegistry.get_plugin(name)() for name in cfg.challenge_validators
+        )
+
+    @staticmethod
+    async def on_startup(app: web.Application):
+        pass
+
+    @staticmethod
+    async def on_run(app: web.Application):
+        await AcmeManagementMixin.on_run(app)
+
+    @staticmethod
+    async def on_shutdown(app: web.Application):
+        pass
+
+    @staticmethod
+    async def on_cleanup(app: web.Application):
+        obj: AcmeServerBase = app[AcmeServerBase.ServerKey]
+        await obj._db.engine.dispose()
 
     def _match_keysize(self, public_key, what):
         for key_type, key_size in self._keysize[what].items():
@@ -226,12 +258,11 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         :param config: A Config object holding the configuration. See :doc:`configuration` for supported options.
         :return: The server instance
         """
-        db = Database(config.db)
-
-        instance = cls(config)
-        instance._db = db
-        instance._db_session = db.session
-
+        instance: AcmeServerBase = cls(config)
+        instance.app[AcmeServerBase.ServerKey] = instance
+        instance.app.on_startup.append(instance.on_startup)
+        instance.app.on_cleanup.append(instance.on_cleanup)
+        instance.app.on_shutdown.append(instance.on_shutdown)
         return instance
 
     def _session(self, request: web.Request) -> AsyncSession:
@@ -251,32 +282,12 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         runner = web.AppRunner(instance.app)
         await runner.setup()
 
-        site = web.TCPSite(runner, config.hostname, config.port)
+        if config.hostname and config.port:
+            site = web.TCPSite(runner, config.hostname, config.port)
+        elif config.path:
+            site = web.UnixSite(runner, config.path)
         await site.start()
-
-        return runner, instance
-
-    @classmethod
-    async def unix_socket(
-        cls,
-        config: Config,
-        path: str,
-    ) -> tuple["aiohttp.web.AppRunner", "AcmeServerBase"]:
-        """A factory that starts the server on a Unix socket bound to the given path using an AppRunner
-        after constructing a server instance using :meth:`.create_app`.
-
-        :param config: A dictionary holding the configuration. See :doc:`configuration` for supported options.
-        :param path: Path of the unix socket.
-        :param kwargs: Additional kwargs are passed to the :meth:`.create_app` call.
-        :return: A tuple containing the app runner as well as the server instance.
-        """
-        instance = await cls.create_app(config)
-
-        runner = web.AppRunner(instance.app)
-        await runner.setup()
-
-        site = web.UnixSite(runner, path)
-        await site.start()
+        await instance.on_run(instance.app)
 
         return runner, instance
 
@@ -821,8 +832,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                     raise acme.messages.Error.with_code(
                         "alreadyReplaced",
                         detail=(
-                            "The request specified a predecessor certificate which has already been"
-                            "marked as replaced."
+                            "The request specified a predecessor certificate which has already beenmarked as replaced."
                         ),
                     )
 
@@ -1013,8 +1023,8 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         await order.validate()
 
         if order.status == models.OrderStatus.INVALID:
-            raise acme.messages.Error(
-                typ="orderInvalid",
+            raise acme.messages.Error.with_code(
+                "orderNotReady",
                 detail="This order cannot be finalized because it is invalid.",
             )
 
@@ -1045,8 +1055,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         elif not order.validate_csr(csr):
             raise acme.messages.Error.with_code(
                 "badCSR",
-                detail="The requested identifiers in the CSR differ from those "
-                "that this order has authorizations for.",
+                detail="The requested identifiers in the CSR differ from those that this order has authorizations for.",
             )
 
         return order, csr
@@ -1344,6 +1353,9 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             return response
 
 
+AcmeServerBase.ServerKey = web.AppKey("Server", AcmeServerBase)
+
+
 @PluginRegistry.register_plugin("ca")
 class AcmeCA(AcmeServerBase):
     """ACME compliant Certificate Authority."""
@@ -1361,16 +1373,6 @@ class AcmeCA(AcmeServerBase):
 
         with open(cfg.private_key, "rb") as pem:
             self._private_key = serialization.load_pem_private_key(pem.read(), None)
-
-    @classmethod
-    async def create_app(cls, config: Config) -> "AcmeCA":
-        db = Database(config.db)
-
-        ca = cls(config)
-        ca._db = db
-        ca._db_session = db.session
-
-        return ca
 
     async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str):
         """Method that handles the actual finalization of an order.
@@ -1434,9 +1436,20 @@ class AcmeRelayBase(AcmeServerBase):
     class Config(AcmeServerBase.Config):
         client: AcmeClient.Config = dataclasses.field(default_factory=AcmeClient.Config)
 
-    def __init__(self, cfg: Config, client: AcmeClient):
+    def __init__(self, cfg: Config):
         super().__init__(cfg)
-        self._client: AcmeClient = client
+        self._client: AcmeClient = AcmeClient(cfg.client)
+
+    @staticmethod
+    async def on_run(app: web.Application):
+        await AcmeServerBase.on_run(app)
+        obj = app[AcmeServerBase.ServerKey]
+        await obj._client.start()
+
+    @staticmethod
+    async def on_shutdown(app: web.Application):
+        obj = app[AcmeServerBase.ServerKey]
+        await obj._client.close()
 
     async def directory(self, request: web.Request) -> web.Response:
         directory = self._directory_data(request)
@@ -1449,23 +1462,6 @@ class AcmeRelayBase(AcmeServerBase):
             del directory["renewalInfo"]
 
         return self._response(request, directory)
-
-    @classmethod
-    async def create_app(cls, config: Config, client: AcmeClient) -> "AcmeRelayBase":
-        """A factory that also creates and initializes the database and session objects,
-        reading the necessary arguments from the passed config dict.
-
-        :param config: A Config object holding the configuration. See :doc:`configuration` for supported options.
-        :param client: The internal started :class:`AcmeClient` instance
-        :return: The server instance
-        """
-        db = Database(config.db)
-
-        instance = cls(config, client=client)
-        instance._db = db
-        instance._db_session = db.session
-
-        return instance
 
     # @routes.post("/certificate/{id}", name="certificate")
     async def certificate(self, request: web.Request) -> web.Response:
@@ -1729,8 +1725,8 @@ class AcmeProxy(AcmeRelayBase):
             except asyncio.TimeoutError:
                 logger.info(f"finalize_order timeout for order {order.order_id}")
                 order.status = models.OrderStatus.INVALID
-                raise acme.messages.Error(
-                    typ="orderInvalid",
+                raise acme.messages.Error.with_code(
+                    "orderNotReady",
                     detail="This order cannot be finalized because it timed out",
                 )
             else:

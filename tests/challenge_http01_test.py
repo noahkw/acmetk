@@ -60,7 +60,6 @@ async def http01(unused_tcp_port_factory):
 
 @pytest.mark.asyncio(loop_scope="session")
 async def test_ourclient_http01(tmp_path_factory, unused_tcp_port_factory, http01, db):
-
     cipher, length = "RSA", 4096
 
     name = "acmetk"

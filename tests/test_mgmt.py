@@ -24,11 +24,7 @@ from acmetk.models import (
 
 from acmetk.models.base import Entity
 from .test_broker import TestCertBotBrokerLocalCA
-from acmetk.main import _url_for
-import acmetk.util
 
-import jinja2
-import aiohttp_jinja2
 
 log = logging.getLogger("acmetk.tests.test_mgmt")
 
@@ -48,11 +44,6 @@ class TestMGMT(TestCertBotBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
         self.site = next(iter(self.runner.sites))
-
-        aiohttp_jinja2.setup(self.runner.app, loader=jinja2.FileSystemLoader("./tpl/"))
-        aiohttp_jinja2.get_env(self.runner.app).globals.update(
-            {"url_for": _url_for, "names_of_csr": acmetk.util.names_of}
-        )
 
     def setUp(self) -> None:
         super().setUp()
