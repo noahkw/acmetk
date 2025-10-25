@@ -10,19 +10,23 @@ import dns.name
 import dns.asyncresolver
 import josepy.jwk
 
-import lexicon
-import lexicon.client
-from lexicon.config import ConfigResolver, DictConfigSource
-from lexicon.exceptions import AuthenticationError, LexiconError
-
 from requests.exceptions import HTTPError, RequestException
 
-from acmetk.client import CouldNotCompleteChallenge
+from acmetk.client.exceptions import CouldNotCompleteChallenge
 from acmetk.client.challenge_solver import ChallengeSolver
 from acmetk.util import DNS01ChallengeHelper
 from acmetk.plugin_base import PluginRegistry
 
 logger = logging.getLogger(__name__)
+
+try:
+    import lexicon
+    import lexicon.client
+    from lexicon.config import ConfigResolver, DictConfigSource
+    from lexicon.exceptions import AuthenticationError, LexiconError
+except ImportError:
+    logger.warning("Lexicon client not available.")
+
 
 """This module contains a DNS challenge solver based on the lexicon library.
 """
@@ -30,16 +34,27 @@ logger = logging.getLogger(__name__)
 
 @PluginRegistry.register_plugin("lexicon")
 class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
-    def __init__(self, provider_name=None, provider_options=None):
+    class Config(DNS01ChallengeHelper.Config, ChallengeSolver.Config):
+        type: typing.Literal["lexicon"] = "lexicon"
+        provider_name: str
+        """
+        lexicon provider name
+        """
+        provider_options: dict[str, typing.Any]
+        """
+        lexicon provider options
+        """
+
+    def __init__(self, cfg: Config):
         self.config: dict[str, typing.Any] = {
-            "provider_name": provider_name,
-            provider_name: provider_options.copy() if provider_options else {},
+            "provider_name": cfg.provider_name,
+            cfg.provider_name: cfg.provider_options.copy() if cfg.provider_options else {},
         }
-        self.provider_name = provider_name
+        self.provider_name = cfg.provider_name
 
         super().__init__()
 
-    async def _config_for(self, name: str) -> ConfigResolver:
+    async def _config_for(self, name: str) -> "ConfigResolver":
         zone = await dns.asyncresolver.zone_for_name(name)
         cfg = ConfigResolver().with_dict(self.config)
         cfg.add_config_source(DictConfigSource({"domain": name, "ddns": {"domain": zone.to_text()}}), 0)
@@ -77,7 +92,7 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
 
     async def set_txt_record(
         self,
-        ops: lexicon.client._ClientOperations,
+        ops: "lexicon.client._ClientOperations",
         name: str,
         text: str,
         views=None,
@@ -106,7 +121,7 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
             logger.debug("Encountered error adding TXT record: %s", e, exc_info=True)
             raise ValueError(f"Error adding TXT record: {e}")
 
-    async def delete_txt_record(self, ops: lexicon.client._ClientOperations, name: str, text: str):
+    async def delete_txt_record(self, ops: "lexicon.client._ClientOperations", name: str, text: str):
         """Deletes a DNS TXT record.
 
         :param ops: The Lexicon Client operations.

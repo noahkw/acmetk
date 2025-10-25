@@ -1,8 +1,10 @@
-proxy:
+service:
+  type: proxy
   hostname: '0.0.0.0'
   port: 8180
   db: 'postgresql+asyncpg://acme_rw:YOUR_READ_WRITE_PW@db:5432/acme'
-  challenge_validator: 'requestipdns'
+  challenge_validators:
+    - requestipdns
   rsa_min_keysize: 2048
   ec_min_keysize: 256
   tos_url: 'https://my-proxy.com/tos'
@@ -17,20 +19,21 @@ proxy:
     - '130.75.0.0/16' # Uni Hannover IP range
   use_forwarded_header: true
   allow_wildcard: true
-  require_eab: false
+  eab:
+    required: false
   client:
     directory: 'https://acme-v02.api.letsencrypt.org/directory' # Let's Encrypt directory
     private_key: '/etc/acme_server/proxy_client_account.key'
     contact:
       email: 'proxy@my-proxy.com'
     challenge_solver:
-      infoblox:
-        host: 'ipam.my-proxy.com'
-        username: 'infobloxuser'
-        password: 'infobloxpassw'
-        dns_servers:
-          - '8.8.8.8' # Google DNS
-          - '1.1.1.1' # Cloudflare DNS
+      type: infoblox
+      host: 'ipam.my-proxy.com'
+      username: 'infobloxuser'
+      password: 'infobloxpassw'
+      dns_servers:
+        - '8.8.8.8' # Google DNS
+        - '1.1.1.1' # Cloudflare DNS
 logging:
   version: 1
   formatters:

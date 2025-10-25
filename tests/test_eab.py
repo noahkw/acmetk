@@ -17,7 +17,6 @@ from cryptography.hazmat.primitives import serialization
 
 from acmetk.server.external_account_binding import (
     ExternalAccountBindingStore,
-    AcmeEABMixin,
 )
 from tests.test_ca import TestCertBotCA, TestOurClientCA
 
@@ -63,14 +62,14 @@ class TestEAB(unittest.TestCase):
         URL = yarl.URL("http://localhost/eab")
 
         request = Mock(
-            headers={AcmeEABMixin.CLIENT_CERT_HEADER: generate_x509_client_cert("test@test.test")},
+            headers={"x-user-email": generate_x509_client_cert("test@test.test")},
             url=URL,
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         pub_key = key.public_key()
 
-        self.eab_store.create(request)
+        self.eab_store.create(request, "x509", "x-user-email", datetime.timedelta(hours=1))
 
         key_json = json.dumps(josepy.jwk.JWKRSA(key=pub_key).to_partial_json()).encode()
         signature = list(self.eab_store._pending.values())[0].signature(key_json)
@@ -85,14 +84,20 @@ class TestCertbotCA_EAB(TestCertBotCA):
     def setUp(self) -> None:
         super().setUp()
 
+    async def asyncSetUp(self) -> None:
+        await super().asyncSetUp()
+        self.ca._eab_cfg.type = "plain"
+
     async def test_register(self):
         URL = yarl.URL("http://localhost:8000/eab")
         request = Mock(
-            headers={AcmeEABMixin.CLIENT_CERT_HEADER: generate_x509_client_cert(self.contact)},
+            headers={self.ca._eab_cfg.header: self.contact},
             url=URL,
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
-        kid, hmac_key = self.ca._eab_store.create(request)
+        kid, hmac_key = self.ca._eab_store.create(
+            request, self.ca._eab_cfg.type, self.ca._eab_cfg.header, self.ca._eab_cfg.expires_after
+        )
 
         self.log.debug("kid: %s, hmac_key: %s", kid, hmac_key)
         await self._run(f"register --agree-tos  -m {kid} --eab-kid {kid} --eab-hmac-key={hmac_key}")
@@ -153,24 +158,28 @@ class TestOurClientCA_EAB:
 class TestOurClientCA_EAB_CERT(TestOurClientCA_EAB, TestOurClientCA):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
-
+        self.ca._eab_cfg.type = "x509"
         request = Mock(
-            headers={AcmeEABMixin.CLIENT_CERT_HEADER: generate_x509_client_cert(self.client._contact["email"])},
+            headers={self.ca._eab_cfg.header: generate_x509_client_cert(self.client._contact["email"])},
             url=yarl.URL("http://localhost:8000/eab"),
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
-        self.client.eab_credentials = self.eab_credentials = self.ca._eab_store.create(request)
+        self.client.eab_credentials = self.eab_credentials = self.ca._eab_store.create(
+            request, self.ca._eab_cfg.type, self.ca._eab_cfg.header, self.ca._eab_cfg.expires_after
+        )
         self.log.debug("kid: %s, hmac_key: %s", self.eab_credentials[0], self.eab_credentials[1])
 
 
 class TestOurClientCA_EAB_EMAIL(TestOurClientCA_EAB, TestOurClientCA):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
-
+        self.ca._eab_cfg.type = "plain"
         request = Mock(
-            headers={AcmeEABMixin.CLIENT_EMAIL_HEADER: self.client._contact["email"]},
+            headers={self.ca._eab_cfg.header: self.client._contact["email"]},
             url=yarl.URL("http://localhost:8000/eab"),
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
-        self.client.eab_credentials = self.eab_credentials = self.ca._eab_store.create(request)
+        self.client.eab_credentials = self.eab_credentials = self.ca._eab_store.create(
+            request, self.ca._eab_cfg.type, self.ca._eab_cfg.header, self.ca._eab_cfg.expires_after
+        )
         self.log.debug("kid: %s, hmac_key: %s", self.eab_credentials[0], self.eab_credentials[1])

@@ -24,9 +24,9 @@ from acmetk.models import (
     Authorization,
 )
 from acmetk.models.base import Entity
+from acmetk.server.base import ServiceBase
 from acmetk.server.routes import routes
 from acmetk.util import PerformanceMeasurementSystem, names_of
-
 from .pagination import paginate
 
 
@@ -38,11 +38,11 @@ def _url_for(context: jinja2.runtime.Context, __route_name, **parts):
         return "ERROR GENERATING URL"
 
 
-class AcmeManagementMixin:
+class AcmeManagementMixin(ServiceBase):
     MGMT_GROUP = "it-admins"
     GROUPS_HEADER = "x-forwarded-groups"
 
-    _mgmt: "Config"
+    _mgmt_cfg: "Config"
 
     @dataclasses.dataclass
     class Config:
@@ -50,8 +50,7 @@ class AcmeManagementMixin:
         header: str | None = None
         group: str | None = None
 
-    @staticmethod
-    async def on_run(app: aiohttp.web.Application):
+    async def on_run(self, app: aiohttp.web.Application):
         aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader("./tpl/"))
         aiohttp_jinja2.get_env(app).globals.update({"url_for": _url_for, "names_of_csr": names_of})
 
@@ -65,13 +64,15 @@ class AcmeManagementMixin:
             * HTTP status code *403* if the header is missing
         """
 
-        if self._mgmt.authentication is False or not request.path.startswith("/mgmt"):
+        if self._mgmt_cfg.authentication is False or not request.path.startswith("/mgmt"):
             return await handler(request)
 
-        if (groups := request.headers.get(self._mgmt.header)) is None or self._mgmt.group not in groups.split(","):
+        if (groups := request.headers.get(self._mgmt_cfg.header)) is None or self._mgmt_cfg.group not in groups.split(
+            ","
+        ):
             return aiohttp.web.Response(
                 status=403,
-                text=f"{type(self).__name__}: This service requires {self._mgmt.header} & {self._mgmt.group}"
+                text=f"{type(self).__name__}: This service requires {self._mgmt_cfg.header} & {self._mgmt_cfg.group}"
                 " Please contact your system administrator.\n",
             )
         return await handler(request)

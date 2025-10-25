@@ -277,18 +277,16 @@ class acmetkClient(TestClient):
 
     def _make_client(self, key_path, email):
         from acmetk import AcmeClient
-        from acmetk.client import DummySolver
 
         client = AcmeClient(
             AcmeClient.Config(
-                directory=self.DIRECTORY,
-                private_key=key_path,
+                directory=str(self.DIRECTORY),
+                private_key=str(key_path),
                 contact={"email": email},
-                server_cert=None,
+                server_cert="",
+                challenge_solver={"type": "dummy"},
             )
         )
-
-        client.register_challenge_solver(DummySolver())
 
         return client
 

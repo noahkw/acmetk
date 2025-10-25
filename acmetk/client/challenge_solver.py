@@ -4,6 +4,7 @@ import typing
 
 import acme.messages
 import josepy
+from pydantic_settings import BaseSettings
 
 from acmetk.models import ChallengeType
 from acmetk.plugin_base import PluginRegistry
@@ -23,6 +24,12 @@ class ChallengeSolver(abc.ABC):
 
     SUPPORTED_CHALLENGES: typing.Iterable[ChallengeType]
     """The types of challenges that the challenge solver implementation supports."""
+
+    class Config(BaseSettings, extra="forbid"):
+        type: typing.Literal["none"] = "none"
+
+    def __init__(self, cfg: Config):
+        pass
 
     @abc.abstractmethod
     async def complete_challenge(
@@ -74,6 +81,9 @@ class DummySolver(ChallengeSolver):
 
     SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
     """The types of challenges that the solver supports."""
+
+    class Config(ChallengeSolver.Config):
+        type: typing.Literal["dummy"] = "dummy"
 
     async def complete_challenge(
         self,

@@ -18,21 +18,23 @@ tests:
     names: &localca_names
       - 'localca.test.de'
       - 'localca2.test.de'
-    ca: &localca_ca
-      hostname: &host '127.0.0.1'
-      port: &port 8000
-      db: &db_debug_ca 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:55432/acme-ca'
-      rsa_min_keysize: &rsa_min 2048
-      tos_url: &tos 'http://localhost:8000/tos'
-      mail_suffixes: &mail_suffixes
-        - 'uni-hannover.de'
-        - 'tib.eu'
-      subnets: &subnets
-        - '127.0.0.1/32'
-        - '10.0.0.0/8'
-        - '172.16.0.0/12'
-        - '192.168.0.0/16'
-      allow_wildcard: false
+    services:
+      ca: &localca_ca
+        type: ca
+        hostname: &host '127.0.0.1'
+        port: &port 8000
+        db: &db_debug_ca 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:55432/acme-ca'
+        rsa_min_keysize: &rsa_min 2048
+        tos_url: &tos 'http://localhost:8000/tos'
+        mail_suffixes: &mail_suffixes
+          - 'uni-hannover.de'
+          - 'tib.eu'
+        subnets: &subnets
+          - '127.0.0.1/32'
+          - '10.0.0.0/8'
+          - '172.16.0.0/12'
+          - '192.168.0.0/16'
+        allow_wildcard: false
     client: &localca_client
       directory: 'http://localhost:8000/directory'
       contact:
@@ -41,42 +43,51 @@ tests:
   LocalCA_WC:
     names:
       - '*.test.de'
-    ca:
-      hostname: *host
-      port: *port
-      db: *db_debug_ca
-      rsa_min_keysize: *rsa_min
-      tos_url: *tos
-      mail_suffixes: *mail_suffixes
-      subnets: *subnets
-      allow_wildcard: true
+    services:
+      ca:
+        type: ca
+        hostname: *host
+        port: *port
+        db: *db_debug_ca
+        rsa_min_keysize: *rsa_min
+        tos_url: *tos
+        mail_suffixes: *mail_suffixes
+        subnets: *subnets
+        allow_wildcard: true
     client: *localca_client
   LocalCA_EAB:
     names: *localca_names
-    ca:
-      hostname: *host
-      port: *port
-      db: *db_debug_ca
-      rsa_min_keysize: *rsa_min
-      tos_url: *tos
-      mail_suffixes: *mail_suffixes
-      subnets: *subnets
-      require_eab: true
-      allow_wildcard: true
+    services:
+      ca:
+        type: ca
+        hostname: *host
+        port: *port
+        db: *db_debug_ca
+        rsa_min_keysize: *rsa_min
+        tos_url: *tos
+        mail_suffixes: *mail_suffixes
+        subnets: *subnets
+        eab:
+          required: true
+          type: plain
+          header: 'x-user-header'
+        allow_wildcard: true
   LocalCADeployment:
     names:
       - 'localhost'
-    ca:
-      hostname: *host
-      port: 8180
-      db: 'postgresql+asyncpg://acme:acmesupw@db:5432/acme' # TODO: consider using a different db
-      rsa_min_keysize: *rsa_min
-      tos_url: *tos
-      cert: '/app/certs/root.crt'
-      private_key: '/app/certs/root.key'
-      mail_suffixes: *mail_suffixes
-      use_forwarded_header: true
-      allow_wildcard: true
+    services:
+      ca:
+        type: ca
+        hostname: *host
+        port: 8180
+        db: 'postgresql+asyncpg://acme:acmesupw@db:5432/acme' # TODO: consider using a different db
+        rsa_min_keysize: *rsa_min
+        tos_url: *tos
+        cert: '/app/certs/root.crt'
+        private_key: '/app/certs/root.key'
+        mail_suffixes: *mail_suffixes
+        use_forwarded_header: true
+        allow_wildcard: true
     client:
       directory: 'https://127.0.0.1/directory'
       contact:
@@ -87,145 +98,162 @@ tests:
     names:
       - 'brokerlocalca.test.de'
       - 'brokerlocalca2.test.de'
-    broker:
-      hostname: *host
-      port: *port
-      db: &db_debug_broker 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:55432/acme-broker'
-      rsa_min_keysize: *rsa_min
-      tos_url: *tos
-      mail_suffixes: *mail_suffixes
-      allow_wildcard: true
-      client:
-        directory: 'http://localhost:8000/ca/directory'
-        private_key: 'broker_client_account.key'
-        contact:
-          # phone: ''
-          email: 'woehler+testbrokerclient@luis.uni-hannover.de'
-    client:
-      directory: 'http://localhost:8000/broker/directory'
-      contact:
-        # phone: ''
-        email: 'woehler+testclient@luis.uni-hannover.de'
-    ca:
-      db: *db_debug_ca
-      rsa_min_keysize: *rsa_min
-      tos_url: *tos
-      allow_wildcard: true
-  BrokerLE:
-    names:
-      - 'acmenoah.luis.uni-hannover.de'
-      - 'srv.acmenoah.luis.uni-hannover.de'
-    broker:
-      hostname: *host
-      port: *port
-      db: *db_debug_broker
-      rsa_min_keysize: *rsa_min
-      tos_url: *tos
-      mail_suffixes: *mail_suffixes
-      allow_wildcard: true
-      client:
-        directory: &le_staging 'https://acme-staging-v02.api.letsencrypt.org/directory'
-        private_key: 'broker_client_account.key'
-        contact:
-          # phone: ''
-          email: 'woehler+testbrokerclient@luis.uni-hannover.de'
-    client:
-      directory: 'http://localhost:8000/broker/directory'
-      contact:
-        # phone: ''
-        email: 'woehler+testclient@luis.uni-hannover.de'
-    ca:
-      directory: 'UNUSED'
-  ProxyLocalCA:
-    names:
-      - 'proxylocalca.test.de'
-      - 'proxylocalca2.test.de'
-    broker:
-      hostname: *host
-      port: *port
-      db: &db_proxy_ca 'postgresql+asyncpg://acme_admin:admin@localhost:5432/proxy'
-      rsa_min_keysize: *rsa_min
-      tos_url: *tos
-      mail_suffixes: *mail_suffixes
-      allow_wildcard: true
-      client:
-        directory: 'http://localhost:8000/ca/directory'
-        private_key: 'proxy_client_account.key'
-        contact:
-          # phone: ''
-          email: 'woehler+testproxyclient@luis.uni-hannover.de'
-    client:
-      directory: 'http://localhost:8000/broker/directory'
-      contact:
-        # phone: ''
-        email: 'woehler+testclient@luis.uni-hannover.de'
-    ca:
-      db: *db_debug_ca
-      rsa_min_keysize: *rsa_min
-      tos_url: *tos
-      allow_wildcard: true
-  ProxyLocalCALexicon:
-    names:
-      - 'proxylocalcalexicon.a.test.de'
-      - 'proxylocalcalexicon2.b.test.de'
-    broker:
-      hostname: *host
-      port: *port
-      db: *db_proxy_ca
-      rsa_min_keysize: *rsa_min
-      tos_url: *tos
-      mail_suffixes: *mail_suffixes
-      allow_wildcard: true
-      client: &xclient
-        directory: 'http://localhost:8000/ca/directory'
-        private_key: 'proxy_client_account.key'
-        contact:
-          # phone: ''
-          email: 'woehler+testproxyclient@luis.uni-hannover.de'
-        challenge_solver:
-          lexicon:
-            provider_name: fakeprovider
-            provider_options:
-              auth_user: user
-              auth_psw: password
+    services:
+      broker:
+        type: broker
+        hostname: *host
+        port: *port
+        db: &db_debug_broker 'postgresql+asyncpg://acme-broker:acme-broker-debug-pw@localhost:55432/acme-broker'
+        rsa_min_keysize: *rsa_min
+        tos_url: *tos
+        mail_suffixes: *mail_suffixes
+        allow_wildcard: true
+        client:
+          directory: 'http://localhost:8000/ca/directory'
+          private_key: 'broker_client_account.key'
+          contact:
+            # phone: ''
+            email: 'woehler+testbrokerclient@luis.uni-hannover.de'
+      ca:
+        type: ca
+        db: *db_debug_ca
+        rsa_min_keysize: *rsa_min
+        tos_url: *tos
+        allow_wildcard: true
 
     client:
       directory: 'http://localhost:8000/broker/directory'
       contact:
         # phone: ''
         email: 'woehler+testclient@luis.uni-hannover.de'
-    ca:
-      db: *db_debug_ca
-      rsa_min_keysize: *rsa_min
-      tos_url: *tos
-      allow_wildcard: true
+  BrokerLE:
+    names:
+      - 'acmenoah.luis.uni-hannover.de'
+      - 'srv.acmenoah.luis.uni-hannover.de'
+    services:
+      broker:
+        type: broker
+        hostname: *host
+        port: *port
+        db: *db_debug_broker
+        rsa_min_keysize: *rsa_min
+        tos_url: *tos
+        mail_suffixes: *mail_suffixes
+        allow_wildcard: true
+        client:
+          directory: &le_staging 'https://acme-staging-v02.api.letsencrypt.org/directory'
+          private_key: 'broker_client_account.key'
+          contact:
+            # phone: ''
+            email: 'woehler+testbrokerclient@luis.uni-hannover.de'
+      ca:
+        type: ca
+        directory: 'UNUSED'
+    client:
+      directory: 'http://localhost:8000/broker/directory'
+      contact:
+        # phone: ''
+        email: 'woehler+testclient@luis.uni-hannover.de'
+  ProxyLocalCA:
+    names:
+      - 'proxylocalca.test.de'
+      - 'proxylocalca2.test.de'
+    services:
+      broker:
+        type: broker
+        hostname: *host
+        port: *port
+        db: &db_proxy_ca 'postgresql+asyncpg://acme_admin:admin@localhost:5432/proxy'
+        rsa_min_keysize: *rsa_min
+        tos_url: *tos
+        mail_suffixes: *mail_suffixes
+        allow_wildcard: true
+        client:
+          directory: 'http://localhost:8000/ca/directory'
+          private_key: 'proxy_client_account.key'
+          contact:
+            # phone: ''
+            email: 'woehler+testproxyclient@luis.uni-hannover.de'
+      ca:
+        type: ca
+        db: *db_debug_ca
+        rsa_min_keysize: *rsa_min
+        tos_url: *tos
+        allow_wildcard: true
+
+    client:
+      directory: 'http://localhost:8000/broker/directory'
+      contact:
+        # phone: ''
+        email: 'woehler+testclient@luis.uni-hannover.de'
+  ProxyLocalCALexicon:
+    names:
+      - 'proxylocalcalexicon.a.test.de'
+      - 'proxylocalcalexicon2.b.test.de'
+    services:
+      broker:
+        type: broker
+        hostname: *host
+        port: *port
+        db: *db_proxy_ca
+        rsa_min_keysize: *rsa_min
+        tos_url: *tos
+        mail_suffixes: *mail_suffixes
+        allow_wildcard: true
+        client: &xclient
+          directory: 'http://localhost:8000/ca/directory'
+          private_key: 'proxy_client_account.key'
+          contact:
+            # phone: ''
+            email: 'woehler+testproxyclient@luis.uni-hannover.de'
+          challenge_solver:
+            type: lexicon
+            provider_name: fakeprovider
+            provider_options:
+              auth_user: user
+              auth_psw: password
+      ca:
+        type: ca
+        db: *db_debug_ca
+        rsa_min_keysize: *rsa_min
+        tos_url: *tos
+        allow_wildcard: true
+
+    client:
+      directory: 'http://localhost:8000/broker/directory'
+      contact:
+        # phone: ''
+        email: 'woehler+testclient@luis.uni-hannover.de'
 
   ProxyLE:
     names:
       - 'acmenoah.luis.uni-hannover.de'
       - 'acmeproxy.acmenoah.luis.uni-hannover.de'
       - 'acmeproxy1.acmenoah.luis.uni-hannover.de'
-    broker:
-      hostname: *host
-      port: *port
-      db: *db_proxy_ca
-      rsa_min_keysize: *rsa_min
-      tos_url: *tos
-      mail_suffixes: *mail_suffixes
-      allow_wildcard: true
-      client:
-        directory: *le_staging
-        private_key: 'proxy_client_account.key'
-        contact:
-          # phone: ''
-          email: 'woehler+testproxyclient@luis.uni-hannover.de'
+    services:
+      broker:
+        type: broker
+        hostname: *host
+        port: *port
+        db: *db_proxy_ca
+        rsa_min_keysize: *rsa_min
+        tos_url: *tos
+        mail_suffixes: *mail_suffixes
+        allow_wildcard: true
+        client:
+          directory: *le_staging
+          private_key: 'proxy_client_account.key'
+          contact:
+            # phone: ''
+            email: 'woehler+testproxyclient@luis.uni-hannover.de'
+      ca:
+        type: ca
+        directory: 'UNUSED'
     client:
       directory: 'http://localhost:8000/broker/directory'
       contact:
         # phone: ''
         email: 'woehler+testclient@luis.uni-hannover.de'
-    ca:
-      directory: 'UNUSED'
 certbot:
   workdir: '/tmp/certbot'
 logging:

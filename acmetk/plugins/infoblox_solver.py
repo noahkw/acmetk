@@ -1,18 +1,25 @@
 import asyncio
 import logging
 import functools
+import typing
 
 import acme.messages
 import josepy.jwk
 
-from infoblox_client import connector, objects
+from pydantic import Field
 
-from acmetk.client import CouldNotCompleteChallenge
+from acmetk.client.exceptions import CouldNotCompleteChallenge
 from acmetk.client.challenge_solver import ChallengeSolver
 from acmetk.util import DNS01ChallengeHelper
 from acmetk.plugin_base import PluginRegistry
 
 logger = logging.getLogger(__name__)
+
+try:
+    from infoblox_client import connector, objects
+except ImportError:
+    logger.warning("Infoblox client not available.")
+
 
 """This module contains a DNS challenge solver based on the infoblox_client library.
 """
@@ -29,17 +36,29 @@ class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
     DEFAULT_VIEWS = ["Extern"]
     """The views to use if none are specified during initialization."""
 
-    def __init__(self, *, host: str, username: str, password: str, dns_servers=None, views=None):
+    class Config(DNS01ChallengeHelper.Config, ChallengeSolver.Config):
+        type: typing.Literal["infoblox"] = "infoblox"
+        """The type of challenge solver"""
+        host: str
+        """InfoBlox API host"""
+        username: str
+        """InfoBlox API username"""
+        password: str
+        """InfoBlox API password"""
+        views: list[str] = Field(default_factory=lambda: list(InfobloxClient.DEFAULT_VIEWS))
+        """The views to use for TXT records"""
+
+    def __init__(self, cfg: Config):
+        super().__init__(cfg)
+
         self._creds = {
-            "host": host,
-            "username": username,
-            "password": password,
+            "host": cfg.host,
+            "username": cfg.username,
+            "password": cfg.password,
             "ssl_verify": True,
         }
         self._conn = None
-        self._views = views or self.DEFAULT_VIEWS
-
-        super().__init__(dns_servers=dns_servers)
+        self._views = cfg.views
 
     async def _connect(self):
         """Connects to the InfoBlox API.

@@ -1,8 +1,10 @@
-broker:
+service:
+  type: broker
   hostname: '127.0.0.1'
   port: 8180
   db: 'postgresql+asyncpg://acme:YOUR_PASSWORD@localhost:5432/acme'
-  challenge_validator: 'requestipdns'
+  challenge_validators:
+    - requestipdns
   rsa_min_keysize: 2048
   ec_min_keysize: 256
   tos_url: 'https://my-broker.com/tos'
@@ -16,7 +18,8 @@ broker:
     - '192.168.0.0/16' # 256 class C private networks
     - '130.75.0.0/16' # Uni Hannover IP range
   use_forwarded_header: false
-  require_eab: false
+  eab:
+    required: false
   allow_wildcard: true
   client:
     directory: 'https://acme-v02.api.letsencrypt.org/directory' # Let's Encrypt directory
@@ -24,13 +27,13 @@ broker:
     contact:
       email: 'broker@my-broker.com'
     challenge_solver:
-      infoblox:
-        host: 'ipam.my-broker.com'
-        username: 'infobloxuser'
-        password: 'infobloxpassw'
-        dns_servers:
-          - '8.8.8.8' # Google DNS
-          - '1.1.1.1' # Cloudflare DNS
+      type: infoblox
+      host: 'ipam.my-broker.com'
+      username: 'infobloxuser'
+      password: 'infobloxpassw'
+      dns_servers:
+        - '8.8.8.8' # Google DNS
+        - '1.1.1.1' # Cloudflare DNS
 logging:
   version: 1
   formatters:

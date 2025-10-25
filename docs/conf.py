@@ -36,8 +36,9 @@ author = "Noah Wöhler"
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
-    "sphinx-prompt",
+    #    "sphinx-prompt",
     "sphinx_substitution_extensions",
+    "sphinxcontrib.autodoc_pydantic",
 ]
 
 intersphinx_mapping = {
@@ -49,7 +50,11 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
 }
 
-autodoc_default_options = {"private-members": True}
+autodoc_default_options = {
+    "members": True,
+    "private-members": True,
+    "member-order": "bysource",
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]

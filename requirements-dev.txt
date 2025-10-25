@@ -1,3 +1,4 @@
+autodoc_pydantic
 pre-commit==2.9.0
 sphinx==3.3.1
 sphinx-glpi-theme==0.3

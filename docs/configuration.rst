@@ -22,7 +22,8 @@ An ACME CA configuration file might look as follows:
 
 .. code-block:: yaml
 
-    ca:
+    service:
+      type: ca
       hostname: '127.0.0.1'
       port: 8000
       db: 'postgresql+asyncpg://user:password@host:5432/db'
@@ -42,51 +43,20 @@ An ACME CA configuration file might look as follows:
         - '192.168.0.0/16'
         - '130.75.0.0/16'
       use_forwarded_header: true
-      require_eab: true
+      eab:
+        required: true
+        type: plain
+        header: x-user-email
       allow_wildcard: false
 
-* hostname (optional): The hostname that the server should bind to. Required if the *path* option is omitted when starting the server from the CLI.
-    May also be an IP.
-
-* port (optional): The TCP port that the server should bind to. Required if the *path* option is omitted when starting the server from the CLI.
-    May require root permissions to bind to a privileged port below 1024. In that case, deployment behind a reverse proxy is advised.
-
-* db (required): The database connection string.
-    At the moment, only PostgreSQL is supported.
-
-* cert (required): Path to the CA's root certificate.
-    Included with client certificates on certificate retrieval.
-
-* private_key (required): Private key that corresponds to the root cert.
-    Used to sign client certificates.
-
-* challenge_validator (required): The plugin that validates challenges.
-    Refer to `Challenge Validator Plugins`_ for a list of possible options.
-
-* rsa_min_keysize (optional): The minimum supported keysize for CSR and account RSA keys.
-    Defaults to *2048* if not specified.
-
-* ec_min_keysize (optional): The minimum supported keysize for CSR EC keys. Account EC keys are currently not supported.
-    Defaults to *256* if not specified.
-
-* tos_url (optional): URL of the terms of service.
-    Omitted from the directory if not specified.
-
-* mail_suffixes (optional): Allowed suffixes for email addresses in the *contact* field during account creation.
-    Defaults to allowing any suffix if not specified.
-
-* subnets (optional): Allowed subnets for all requests. Must be in CIDR notation.
-    Hosts with an IP that is not part of any of these get a *503 Forbidden* HTTP error.
-    Defaults to allowing any subnet if not specified.
-
-* use_forwarded_header (optional): Whether to read the host IP from the *X-Forwarded-For* header. Required if deployed behind a reverse proxy.
-    Needed so the app can identify *X-Forwarded-For* header spoofing.
-
-* require_eab (optional): Whether to require an External Account Binding on account creation.
-    Defaults to allowing account creation without EAB if not specified.
-
-* allow_wildcard (optional): Whether to allow wildcards in identifiers.
-    Defaults to prohibiting wildcards in identifiers if not specified.
+.. autopydantic_settings:: acmetk.server.AcmeCA.Config
+   :inherited-members: BaseSettings
+   :settings-show-json: False
+   :settings-show-config-member: False
+   :settings-show-config-summary: False
+   :settings-show-validator-members: False
+   :settings-show-validator-summary: False
+   :field-list-validators: False
 
 To run a CA that issues self-signed certificates, the private key
 and root certificate may be generated using the following command:
@@ -126,7 +96,10 @@ For a broker, the file might looks as follows:
         - '192.168.0.0/16'
         - '130.75.0.0/16'
       use_forwarded_header: true
-      require_eab: true
+      eab:
+        require: true
+        type: plain
+        header: x-user-email
       allow_wildcard: false
       client:
         directory: 'https://acme-v02.api.letsencrypt.org/directory'
@@ -135,13 +108,23 @@ For a broker, the file might looks as follows:
           phone: '555-1234'
           email: 'brokerclient@mybroker.com'
         challenge_solver:
-          infoblox:
-            host: 'ipam.uni-hannover.de'
-            username: 'infobloxuser'
-            password: 'infobloxpassw'
-            dns_servers:
-              - '8.8.8.8' # Google DNS
-              - '1.1.1.1' # Cloudflare DNS
+          type: rfc2136
+          alg: hmac-sha512
+          keyid: tsig-update-key
+          secret: test
+          server: 127.0.0.1
+          dns_servers: ["127.1.2.3","127.2.3.4"]
+
+
+.. autopydantic_settings:: acmetk.server.AcmeProxy.Config
+   :inherited-members: BaseSettings
+   :settings-show-json: False
+   :settings-show-config-member: False
+   :settings-show-config-summary: False
+   :settings-show-validator-members: False
+   :settings-show-validator-summary: False
+   :field-list-validators: False
+
 
 Refer to section `ACME Certificate Authority`_ for the options *hostname*, *port*, *db*, *challenge_validator*,
 *rsa_min_keysize*, *ec_min_keysize*, *tos_url*, *mail_suffixes*, *subnets*, *use_forwarded_header*, *require_eab*,
@@ -228,17 +211,16 @@ The *client* block inside the respective app's surrounding configuration block m
       phone: '555-1234'
       email: 'broker@my-broker.com'
 
-* directory (required): The directory URL of the ACME CA that the client should communicate with.
-    Usually, this will be Let's Encrypt or a similar ACME CA that issues free Domain Validation certificates.
 
-* private_key (required): The RSA private key in PEM format that is used to sign requests sent to the CA.
-    May be generated with :code:`python -m acmetk generate-account-key`.
+.. autopydantic_settings:: acmetk.client.AcmeClient.Config
+   :inherited-members: BaseSettings
+   :settings-show-json: False
+   :settings-show-config-member: False
+   :settings-show-config-summary: False
+   :settings-show-validator-members: False
+   :settings-show-validator-summary: False
+   :field-list-validators: False
 
-* challenge_solver (required): Contains the configuration for the plugin that completes challenges.
-    Refer to `Challenge Solver Plugins`_ for a list of possible options.
-
-* contact (optional): Contact information that is sent to the CA on account creation.
-    Should contain a string *phone* with a phone number, a string *email* with an email address, or both.
 
 Challenge Solver Plugins
 ########################
@@ -258,38 +240,98 @@ block as follows:
 .. code-block:: yaml
 
   challenge_solver:
-    dummy:
+    type: dummy
     # There are no configuration options
 
 
 Infoblox Client
 ---------------
 
-The :class:`~acmetk.client.challenge_solver.InfobloxClient` is a *DNS-01* challenge solver that integrates
+The :class:`~acmetk.plugins.infoblox_solver.InfobloxClient` is a *DNS-01* challenge solver that integrates
 with an `Infoblox <https://www.infoblox.com/>`_ instance to provision TXT records.
 
-The *challenge_solver* section inside the respective client's surrounding configuration block might look as follows:
+The *challenge_solver* :class:`~acmetk.plugins.infoblox_solver.InfobloxClient.Config` block might look as follows:
 
 .. code-block:: yaml
 
   challenge_solver:
-    infoblox:
-      host: 'ipam.uni-hannover.de'
-      username: 'infobloxuser'
-      password: 'infobloxpassw'
-      dns_servers:
-        - '8.8.8.8' # Google DNS
-        - '1.1.1.1' # Cloudflare DNS
-      views:
-        - 'Extern'
+    type: infoblox
+    host: 'ipam.uni-hannover.de'
+    username: 'infobloxuser'
+    password: 'infobloxpassw'
+    dns_servers:
+    - '8.8.8.8' # Google DNS
+    - '1.1.1.1' # Cloudflare DNS
+    views:
+    - 'Extern'
 
-The options *host*, *username*, and *password* are required and depend on the Infoblox instance's configuration.
 
-* dns_servers (optional): List of IP addresses of the DNS servers that are queried to determine when the remote CA should validate the challenge.
-    Defaults to :attr:`~acmetk.client.challenge_solver.InfobloxClient.DEFAULT_DNS_SERVERS` if omitted.
+.. autopydantic_settings:: acmetk.plugins.infoblox_solver.InfobloxClient.Config
+   :inherited-members: BaseSettings
+   :settings-show-json: False
+   :settings-show-config-member: False
+   :settings-show-config-summary: False
+   :settings-show-validator-members: False
+   :settings-show-validator-summary: False
+   :field-list-validators: False
 
-* views (optional): List of views to set the record in.
-    Defaults to :attr:`~acmetk.client.challenge_solver.InfobloxClient.DEFAULT_VIEWS` if omitted.
+
+RFC2136 Client
+--------------
+
+:class:`~acmetk.plugins.rfc2136_solver.RFC2136Client` is a *DNS-01* challenge using TSIG dns updates.
+
+The *challenge_solver* :class:`~acmetk.plugins.rfc2136_solver.RFC2136Client.Config` block might look as follows:
+
+.. code-block:: yaml
+
+  challenge_solver:
+    type: rfc2136
+    alg: hmac-sha512
+    keyid: tsig-update-key
+    secret: test
+    server: 127.0.0.1
+    dns_servers: ["127.1.2.3","127.2.3.4"]
+
+
+.. autopydantic_settings:: acmetk.plugins.rfc2136_solver.RFC2136Client.Config
+   :inherited-members: BaseSettings
+   :settings-show-json: False
+   :settings-show-config-member: False
+   :settings-show-config-summary: False
+   :settings-show-validator-members: False
+   :settings-show-validator-summary: False
+   :field-list-validators: False
+
+
+Lexicon Client
+--------------
+
+:class:`~acmetk.plugins.lexicon_solver.LexiconChallengeSolver` is a *DNS-01* challenge using `lexicon-dns <https://github.com/dns-lexicon/dns-lexicon>`_.
+
+The *challenge_solver* :class:`~acmetk.plugins.lexicon_solver.LexiconChallengeSolver.Config` block might look as follows:
+
+.. code-block:: yaml
+
+  challenge_solver:
+    type: lexicon
+    dns_servers: ["127.1.2.3","127.2.3.4"]
+    provider_name: …
+    provider_options: …
+
+
+.. autopydantic_settings:: acmetk.plugins.lexicon_solver.LexiconChallengeSolver.Config
+   :inherited-members: BaseSettings
+   :settings-show-json: False
+   :settings-show-config-member: False
+   :settings-show-config-summary: False
+   :settings-show-validator-members: False
+   :settings-show-validator-summary: False
+   :field-list-validators: False
+
+
+Refer to the `lexicon documentation <https://dns-lexicon.github.io/dns-lexicon/configuration_reference.html#providers-options>`_ for provider_name and provider_options.
+
 
 .. _config_logging:
 

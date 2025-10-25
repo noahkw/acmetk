@@ -4,7 +4,7 @@ import pytest_asyncio
 
 import acme.messages
 
-from acmetk.server import DummyValidator, AcmeCA
+from acmetk.server import AcmeCA
 from acmetk.util import CertID
 from .services import CAService
 from .clients import acmetkClient
@@ -14,7 +14,7 @@ from .clients import acmetkClient
 async def service(tmp_path_factory, unused_tcp_port_factory, db):
     tmpdir = tmp_path_factory.mktemp("acmetk")
     service = CAService(tmpdir)
-    await service.run(unused_tcp_port_factory(), db, AcmeCA.Config())
+    await service.run(unused_tcp_port_factory(), db, AcmeCA.Config(db=db, challenge_validators=["dummy"]))
     return service
 
 
@@ -31,8 +31,6 @@ def test_RenewalInfo():
 async def test_ourclient_ari(tmp_path_factory, service):
     cipher, length = "RSA", 4096
     name = "acmetk"
-
-    service.ca.register_challenge_validator(DummyValidator())
 
     directory: str = URL(next(iter(service.runner.sites)).name).with_path("directory")
     tmpdir = tmp_path_factory.mktemp(name)

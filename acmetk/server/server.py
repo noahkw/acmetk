@@ -2,7 +2,6 @@ import abc
 import asyncio
 import collections
 import cProfile
-import dataclasses
 import datetime
 import functools
 import ipaddress
@@ -33,6 +32,10 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
+import pydantic
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
 import acmetk.util
 from acmetk.util import CertID
 from acmetk import models
@@ -40,6 +43,7 @@ from acmetk.client import CouldNotCompleteChallenge, AcmeClientException, AcmeCl
 from acmetk.database import Database
 from acmetk.models import messages
 from acmetk.server import ChallengeValidator
+from acmetk.server.base import ServiceBase
 from acmetk.server.external_account_binding import AcmeEABMixin
 from acmetk.server.management import AcmeManagementMixin
 from acmetk.server.routes import routes
@@ -76,7 +80,21 @@ class AcmeResponse(web.Response):
         )
 
 
-class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
+async def on_startup(app: web.Application):
+    pass
+
+
+async def on_shutdown(app: web.Application):
+    obj: AcmeServerBase = app[AcmeServerBase.ServerKey]
+    await obj.on_shutdown(app)
+
+
+async def on_cleanup(app: web.Application):
+    obj: AcmeServerBase = app[AcmeServerBase.ServerKey]
+    await obj.on_cleanup(app)
+
+
+class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, ServiceBase, abc.ABC):
     """Base class for an ACME compliant server.
 
     Implementations must also be registered with the plugin registry via
@@ -132,28 +150,64 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
     https://github.com/letsencrypt/boulder/blob/3fcaebe934a5f52440976b38a05aa43b743dbe92/cmd/boulder-ra/main.go#L258
     """
 
-    @dataclasses.dataclass
-    class Config:
+    class Config(BaseSettings):
         rsa_min_keysize: int = 2048
+        """
+        minmum RSA keysize in bits
+        """
+
         ec_min_keysize: int = 256
-        tos_url: str = (None,)
-        mail_suffixes: list[str] = dataclasses.field(default_factory=list)
-        subnets: list[str] = dataclasses.field(default_factory=list)
-        use_forwarded_header: bool = (False,)
-        require_eab: bool = False
+        """
+        minimum EC keysize in bits
+        """
+        tos_url: str = ""
+        """
+        terms of service url
+        """
+        mail_suffixes: list[str] = Field(default_factory=list)
+        """
+        allowed mail suffixes for EAB
+        """
+        subnets: list[str] = Field(default_factory=list)
+        """
+        no idea
+        """
+        use_forwarded_header: bool = False
+        """
+        retrieve client ip address from X-Forwarded-For header
+        """
         allow_wildcard: bool = False
-        mgmt_auth: bool = False
-        challenge_validators: list[str] = dataclasses.field(default_factory=list)
-        hostname: str = None
-        port: int = None
-        path: str = None
+        """
+        allow wildcard certificates
+        """
+        challenge_validators: list[typing.Literal["dns01", "http01", "tlsalpn01", "requestipdns", "dummy"]] = Field(
+            default_factory=list
+        )
+        """
+        list of challenge validators to use for validation
+        """
+        hostname: str = ""
+        """hostname of the server - e.g. 0.0.0.0 or localhost"""
+        port: int = 0
+        """port to bind to"""
+        path: str = ""
         """
         unix domain socket - exclusive with host,port
         """
-        db: str = ""
-        mgmt: AcmeManagementMixin.Config = dataclasses.field(
+        db: pydantic.PostgresDsn = ""
+        """
+        database connection string
+        """
+        mgmt: AcmeManagementMixin.Config = Field(
             default_factory=lambda: AcmeManagementMixin.Config(authentication=False)
         )
+        """
+        management ui configuration
+        """
+        eab: AcmeEABMixin.Config = Field(default_factory=lambda: AcmeEABMixin.Config(required=False))
+        """
+        External Authentication Binding configuration
+        """
 
     def __init__(
         self,
@@ -177,9 +231,10 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
             [ipaddress.ip_network(subnet) for subnet in cfg.subnets] if cfg.subnets else []
         )
         self._use_forwarded_header: bool = cfg.use_forwarded_header
-        self._require_eab: bool = cfg.require_eab
         self._allow_wildcard: bool = cfg.allow_wildcard
-        self._mgmt: AcmeManagementMixin.Config = cfg.mgmt
+
+        self._mgmt_cfg: AcmeManagementMixin.Config = cfg.mgmt
+        self._eab_cfg: AcmeEABMixin.Config = cfg.eab
 
         self.app = web.Application(
             middlewares=[
@@ -194,31 +249,27 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
 
         self._nonces: set[str] = set()
 
-        self._db: Database = Database(cfg.db)
+        self._db: Database = Database(str(cfg.db))
         self._db_session: sessionmaker = self._db.session
 
         self._challenge_validators: dict[str, ChallengeValidator] = {}
 
         self.register_challenge_validators(
-            ChallengeValidatorRegistry.get_plugin(name)() for name in cfg.challenge_validators
+            [ChallengeValidatorRegistry.get_plugin(name)() for name in cfg.challenge_validators]
         )
 
-    @staticmethod
-    async def on_startup(app: web.Application):
-        pass
+    async def on_startup(self, app: web.Application):
+        await super().on_startup(app)
 
-    @staticmethod
-    async def on_run(app: web.Application):
-        await AcmeManagementMixin.on_run(app)
+    async def on_run(self, app: web.Application):
+        await super().on_run(app)
 
-    @staticmethod
-    async def on_shutdown(app: web.Application):
-        pass
+    async def on_shutdown(self, app: web.Application):
+        await super().on_shutdown(app)
 
-    @staticmethod
-    async def on_cleanup(app: web.Application):
-        obj: AcmeServerBase = app[AcmeServerBase.ServerKey]
-        await obj._db.engine.dispose()
+    async def on_cleanup(self, app: web.Application):
+        await super().on_cleanup(app)
+        await self._db.engine.dispose()
 
     def _match_keysize(self, public_key, what):
         for key_type, key_size in self._keysize[what].items():
@@ -627,8 +678,8 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         if self._tos_url:
             directory["meta"]["termsOfService"] = self._tos_url
 
-        if self._require_eab is not None:
-            directory["meta"]["externalAccountRequired"] = self._require_eab
+        if self._eab_cfg.required is not None:
+            directory["meta"]["externalAccountRequired"] = self._eab_cfg.required
         return directory
 
     @routes.get("/directory", name="directory")
@@ -705,7 +756,7 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
                         title=f"The client must agree to the terms of service: {self._tos_url}.",
                     )
                 else:  # create new account
-                    if self._require_eab:
+                    if self._eab_cfg.required:
                         self.verify_eab(request, pub_key, reg)
 
                     self._validate_contact_info(reg)
@@ -759,9 +810,9 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, abc.ABC):
         """
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session, expunge_account=False)
-            upd = messages.AccountUpdate.json_loads(jws.payload)
+            upd: messages.AccountUpdate = messages.AccountUpdate.json_loads(jws.payload)
 
-            if self._require_eab and upd.contact:
+            if self._eab_cfg.required and upd.contact:
                 raise acme.messages.Error.with_code(
                     "unauthorized",
                     detail="Updates to the contact field are not allowed since external account binding is required.",
@@ -1360,10 +1411,16 @@ AcmeServerBase.ServerKey = web.AppKey("Server", AcmeServerBase)
 class AcmeCA(AcmeServerBase):
     """ACME compliant Certificate Authority."""
 
-    @dataclasses.dataclass
     class Config(AcmeServerBase.Config):
+        type: typing.Literal["ca"] = "ca"
         cert: str = ""
+        """
+        The CA's Root Certificate.
+        """
         private_key: str = ""
+        """
+        The private key of the CA.
+        """
 
     def __init__(self, cfg: Config):
         super().__init__(cfg)
@@ -1432,24 +1489,23 @@ class AcmeRelayBase(AcmeServerBase):
     are valid before applying for certificate issuance.
     """
 
-    @dataclasses.dataclass
     class Config(AcmeServerBase.Config):
-        client: AcmeClient.Config = dataclasses.field(default_factory=AcmeClient.Config)
+        client: AcmeClient.Config = Field(default_factory=AcmeClient.Config)
+        """
+        The ACME client used to retrieve certificates.
+        """
 
     def __init__(self, cfg: Config):
         super().__init__(cfg)
         self._client: AcmeClient = AcmeClient(cfg.client)
 
-    @staticmethod
-    async def on_run(app: web.Application):
-        await AcmeServerBase.on_run(app)
-        obj = app[AcmeServerBase.ServerKey]
-        await obj._client.start()
+    async def on_run(self, app: web.Application):
+        await super().on_run(app)
+        await self._client.start()
 
-    @staticmethod
-    async def on_shutdown(app: web.Application):
-        obj = app[AcmeServerBase.ServerKey]
-        await obj._client.close()
+    async def on_shutdown(self, app: web.Application):
+        await super().on_shutdown(app)
+        await self._client.close()
 
     async def directory(self, request: web.Request) -> web.Response:
         directory = self._directory_data(request)
@@ -1564,6 +1620,9 @@ class AcmeBroker(AcmeRelayBase):
     the :class:`AcmeProxy` class should be used instead.
     """
 
+    class Config(AcmeRelayBase.Config):
+        type: typing.Literal["broker"] = "broker"
+
     async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str):
         """Method that handles the actual finalization of an order.
 
@@ -1620,6 +1679,9 @@ class AcmeProxy(AcmeRelayBase):
     Orders are relayed to the remote CA transparently, which allows for
     the possibility to show errors to the end user as they occur at the remote CA.
     """
+
+    class Config(AcmeRelayBase.Config):
+        type: typing.Literal["proxy"] = "proxy"
 
     # @routes.post("/new-order", name="new-order")
     async def new_order(self, request: web.Request) -> web.Response:
