@@ -393,7 +393,7 @@ class AcmeManagementMixin(ServiceBase):
             a = r.scalars().first()
             context = {"certificate": a.cert, "cryptography": cryptography}
             response = aiohttp_jinja2.render_template("certificate.jinja2", request, context)
-            response.content_type = "text"
+            response.content_type = "text/plain"
             response.charset = "utf-8"
             return response
 
@@ -407,6 +407,6 @@ class AcmeManagementMixin(ServiceBase):
             a = r.scalars().first()
             context = {"csr": a.csr, "cryptography": cryptography}
             response = aiohttp_jinja2.render_template("csr.jinja2", request, context)
-            response.content_type = "text"
+            response.content_type = "text/plain"
             response.charset = "utf-8"
             return response
