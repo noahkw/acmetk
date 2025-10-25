@@ -14,16 +14,7 @@ async def service(tmp_path_factory, unused_tcp_port_factory, db):
     await service.run(
         unused_tcp_port_factory(),
         db,
-        AcmeCA.Config(
-            rsa_min_keysize=2048,
-            ec_min_keysize=256,
-            tos_url=None,
-            mail_suffixes=None,
-            subnets=None,
-            use_forwarded_header=False,
-            require_eab=False,
-            allow_wildcard=False,
-        ),
+        AcmeCA.Config(db=db),
     )
     return service
 

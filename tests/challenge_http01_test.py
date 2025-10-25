@@ -69,13 +69,7 @@ async def test_ourclient_http01(tmp_path_factory, unused_tcp_port_factory, http0
     await service.run(
         unused_tcp_port_factory(),
         db,
-        AcmeCA.Config(
-            rsa_min_keysize=2048,
-            ec_min_keysize=256,
-            use_forwarded_header=False,
-            require_eab=False,
-            allow_wildcard=False,
-        ),
+        AcmeCA.Config(db=db),
     )
 
     await service.ca._db._recreate()
@@ -108,7 +102,7 @@ async def test_ourclient_http01(tmp_path_factory, unused_tcp_port_factory, http0
             del http01.sessions[token]
 
     client.client._challenge_solvers = dict()
-    client.client.register_challenge_solver(HTTP01Solver())
+    client.client.register_challenge_solver(HTTP01Solver(HTTP01Solver.Config()))
 
     await client.register()
     cert_key = client._make_key(client.tmpdir / "cert_key.pem", ("RSA", 4096))
@@ -139,7 +133,7 @@ async def test_ourclient_http01(tmp_path_factory, unused_tcp_port_factory, http0
             del http01.sessions[token]
 
     client.client._challenge_solvers = dict()
-    client.client.register_challenge_solver(BadHTTP01Solver())
+    client.client.register_challenge_solver(BadHTTP01Solver(HTTP01Solver.Config()))
 
     with pytest.raises(acmetk.client.exceptions.CouldNotCompleteChallenge):
         await client.order(csr)

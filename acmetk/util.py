@@ -19,6 +19,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.x509 import NameOID
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 logger = logging.getLogger(__name__)
 if typing.TYPE_CHECKING:
@@ -46,11 +48,25 @@ class DNS01ChallengeHelper:
     DEFAULT_DNS_SERVERS = ["1.1.1.1", "8.8.8.8"]
     """The DNS servers to use if none are specified during initialization."""
 
-    def __init__(self, dns_servers: list[str] | None = None):
+    class Config(BaseSettings):
+        dns_servers: list[str] = Field(default_factory=lambda: list(DNS01ChallengeHelper.DEFAULT_DNS_SERVERS))
+        """
+        The DNS servers to used to verify the DNS changes propagated.
+        """
+        polling_delay: float = Field(default_factory=lambda: DNS01ChallengeHelper.POLLING_DELAY)
+        """
+        Delay in seconds between consecutive DNS propagation queries.
+        """
+        polling_timeout: float = Field(default_factory=lambda: DNS01ChallengeHelper.POLLING_TIMEOUT)
+        """
+        Timeout in seconds after which placing the TXT record is considered a failure.
+        """
+
+    def __init__(self, cfg: Config):
         self._loop = asyncio.get_event_loop()
         self._resolvers = []
 
-        for nameserver in dns_servers or self.DEFAULT_DNS_SERVERS:
+        for nameserver in cfg.dns_servers:
             resolver = dns.asyncresolver.Resolver()
             resolver.nameservers = [nameserver]
             self._resolvers.append(resolver)

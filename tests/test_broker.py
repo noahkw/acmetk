@@ -6,13 +6,7 @@ from aiohttp import web
 
 import acmetk.util
 from acmetk import AcmeCA, AcmeBroker
-from acmetk.client import (
-    AcmeClient,
-    DummySolver,
-)
-from acmetk.plugins.infoblox_solver import InfobloxClient
 from acmetk.server import DummyValidator
-from acmetk.main import create_challenge_solver
 from tests.test_ca import (
     TestCA,
     TestAcmetiny,
@@ -33,7 +27,7 @@ class TestBroker(TestCA):
     def setUp(self) -> None:
         super().setUp()
 
-        self.brokerclient_account_key_path = self.path / self.config_sec["broker"]["client"]["private_key"]
+        self.brokerclient_account_key_path = self.path / self.config_sec["services"]["broker"]["client"]["private_key"]
 
         if not self.brokerclient_account_key_path.exists():
             acmetk.util.generate_rsa_key(self.brokerclient_account_key_path)
@@ -41,14 +35,7 @@ class TestBroker(TestCA):
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
 
-        broker_client = AcmeClient(
-            directory_url=self.config_sec["broker"]["client"]["directory"],
-            private_key=self.brokerclient_account_key_path,
-            contact=self.config_sec["broker"]["client"]["contact"],
-        )
-
-        broker = await self._cls.create_app(self.config_sec["broker"], client=broker_client)
-        broker.register_challenge_validator(DummyValidator())
+        broker = await self._cls.create_app(acmetk.AcmeBroker.Config(**self.config_sec["broker"]))
 
         await broker._db._recreate()
 
@@ -65,10 +52,7 @@ class TestBroker(TestCA):
         )
         await site.start()
 
-        await broker_client.start()
-
         self.runner = runner
-        self.broker_client = broker_client
         self.relay = broker
 
     @property
@@ -77,8 +61,6 @@ class TestBroker(TestCA):
 
     async def asyncTearDown(self) -> None:
         await super().asyncTearDown()
-        await self.broker_client.close()
-        await self.relay._db.engine.dispose()
 
 
 class TestBrokerLocalCA(TestBroker):
@@ -88,27 +70,16 @@ class TestBrokerLocalCA(TestBroker):
 
     async def asyncSetUp(self) -> None:
         self.loop = asyncio.get_event_loop()
-        ca = await AcmeCA.create_app(AcmeCA.Config(**self.config_sec["ca"]))
+        ca = await AcmeCA.create_app(AcmeCA.Config(**self.config_sec["services"]["ca"]))
         ca.register_challenge_validator(DummyValidator())
 
         await ca._db._recreate()
 
-        del self.config_sec["broker"]["client"]["private_key"]
-        broker_client = AcmeClient(
-            AcmeClient.Config(
-                **self.config_sec["broker"]["client"],
-                private_key=self.brokerclient_account_key_path,
-            )
+        self.config_sec["services"]["broker"]["client"].update(
+            dict(private_key=str(self.brokerclient_account_key_path), challenge_solver={"type": "dummy"})
         )
 
-        if "challenge_solver" in self.config_sec["broker"]["client"]:
-            solver = create_challenge_solver(self.config_sec["broker"]["client"]["challenge_solver"])
-            broker_client.register_challenge_solver(solver)
-        else:
-            broker_client.register_challenge_solver(DummySolver())
-
-        broker = await self._cls.create_app(self._cls.Config(**self.config_sec["broker"]), client=broker_client)
-
+        broker = await self._cls.create_app(self._cls.Config(**self.config_sec["services"]["broker"]))
         broker.register_challenge_validator(DummyValidator())
 
         await broker._db._recreate()
@@ -122,15 +93,14 @@ class TestBrokerLocalCA(TestBroker):
 
         site = web.TCPSite(
             runner,
-            self.config_sec["broker"]["hostname"],
-            self.config_sec["broker"]["port"],
+            self.config_sec["services"]["broker"]["hostname"],
+            self.config_sec["services"]["broker"]["port"],
         )
         await site.start()
-
-        await broker_client.start()
+        await broker.on_run(broker.app)
+        await ca.on_run(ca.app)
 
         self.runner = runner
-        self.broker_client = broker_client
         self.relay = self._broker = broker
         self._ca = ca
 
@@ -200,10 +170,6 @@ class TestBrokerLE(TestBroker):
 
         with open("../infoblox") as f:
             self._config["infoblox"]["password"] = f.read().strip()
-
-        self.infoblox_client = InfobloxClient(**self._config["infoblox"])
-
-        self.broker_client.register_challenge_solver(self.infoblox_client)
 
 
 class TestAcmetinyBrokerLE(TestAcmetiny, TestBrokerLE, unittest.IsolatedAsyncioTestCase):

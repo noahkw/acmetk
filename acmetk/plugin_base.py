@@ -31,6 +31,9 @@ class PluginRegistry:
             path_ = Path(o.__file__).parent
             for i in path_.iterdir():
                 module_name = f"{module_base_name}.{i.stem}"
+                if module_name in sys.modules:
+                    logger.debug("Skipping %s", module_name)
+                    continue
                 logger.debug("Loading %s", module_name)
                 try:
                     __import__(module_name)

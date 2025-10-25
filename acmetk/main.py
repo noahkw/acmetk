@@ -3,9 +3,12 @@ import logging
 import logging.config
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import click
 import yaml
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 from acmetk.client import ChallengeSolver
 from acmetk.database import Database
@@ -14,6 +17,8 @@ from acmetk.server import (
     AcmeServerBase,
     AcmeRelayBase,
     AcmeCA,
+    AcmeProxy,
+    AcmeBroker,
     ChallengeValidator,
 )
 from acmetk.util import generate_root_cert, generate_rsa_key, generate_ec_key
@@ -28,14 +33,16 @@ challenge_validator_registry = PluginRegistry.get_registry(ChallengeValidator)
 PATH_OR_HOST_AND_PORT_MSG = "Must specify either the path of the unix socket or the hostname + port."
 
 
-def load_config(config_file: str) -> dict:
+class Config(BaseSettings, extra="forbid"):
+    service: AcmeCA.Config | AcmeProxy.Config | AcmeBroker.Config = Field(discriminator="type")
+    logging: Any
+
+
+def load_config(config_file: str) -> Config:
     with open(config_file) as stream:
         config = yaml.safe_load(stream)
 
-    if logging_section := config.get("logging"):
-        logging.config.dictConfig(logging_section)
-
-    return config
+    return Config.model_validate(config)
 
 
 @click.group()
@@ -93,11 +100,11 @@ def generate_account_key(account_key_file, key_type):
 
 
 def alembic_run(config: AcmeServerBase.Config) -> None:
-    from alembic.config import Config
+    from alembic.config import Config as alembic_Config
     from alembic import command
     import yarl
 
-    cfg = Config((base := Path(__file__).parent.parent) / "alembic.ini")
+    cfg = alembic_Config((base := Path(__file__).parent.parent) / "alembic.ini")
     cfg.set_main_option("script_location", str(base / "alembic"))
     db = str(yarl.URL(config.db).with_scheme("postgresql+psycopg2"))
     cfg.set_section_option("alembic", "sqlalchemy.url", db)
@@ -119,21 +126,21 @@ def run(
 
     Starts the app in bootstrap mode if the bootstrap port is set via --bootstrap-port.
     """
-    config = load_config(config_file)
+    config: Config = load_config(config_file)
 
     loop = asyncio.get_event_loop()
 
-    app_config_name = list(config.keys())[0]
+    if app_cfg := config.ca:
+        app_class = AcmeCA
+    elif app_cfg := config.proxy:
+        app_class = AcmeProxy
+    elif app_cfg := config.broker:
+        app_class = AcmeBroker
+    else:
+        raise ValueError("no service")
 
-    try:
-        app_class: AcmeServerBase = server_app_registry.get_plugin(app_config_name)
-    except ValueError as e:
-        raise click.UsageError(*e.args)
-
-    app_config = config.get(app_config_name)
     if path:
-        app_config["path"] = path
-    app_cfg = app_class.Config(**app_config)
+        app_cfg.path = path
 
     if alembic_upgrade:
         alembic_run(app_cfg)
@@ -152,7 +159,7 @@ def run(
         ]  # Only allow localhost and the docker bridge network
         # Bootstrap app does not run behind a reverse proxy:
         app_cfg.use_forwarded_header = False
-        app_cfg.require_eab = False
+        app_cfg.eab.require = False
     else:
         click.echo(f"Starting {app_class.__name__}")
 

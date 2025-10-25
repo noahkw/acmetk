@@ -10,14 +10,13 @@ from pathlib import Path
 import sys
 
 import acme.messages
+import yaml
 
 import acmetk.util
 from acmetk import AcmeCA
 from acmetk.client import (
     AcmeClient,
-    DummySolver,
 )
-from acmetk.main import load_config
 from acmetk.models.messages import RevocationReason
 
 log = logging.getLogger("acmetk.test_ca")
@@ -56,7 +55,7 @@ class TestAcme:
 
     def setUp(self) -> None:
         """Sets up our test object with the necessary properties for testing using a client"""
-        self._config = load_config("tests/conf/debug.yml")
+        self._config = yaml.safe_load(Path("tests/conf/debug.yml").read_text())
         self.log = logging.getLogger(f"acmetk.tests.{self.name}")
         self.contact = f"woehler+{self.name}@luis.uni-hannover.de"
 
@@ -112,10 +111,10 @@ class TestCA(TestAcme):
         ca_key_path = self.path / "root.key"
         ca_cert_path = self.path / "root.crt"
 
-        self.config_sec["ca"].update(
+        self.config_sec["services"]["ca"].update(
             {
-                "cert": ca_cert_path,
-                "private_key": ca_key_path,
+                "cert": str(ca_cert_path),
+                "private_key": str(ca_key_path),
             }
         )
 
@@ -126,8 +125,10 @@ class TestCA(TestAcme):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
 
-        runner, ca = await AcmeCA.runner(AcmeCA.Config(**self.config_sec["ca"], challenge_validators=["dummy"]))
-        #        await ca._db._recreate()
+        runner, ca = await AcmeCA.runner(
+            AcmeCA.Config(**self.config_sec["services"]["ca"], challenge_validators=["dummy"])
+        )
+        await ca._db._recreate()
 
         self.runner = runner
         self.ca = ca
@@ -135,7 +136,6 @@ class TestCA(TestAcme):
     async def asyncTearDown(self) -> None:
         await self.runner.shutdown()
         await self.runner.cleanup()
-        await self.ca._db.engine.dispose()
 
 
 class TestAcmetiny:
@@ -470,14 +470,13 @@ class TestOurClient:
     def _make_client(self, key_path, email):
         client = AcmeClient(
             AcmeClient.Config(
-                directory=self.DIRECTORY,
-                private_key=key_path,
+                directory=str(self.DIRECTORY),
+                private_key=str(key_path),
                 contact={"email": email},
-                server_cert=self.config_sec.get("client", {}).get("server_cert", None),
+                server_cert=self.config_sec.get("client", {}).get("server_cert", ""),
+                challenge_solver={"type": "dummy"},
             )
         )
-
-        client.register_challenge_solver(DummySolver())
 
         return client
 
@@ -631,6 +630,7 @@ class TestOurClientStress(TestOurClient):
                 # errors as the tg closes before the last clients add_done is run …
                 # task.add_done_callback(lambda x: tg.create_task(client.close()))
 
+                clients_csr.append((client, csr))
         await asyncio.gather(*[client.close() for client, _ in clients_csr])
 
     async def test_revoke(self):

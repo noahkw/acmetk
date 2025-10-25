@@ -18,6 +18,8 @@ dependencies = [
     "josepy",
     "psycopg2-binary",
     "sqlalchemy",
+    "pydantic-settings",
+    "asyncache",
 ]
 requires-python = ">=3.9"
 readme = "README.md"
@@ -44,7 +46,6 @@ infoblox = [
 ]
 lexicon = [
     "dns-lexicon",
-    "asyncache",
 ]
 [build-system]
 requires = ["setuptools>=61", "wheel"]

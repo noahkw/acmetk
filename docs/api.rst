@@ -4,18 +4,25 @@ API
 ACME Client
 ###########
 
+
 .. autoclass:: acmetk.client.AcmeClient
+    :class-doc-from: class
+    :exclude-members: Config
     :members:
-    :inherited-members:
 
-    .. automethod:: __init__
+.. autopydantic_settings:: acmetk.client.AcmeClient.Config
+   :settings-show-json: False
+   :settings-show-config-member: False
+   :settings-show-config-summary: False
+   :settings-show-validator-members: False
+   :settings-show-validator-summary: False
+   :field-list-validators: False
 
-Challenge Solvers
------------------
+Challenge Solvers & Configurations
+----------------------------------
 
 .. automodule:: acmetk.client.challenge_solver
     :members:
-    :inherited-members:
 
 Exceptions
 ----------
@@ -38,6 +45,7 @@ ACME Server Base
 
 .. autoclass:: acmetk.server.AcmeServerBase
     :members:
+    :exclude-members: Config
     :inherited-members:
 
 ACME Relay Base
@@ -45,6 +53,7 @@ ACME Relay Base
 
 .. autoclass:: acmetk.server.AcmeRelayBase
     :members:
+    :exclude-members: Config
     :show-inheritance:
 
 ACME Certificate Authority
@@ -52,6 +61,7 @@ ACME Certificate Authority
 
 .. autoclass:: acmetk.server.AcmeCA
     :members:
+    :exclude-members: Config
     :show-inheritance:
 
 ACME Broker
@@ -59,6 +69,7 @@ ACME Broker
 
 .. autoclass:: acmetk.server.AcmeBroker
     :members:
+    :exclude-members: Config
     :show-inheritance:
 
 ACME Proxy
@@ -66,6 +77,7 @@ ACME Proxy
 
 .. autoclass:: acmetk.server.AcmeProxy
     :members:
+    :exclude-members: Config
     :show-inheritance:
 
 Challenge Validators

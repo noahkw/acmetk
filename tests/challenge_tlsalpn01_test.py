@@ -159,7 +159,7 @@ async def test_ourclient_tlsalpn01(tmp_path_factory, unused_tcp_port_factory, al
 
     tmpdir = tmp_path_factory.mktemp("CA")
     service = CAService(tmpdir)
-    await service.run(unused_tcp_port_factory(), db, AcmeCA.Config())
+    await service.run(unused_tcp_port_factory(), db, AcmeCA.Config(db=db))
 
     service.ca.register_challenge_validator(TLSALPN01ChallengeValidator(alpn.port))
 
@@ -188,7 +188,7 @@ async def test_ourclient_tlsalpn01(tmp_path_factory, unused_tcp_port_factory, al
             del alpn.sessions[identifier.value]
 
     client.client._challenge_solvers = dict()
-    client.client.register_challenge_solver(TLSALPN01Solver())
+    client.client.register_challenge_solver(TLSALPN01Solver(TLSALPN01Solver.Config()))
 
     await client.register()
     cert_key = client._make_key(client.tmpdir / "cert_key.pem", ("RSA", 4096))
@@ -217,7 +217,7 @@ async def test_ourclient_tlsalpn01(tmp_path_factory, unused_tcp_port_factory, al
             del alpn.sessions[identifier.value]
 
     client.client._challenge_solvers = dict()
-    client.client.register_challenge_solver(BadTLSALPN01Solver())
+    client.client.register_challenge_solver(BadTLSALPN01Solver(TLSALPN01Solver.Config()))
 
     with pytest.raises(acmetk.client.exceptions.CouldNotCompleteChallenge):
         await client.order(csr)

@@ -10,12 +10,21 @@ from acme import jws
 from aiohttp import ClientSession, ClientResponseError
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
+from pydantic import Field
+from pydantic_settings import BaseSettings
+
 import acmetk.util
-from acmetk.client.challenge_solver import ChallengeSolver
+from acmetk.client.challenge_solver import DummySolver, ChallengeSolver
 from acmetk.client.exceptions import PollingException, CouldNotCompleteChallenge
 from acmetk.models import messages, ChallengeType
 from acmetk.version import __version__
 from acmetk.plugin_base import PluginRegistry
+
+# sphinx looses all docstrings for the file when looking up the solvers from the plugin registry dynamically
+from acmetk.plugins.infoblox_solver import InfobloxClient
+from acmetk.plugins.rfc2136_solver import RFC2136Client
+from acmetk.plugins.lexicon_solver import LexiconChallengeSolver
+
 
 if typing.TYPE_CHECKING:
     import cryptography.x509
@@ -62,17 +71,33 @@ class ExternalAccountBindingCredentials:
 
 
 class AcmeClient:
-    @dataclasses.dataclass
-    class Config:
-        directory: str
-        private_key: str
-        challenge_solver: list[str] = dataclasses.field(default_factory=list)
-        contact: dict[str, str] = dataclasses.field(default_factory=dict)
-        server_cert: str = None
-        kid: str = None
-        hmac_key: str = None
-
     """ACME compliant client."""
+
+    class Config(BaseSettings, extra="forbid"):
+        """Configuration for :class:`acmetk.client.AcmeClient`."""
+
+        directory: str
+        """The ACME server's directory URL"""
+
+        private_key: str
+        """path to private key"""
+
+        challenge_solver: (
+            DummySolver.Config | InfobloxClient.Config | RFC2136Client.Config | LexiconChallengeSolver.Config
+        ) = Field(discriminator="type")
+        """challenge solver specific configuration"""
+
+        contact: dict[str, str] = Field(default_factory=dict)
+        """contact info to supply on registration"""
+
+        server_cert: str = ""
+        """path to server certificate"""
+
+        kid: str = ""
+        """External Account Binding's key identifier"""
+
+        hmac_key: str = ""
+        """External Account Binding's symmetric encryption key"""
 
     FINALIZE_DELAY = 3.0
     """The delay in seconds between finalization attemps."""
@@ -112,14 +137,10 @@ class AcmeClient:
         self._challenge_solvers = dict()
         self.eab_credentials = (cfg.kid, cfg.hmac_key)
 
-        for name in cfg.challenge_solver:
-            solver_cfg = getattr(cfg, name, None)
-            solver_cls = ChallengeSolverRegistry.get_plugin(name)
-            if solver_cfg:
-                solver = solver_cls(solver_cfg)
-            else:
-                solver = solver_cls()
-            self.register_challenge_solver(solver)
+        solver_cfg = cfg.challenge_solver
+        solver_cls = ChallengeSolverRegistry.get_plugin(solver_cfg.type)
+        solver = solver_cls(solver_cfg)
+        self.register_challenge_solver(solver)
 
     @property
     def eab_credentials(self) -> ExternalAccountBindingCredentials:

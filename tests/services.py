@@ -81,9 +81,9 @@ class RelayService(TestService):
             hostname="localhost",
             port=port,
             client=acmetk.AcmeClient.Config(
-                private_key=config.private_key,
+                private_key=str(config.private_key),
                 directory=f"http://{config.hostname}:{config.port}/ca/directory",
-                challenge_solver=["dummy"],
+                challenge_solver={"type": "dummy"},
                 contact={"email": "acmetk@example.org"},
             ),
             challenge_validators=["dummy"],

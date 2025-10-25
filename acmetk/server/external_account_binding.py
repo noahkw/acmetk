@@ -1,6 +1,7 @@
 import datetime
 import json
 import secrets
+import typing
 import urllib.parse
 
 import acme.jws
@@ -11,6 +12,8 @@ import josepy
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+from pydantic_settings import BaseSettings
+from pydantic import Field
 
 from acmetk.server.routes import routes
 from acmetk.util import url_for, forwarded_url
@@ -22,13 +25,11 @@ class ExternalAccountBinding:
     `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_
     """
 
-    EXPIRES_AFTER = datetime.timedelta(hours=3)
-    """Timedelta after which an external account binding request is considered expired."""
-
     def __init__(
         self,
         email: str,
         url: str,
+        lifetime: datetime.timedelta,
     ):
         self.kid: str = email
         """The key identifier provided by the external binding mechanism."""
@@ -38,6 +39,7 @@ class ExternalAccountBinding:
         """The key that is used to symmetrically sign the JWS."""
         self.when: datetime.datetime = datetime.datetime.now()
         """The time when the EAB request was created."""
+        self.lifetime: datetime.timedelta = lifetime
 
     def verify(
         self,
@@ -56,7 +58,7 @@ class ExternalAccountBinding:
 
         :return: True iff the EAB has expired.
         """
-        return datetime.datetime.now() - self.when > self.EXPIRES_AFTER
+        return datetime.datetime.now() - self.when > self.lifetime
 
     def _eab(self, key_json) -> acme.jws.JWS:
         decoded_hmac_key = josepy.b64.b64decode(self.hmac_key)
@@ -88,7 +90,9 @@ class ExternalAccountBindingStore:
     def __init__(self):
         self._pending = dict()
 
-    def create(self, request: aiohttp.web.Request) -> tuple[str, str]:
+    def create(
+        self, request: aiohttp.web.Request, type: str, header: str, lifetime: datetime.timedelta
+    ) -> tuple[str, str]:
         """Creates an :class:`ExternalAccountBinding` request and stores it internally for verification at a later
         point in time.
 
@@ -97,11 +101,14 @@ class ExternalAccountBindingStore:
             :attr:`~ExternalAccountBinding.hmac_key`.
         """
         mail: str
-        if mail := request.headers.get(AcmeEABMixin.CLIENT_EMAIL_HEADER):
-            pass
-        elif qpem := request.headers.get(AcmeEABMixin.CLIENT_CERT_HEADER):
+        if (value := request.headers.get(header)) is None:
+            raise ValueError(f"{header} header missing")
+
+        if type == "plain":
+            mail = value
+        elif type == "x509":
             # The client certificate in the PEM format (urlencoded) for an established SSL connection (1.13.5);
-            cert = x509.load_pem_x509_certificate(urllib.parse.unquote(qpem).encode())
+            cert = x509.load_pem_x509_certificate(urllib.parse.unquote(value).encode())
 
             mails: set[str] = set()
             nl: list[x509.NameAttribute]
@@ -109,8 +116,8 @@ class ExternalAccountBindingStore:
                 mails |= set(map(lambda x: x.value, nl))
 
             ext = cert.extensions.get_extension_for_oid(x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
-            value: x509.SubjectAlternativeName = ext.value
-            mails |= set(value.get_values_for_type(x509.RFC822Name))
+            san: x509.SubjectAlternativeName = ext.value
+            mails |= set(san.get_values_for_type(x509.RFC822Name))
 
             if len(mails) != 1:
                 raise ValueError(f"{len(mails)} mail addresses in cert, expecting 1 ({mails})")
@@ -118,7 +125,7 @@ class ExternalAccountBindingStore:
             mail = mails.pop()
 
         if (pending_eab := self._pending.get(mail)) is None or pending_eab.expired():
-            pending_eab = self._pending[mail] = ExternalAccountBinding(mail, url_for(request, "new-account"))
+            pending_eab = self._pending[mail] = ExternalAccountBinding(mail, url_for(request, "new-account"), lifetime)
 
         return pending_eab.kid, pending_eab.hmac_key
 
@@ -156,11 +163,25 @@ class AcmeEABMixin:
     verifying it.
     """
 
-    CLIENT_CERT_HEADER = "ssl-client-cert"
-    CLIENT_EMAIL_HEADER = "x-auth-request-email"
+    SUPPORTED_EAB_JWS_ALGORITHMS: tuple[type]
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    EXPIRE_DEFAULT = datetime.timedelta(hours=3)
+
+    class Config(BaseSettings, extra="forbid"):
+        required: bool = False
+        type: typing.Literal["x509", "plain"] = "plain"
+        header: str = "x-auth-request-email"
+        """
+        examples:
+          for x509: ssl-client-cert
+          for plain: x-auth-request-email
+        """
+        expires_after: datetime.timedelta = Field(default_factory=lambda: AcmeEABMixin.EXPIRE_DEFAULT)
+        """Timedelta in seconds after which an external account binding request is considered expired."""
+
+    _eab_cfg: Config
+
+    def __init__(self):
         self._eab_store = ExternalAccountBindingStore()
 
     def verify_eab(
@@ -240,17 +261,13 @@ class AcmeEABMixin:
         # from unittest.mock import Mock
         # request = Mock(headers={"X-SSL-CERT": urllib.parse.quote(self.data)}, url=request.url)
 
-        if (
-            request.headers.get(self.CLIENT_CERT_HEADER) is None
-            and request.headers.get(self.CLIENT_EMAIL_HEADER) is None
-        ):
+        if request.headers.get(self._eab_cfg.header) is None:
             response = aiohttp_jinja2.render_template("eab.jinja2", request, {})
             response.set_status(403)
-            response.text = (
-                "An External Account Binding may only be created if a valid client certificate "
-                "is sent with the request or the request is authenticated and a the username supplied."
-            )
+            response.text = f"An External Account Binding requires {self._eab_cfg.type} authentication in the {self._eab_cfg.header} header. "
             return response
 
-        kid, hmac_key = self._eab_store.create(request)
+        kid, hmac_key = self._eab_store.create(
+            request, self._eab_cfg.type, self._eab_cfg.header, self._eab_cfg.expires_after
+        )
         return {"kid": kid, "hmac_key": hmac_key}

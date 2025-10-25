@@ -6,8 +6,10 @@ import dns.asyncresolver
 import dns.tsigkeyring
 import dns.update
 import josepy.jwk
+import typing
 
-from acmetk.client import CouldNotCompleteChallenge
+
+from acmetk.client.exceptions import CouldNotCompleteChallenge
 from acmetk.client.challenge_solver import ChallengeSolver
 from acmetk.util import DNS01ChallengeHelper
 from acmetk.plugin_base import PluginRegistry
@@ -23,15 +25,46 @@ It looks up the zone name using the TSIG credentials on the resolver
 
 @PluginRegistry.register_plugin("rfc2136")
 class RFC2136Client(DNS01ChallengeHelper, ChallengeSolver):
-    def __init__(self, server: str, keyid: str, alg: str, secret: str):
+    """
+    Manages DNS-01 challenges using RFC 2136 dynamic updates.
+
+    This class provides methods for setting up and removing TXT DNS records
+    required to complete DNS-01 challenges as part of ACME (Automated Certificate
+    Management Environment) protocol. It uses RFC 2136 for dynamic DNS updates and
+    is intended to work with DNS servers supporting the specified protocol.
+    """
+
+    class Config(DNS01ChallengeHelper.Config, ChallengeSolver.Config):
+        """
+        Represents the configuration for the RFC2136 DNS challenge solver.
+
+        This class inherits from `DNS01ChallengeHelper.Config` and
+        `ChallengeSolver.Config` and is specifically designed to handle the
+        configuration required for the RFC2136 DNS challenge solver. It includes
+        attributes to define server details, authentication credentials, and other
+        necessary parameters.
+        """
+
+        type: typing.Literal["rfc2136"] = "rfc2136"
+        """The type of challenge solver"""
+        server: str
+        """DNS server to use for TSIG updates"""
+        keyid: str
+        """TSIG key ID to use for TSIG updates"""
+        alg: str
+        """TSIG algorithm to use for TSIG updates"""
+        secret: str
+        """TSIG secret to use for TSIG updates"""
+
+    def __init__(self, cfg: Config):
         super().__init__()
-        self.keyring = dns.tsigkeyring.from_text({keyid: (alg, secret)})
+        self.keyring = dns.tsigkeyring.from_text({cfg.keyid: (cfg.alg, cfg.secret)})
 
         self.resolver = dns.asyncresolver.Resolver(configure=False)
-        self.resolver.nameservers = [server]
+        self.resolver.nameservers = [cfg.server]
         self.resolver.keyring = self.keyring
-        self.resolver.keyname = keyid
-        self.resolver.keyalgorithm = alg
+        self.resolver.keyname = cfg.keyid
+        self.resolver.keyalgorithm = cfg.alg
 
     async def _run_query(self, msg):
         await dns.asyncquery.tcp(q=msg, where=self.resolver.nameservers[0])
