@@ -6,6 +6,7 @@ from yarl import URL
 import acmetk.util
 from acmetk import AcmeCA, AcmeBroker, AcmeProxy
 from acmetk.server import AcmeRelayBase, AcmeServerBase
+from acmetk.server.metrics import PrometheusMetricsMixin
 
 
 class TestService:
@@ -88,6 +89,7 @@ class RelayService(TestService):
             ),
             challenge_validators=["dummy"],
             db=db.format(database="acme-broker"),
+            metrics=PrometheusMetricsMixin.Config(enable=True),
         )
         broker = await self._cls.create_app(config)
         #        await broker._db._recreate()
