@@ -37,6 +37,7 @@ from pydantic import Field
 from pydantic_settings import BaseSettings
 
 import acmetk.util
+from acmetk.server.metrics import PrometheusMetricsMixin
 from acmetk.util import CertID
 from acmetk import models
 from acmetk.client import CouldNotCompleteChallenge, AcmeClientException, AcmeClient
@@ -94,7 +95,7 @@ async def on_cleanup(app: web.Application):
     await obj.on_cleanup(app)
 
 
-class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, ServiceBase, abc.ABC):
+class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, ServiceBase, abc.ABC):
     """Base class for an ACME compliant server.
 
     Implementations must also be registered with the plugin registry via
@@ -209,10 +210,21 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, ServiceBase, abc.ABC):
         External Authentication Binding configuration
         """
 
+        metrics: PrometheusMetricsMixin.Config = Field(
+            default_factory=lambda: PrometheusMetricsMixin.Config(enable=False)
+        )
+        """
+        prometheus metrics export at /metrics
+        """
+
     def __init__(
         self,
         cfg: Config,
     ):
+        self._mgmt_cfg: AcmeManagementMixin.Config = cfg.mgmt
+        self._eab_cfg: AcmeEABMixin.Config = cfg.eab
+        self._metrics_cfg: PrometheusMetricsMixin.Config = cfg.metrics
+
         super().__init__()
 
         self._keysize: dict[str, dict[type, tuple[int, int]]] = {
@@ -233,16 +245,23 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, ServiceBase, abc.ABC):
         self._use_forwarded_header: bool = cfg.use_forwarded_header
         self._allow_wildcard: bool = cfg.allow_wildcard
 
-        self._mgmt_cfg: AcmeManagementMixin.Config = cfg.mgmt
-        self._eab_cfg: AcmeEABMixin.Config = cfg.eab
+        middlewares = [
+            self.error_middleware,
+            self.host_ip_middleware,
+            self.mgmt_auth_middleware,
+            self.aiohttp_jinja2_middleware,
+        ]
+
+        if self._metrics_cfg.enable:
+            from acmetk.server.metrics import prometheus_middleware_factory
+
+            prometheus_middleware = prometheus_middleware_factory(
+                metrics_prefix="acmetk", registry=self._metrics_registry
+            )
+            middlewares = [*middlewares[:2], prometheus_middleware, *middlewares[2:]]
 
         self.app = web.Application(
-            middlewares=[
-                self.error_middleware,
-                self.host_ip_middleware,
-                self.mgmt_auth_middleware,
-                self.aiohttp_jinja2_middleware,
-            ]
+            middlewares=middlewares,
         )
 
         self._add_routes()
@@ -1292,6 +1311,10 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, ServiceBase, abc.ABC):
 
         return self._response(request, r.to_json(), headers={"Retry-After": str(rtrya)})
 
+    @routes.get("/metrics", name="metrics")
+    async def metrics(self, request: web.Request) -> web.StreamResponse:
+        return await super().metrics(request)
+
     @abc.abstractmethod
     async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str) -> web.Response:
         """Method that handles the actual finalization of an order.
@@ -1397,9 +1420,11 @@ class AcmeServerBase(AcmeEABMixin, AcmeManagementMixin, ServiceBase, abc.ABC):
                 status=messages.get_status(error.code),
                 content_type="application/problem+json",
             )
+        except web.HTTPException as error:
+            raise error from None
         except Exception as unexpected_error:
             logger.exception(unexpected_error)
-            return None
+            raise web.HTTPInternalServerError(text=str(unexpected_error)) from None
         else:
             return response
 
