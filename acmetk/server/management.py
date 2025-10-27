@@ -1,11 +1,12 @@
 import collections
-import dataclasses
 
 import aiohttp_jinja2
 import cryptography
 import sqlalchemy
 import sqlalchemy.ext.asyncio
 import sqlalchemy.dialects.postgresql
+from pydantic import Field
+from pydantic_settings import BaseSettings
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload, defer, defaultload
 from sqlalchemy.sql import text
@@ -44,11 +45,13 @@ class AcmeManagementMixin(ServiceBase):
 
     _mgmt_cfg: "Config"
 
-    @dataclasses.dataclass
-    class Config:
-        authentication: bool = dataclasses.field(default=False)
-        header: str | None = None
-        group: str | None = None
+    class Config(BaseSettings, extra="forbid"):
+        authentication: bool = False
+        """Whether to require authentication for management requests"""
+        header: str = Field(default_factory=lambda: AcmeManagementMixin.GROUPS_HEADER)
+        """Header name that contains the groups the authenticated user belongs to"""
+        group: str = Field(default_factory=lambda: AcmeManagementMixin.MGMT_GROUP)
+        """Group name that the authenticated user must belong to"""
 
     async def on_run(self, app: aiohttp.web.Application):
         aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader("./tpl/"))
