@@ -48,7 +48,7 @@ lexicon = [
     "dns-lexicon",
 ]
 metrics = [
-    "prometheus-client @ git+https://github.com/prometheus/client_python@10db862c7a300e98e4529e26d969d2afd40d6811"
+    "prometheus-client @ git+https://github.com/prometheus/client_python@10db862c7a300e98e4529e26d969d2afd40d6811",
 ]
 [build-system]
 requires = ["setuptools>=61", "wheel"]
