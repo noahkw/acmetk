@@ -98,6 +98,7 @@ jobs:
         pdm run coverage run --data-file=profile.coverage -m pytest "tests/profile_test.py"
         pdm run coverage run --data-file=ari.coverage -m pytest "tests/ari_test.py"
         pdm run coverage run --data-file=config.coverage -m pytest "tests/config_test.py"
+        pdm install -G metrics
         pdm run coverage run --data-file=metrics.coverage -m pytest "tests/metrics_test.py"
         pdm run coverage combine --data-file=.coverage ca.coverage eab-ca.coverage broker-ca.coverage mgmt.coverage chalval_tlsalpn01.coverage chalval_http01.coverage profile.coverage ari.coverage config.coverage metrics.coverage
         pdm run coverage xml --data-file=.coverage -o coverage.xml
