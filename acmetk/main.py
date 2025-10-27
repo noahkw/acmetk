@@ -106,7 +106,7 @@ def alembic_run(config: AcmeServerBase.Config) -> None:
 
     cfg = alembic_Config((base := Path(__file__).parent.parent) / "alembic.ini")
     cfg.set_main_option("script_location", str(base / "alembic"))
-    db = str(yarl.URL(config.db).with_scheme("postgresql+psycopg2"))
+    db = str(yarl.URL(str(config.db)).with_scheme("postgresql+psycopg2"))
     cfg.set_section_option("alembic", "sqlalchemy.url", db)
     command.upgrade(cfg, Database.ALEMBIC_REVISION)
 
@@ -130,14 +130,8 @@ def run(
 
     loop = asyncio.get_event_loop()
 
-    if app_cfg := config.ca:
-        app_class = AcmeCA
-    elif app_cfg := config.proxy:
-        app_class = AcmeProxy
-    elif app_cfg := config.broker:
-        app_class = AcmeBroker
-    else:
-        raise ValueError("no service")
+    app_cfg = config.service
+    app_class = server_app_registry.get_plugin(app_cfg.type)
 
     if path:
         app_cfg.path = path
@@ -163,7 +157,7 @@ def run(
     else:
         click.echo(f"Starting {app_class.__name__}")
 
-    runner, site = loop.run_until_complete(run_app(app_cfg))
+    runner, site = loop.run_until_complete(run_app(app_class, app_cfg))
 
     try:
         loop.run_forever()
@@ -172,8 +166,8 @@ def run(
         loop.run_until_complete(runner.cleanup())
 
 
-async def run_app(service: AcmeServerBase | AcmeRelayBase, config: AcmeCA.Config):
-    runner, ca = await service.runner(config)
+async def run_app(service_cls: type[AcmeServerBase | AcmeRelayBase], config: AcmeCA.Config):
+    runner, ca = await service_cls.runner(config)
     return runner, ca
 
 
