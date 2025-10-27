@@ -46,6 +46,8 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
         """
 
     def __init__(self, cfg: Config):
+        super(DNS01ChallengeHelper, self).__init__(cfg)
+
         self.config: dict[str, typing.Any] = {
             "provider_name": cfg.provider_name,
             cfg.provider_name: cfg.provider_options.copy() if cfg.provider_options else {},
