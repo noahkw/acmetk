@@ -87,11 +87,16 @@ except ImportError:
 
 
 class PrometheusMetricsMixin:
+    DEFAULT_NETWORKS = ["::1/128", "127.0.0.0/8"]
+    """default networks to allow access to /metrics from"""
+
     class Config(BaseSettings, extra="forbid"):
         enable: bool = False
+        """enable /metrics"""
         allow_from: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = Field(
-            default_factory=lambda: list([ipaddress.ip_network("127.0.0.0/8")])
+            default_factory=lambda: list([ipaddress.ip_network(i) for i in PrometheusMetricsMixin.DEFAULT_NETWORKS])
         )
+        """allow accessing /metrics from these networks"""
         disable_compression: bool = False
 
     _metrics_cfg: Config
