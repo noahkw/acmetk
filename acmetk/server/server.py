@@ -225,6 +225,9 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         self._eab_cfg: AcmeEABMixin.Config = cfg.eab
         self._metrics_cfg: PrometheusMetricsMixin.Config = cfg.metrics
 
+        super(PrometheusMetricsMixin, self).__init__()
+        super(AcmeEABMixin, self).__init__()
+        super(AcmeManagementMixin, self).__init__()
         super().__init__()
 
         self._keysize: dict[str, dict[type, tuple[int, int]]] = {
