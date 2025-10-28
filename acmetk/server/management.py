@@ -53,6 +53,10 @@ class AcmeManagementMixin(ServiceBase):
         group: str = Field(default_factory=lambda: AcmeManagementMixin.MGMT_GROUP)
         """Group name that the authenticated user must belong to"""
 
+    def __init__(self, mgmt: "Config", **kwargs):
+        super().__init__(**kwargs)
+        self.__c: AcmeManagementMixin.Config = mgmt
+
     async def on_run(self, app: aiohttp.web.Application):
         aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader("./tpl/"))
         aiohttp_jinja2.get_env(app).globals.update({"url_for": _url_for, "names_of_csr": names_of})

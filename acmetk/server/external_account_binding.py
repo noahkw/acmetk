@@ -181,7 +181,8 @@ class AcmeEABMixin:
 
     _eab_cfg: Config
 
-    def __init__(self):
+    def __init__(self, eab: Config, **kwargs):
+        super().__init__(**kwargs)
         self._eab_store = ExternalAccountBindingStore()
 
     def verify_eab(

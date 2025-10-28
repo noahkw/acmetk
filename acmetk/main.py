@@ -128,6 +128,9 @@ def run(
     """
     config: Config = load_config(config_file)
 
+    if config.logging:
+        logging.config.dictConfig(config.logging)
+
     loop = asyncio.get_event_loop()
 
     app_cfg = config.service

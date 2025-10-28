@@ -224,11 +224,8 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         self._mgmt_cfg: AcmeManagementMixin.Config = cfg.mgmt
         self._eab_cfg: AcmeEABMixin.Config = cfg.eab
         self._metrics_cfg: PrometheusMetricsMixin.Config = cfg.metrics
+        super().__init__(metrics=cfg.metrics, eab=cfg.eab, mgmt=cfg.mgmt)
 
-        super(PrometheusMetricsMixin, self).__init__()
-        super(AcmeEABMixin, self).__init__()
-        super(AcmeManagementMixin, self).__init__()
-        super().__init__()
 
         self._keysize: dict[str, dict[type, tuple[int, int]]] = {
             "csr": {
@@ -1651,6 +1648,9 @@ class AcmeBroker(AcmeRelayBase):
     class Config(AcmeRelayBase.Config):
         type: typing.Literal["broker"] = "broker"
 
+    def __init__(self, cfg: Config):
+        super().__init__(cfg)
+
     async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str):
         """Method that handles the actual finalization of an order.
 
@@ -1710,6 +1710,9 @@ class AcmeProxy(AcmeRelayBase):
 
     class Config(AcmeRelayBase.Config):
         type: typing.Literal["proxy"] = "proxy"
+
+    def __init__(self, cfg: Config):
+        super().__init__(cfg)
 
     # @routes.post("/new-order", name="new-order")
     async def new_order(self, request: web.Request) -> web.Response:
