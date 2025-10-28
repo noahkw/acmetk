@@ -1,21 +1,9 @@
-from yarl import URL
 import pytest
-import pytest_asyncio
 
 import acme.messages
 
-from acmetk.server import AcmeCA
 from acmetk.util import CertID
-from .services import CAService
 from .clients import acmetkClient
-
-
-@pytest_asyncio.fixture
-async def service(tmp_path_factory, unused_tcp_port_factory, db):
-    tmpdir = tmp_path_factory.mktemp("acmetk")
-    service = CAService(tmpdir)
-    await service.run(unused_tcp_port_factory(), db, AcmeCA.Config(db=db, challenge_validators=["dummy"]))
-    return service
 
 
 def test_RenewalInfo():
@@ -32,7 +20,7 @@ async def test_ourclient_ari(tmp_path_factory, service):
     cipher, length = "RSA", 4096
     name = "acmetk"
 
-    directory: str = URL(next(iter(service.runner.sites)).name).with_path("directory")
+    directory: str = str(service.directory)
     tmpdir = tmp_path_factory.mktemp(name)
     client = acmetkClient((cipher, length), service, directory, tmpdir)
 
