@@ -49,7 +49,7 @@ class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
         """The views to use for TXT records"""
 
     def __init__(self, cfg: Config):
-        super(DNS01ChallengeHelper, self).__init__(cfg)
+        super().__init__(cfg=cfg, helper=cfg)
 
         self._creds = {
             "host": cfg.host,

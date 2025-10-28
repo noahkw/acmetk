@@ -62,11 +62,13 @@ class DNS01ChallengeHelper:
         Timeout in seconds after which placing the TXT record is considered a failure.
         """
 
-    def __init__(self, cfg: Config):
+    def __init__(self, helper: Config, **kwargs):
+        super().__init__(**kwargs)
+        self.__c: DNS01ChallengeHelper.Config = helper
         self._loop = asyncio.get_event_loop()
         self._resolvers = []
 
-        for nameserver in cfg.dns_servers:
+        for nameserver in helper.dns_servers:
             resolver = dns.asyncresolver.Resolver()
             resolver.nameservers = [nameserver]
             self._resolvers.append(resolver)
@@ -112,7 +114,7 @@ class DNS01ChallengeHelper:
             if done is True:
                 return
             logger.debug(f"{name} does not have TXT {text} yet. Retrying (name servers missing record: {missing})")
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(self.__c.polling_delay)
 
 
 def generate_csr(CN: str, private_key: rsa.RSAPrivateKey, path: Path, sans: list[str]):

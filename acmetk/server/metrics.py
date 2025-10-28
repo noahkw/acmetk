@@ -101,8 +101,9 @@ class PrometheusMetricsMixin:
 
     _metrics_cfg: Config
 
-    def __init__(self):
-        if not self._metrics_cfg.enable:
+    def __init__(self, metrics: Config, **kwargs):
+        super().__init__(**kwargs)
+        if not self.__c.enable:
             return
 
         from prometheus_client import CollectorRegistry

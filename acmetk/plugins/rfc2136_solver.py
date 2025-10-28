@@ -57,7 +57,7 @@ class RFC2136Client(DNS01ChallengeHelper, ChallengeSolver):
         """TSIG secret to use for TSIG updates"""
 
     def __init__(self, cfg: Config):
-        super(DNS01ChallengeHelper, self).__init__(cfg)
+        super().__init__(cfg=cfg, helper=cfg)
 
         self.keyring = dns.tsigkeyring.from_text({cfg.keyid: (cfg.alg, cfg.secret)})
         self.resolver = dns.asyncresolver.Resolver(configure=False)

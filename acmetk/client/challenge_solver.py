@@ -28,8 +28,8 @@ class ChallengeSolver(abc.ABC):
     class Config(BaseSettings, extra="forbid"):
         type: typing.Literal["none"] = "none"
 
-    def __init__(self, cfg: Config):
-        pass
+    def __init__(self, cfg: Config, **kwargs):
+        super().__init__(**kwargs)
 
     @abc.abstractmethod
     async def complete_challenge(
@@ -84,6 +84,9 @@ class DummySolver(ChallengeSolver):
 
     class Config(ChallengeSolver.Config):
         type: typing.Literal["dummy"] = "dummy"
+
+    def __init__(self, cfg: Config):
+        super().__init__(cfg)
 
     async def complete_challenge(
         self,
