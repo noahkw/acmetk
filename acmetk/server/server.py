@@ -1572,7 +1572,7 @@ class AcmeRelayBase(AcmeServerBase):
             # profiles is a frozendict, … is not JSON serializeable
             directory["meta"]["profiles"] = dict(self._client._directory.meta.profiles)
 
-        if self._client._directory._jobj.get("renewalInfo"):
+        if self._client._directory._jobj.get("renewalInfo", None) is None:
             del directory["renewalInfo"]
 
         return self._response(request, directory)
@@ -1908,5 +1908,5 @@ class AcmeProxy(AcmeRelayBase):
 
         https://www.rfc-editor.org/rfc/rfc9773.html#name-the-renewalinfo-resource
         """
-        r, rtrya = self._client.renewalinfo_get(request.match_info["aci"])
+        r, rtrya = await self._client.renewalinfo_get(request.match_info["aci"])
         return self._response(request, r.to_json(), headers={"Retry-After": str(rtrya)})
