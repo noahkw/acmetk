@@ -179,10 +179,11 @@ class AcmeEABMixin:
         expires_after: datetime.timedelta = Field(default_factory=lambda: AcmeEABMixin.EXPIRE_DEFAULT)
         """Timedelta in seconds after which an external account binding request is considered expired."""
 
-    _eab_cfg: Config
+    __c: Config
 
     def __init__(self, eab: Config, **kwargs):
         super().__init__(**kwargs)
+        self.__c: AcmeEABMixin.Config = eab
         self._eab_store = ExternalAccountBindingStore()
 
     def verify_eab(
@@ -262,13 +263,13 @@ class AcmeEABMixin:
         # from unittest.mock import Mock
         # request = Mock(headers={"X-SSL-CERT": urllib.parse.quote(self.data)}, url=request.url)
 
-        if request.headers.get(self._eab_cfg.header) is None:
+        if request.headers.get(self.__c.header) is None:
             response = aiohttp_jinja2.render_template("eab.jinja2", request, {})
             response.set_status(403)
-            response.text = f"An External Account Binding requires {self._eab_cfg.type} authentication in the {self._eab_cfg.header} header. "
+            response.text = (
+                f"An External Account Binding requires {self.__c.type} authentication in the {self.__c.header} header. "
+            )
             return response
 
-        kid, hmac_key = self._eab_store.create(
-            request, self._eab_cfg.type, self._eab_cfg.header, self._eab_cfg.expires_after
-        )
+        kid, hmac_key = self._eab_store.create(request, self.__c.type, self.__c.header, self.__c.expires_after)
         return {"kid": kid, "hmac_key": hmac_key}

@@ -53,6 +53,7 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
             cfg.provider_name: cfg.provider_options.copy() if cfg.provider_options else {},
         }
         self.provider_name = cfg.provider_name
+        self.__c: LexiconChallengeSolver.Config = cfg
 
     async def _config_for(self, name: str) -> "ConfigResolver":
         zone = await dns.asyncresolver.zone_for_name(name)
@@ -181,7 +182,7 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
 
         # Poll the DNS until the correct record is available
         try:
-            await asyncio.wait_for(self._query_until_completed(name, text), self.POLLING_TIMEOUT)
+            await asyncio.wait_for(self._query_until_completed(name, text), self.__c.polling_timeout)
         except asyncio.TimeoutError:
             raise CouldNotCompleteChallenge(
                 challenge,

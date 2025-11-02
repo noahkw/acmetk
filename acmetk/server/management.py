@@ -43,7 +43,7 @@ class AcmeManagementMixin(ServiceBase):
     MGMT_GROUP = "it-admins"
     GROUPS_HEADER = "x-forwarded-groups"
 
-    _mgmt_cfg: "Config"
+    __c: "Config"
 
     class Config(BaseSettings, extra="forbid"):
         authentication: bool = False
@@ -71,15 +71,13 @@ class AcmeManagementMixin(ServiceBase):
             * HTTP status code *403* if the header is missing
         """
 
-        if self._mgmt_cfg.authentication is False or not request.path.startswith("/mgmt"):
+        if self.__c.authentication is False or not request.path.startswith("/mgmt"):
             return await handler(request)
 
-        if (groups := request.headers.get(self._mgmt_cfg.header)) is None or self._mgmt_cfg.group not in groups.split(
-            ","
-        ):
+        if (groups := request.headers.get(self.__c.header)) is None or self.__c.group not in groups.split(","):
             return aiohttp.web.Response(
                 status=403,
-                text=f"{type(self).__name__}: This service requires {self._mgmt_cfg.header} & {self._mgmt_cfg.group}"
+                text=f"{type(self).__name__}: This service requires {self.__c.header} & {self.__c.group}"
                 " Please contact your system administrator.\n",
             )
         return await handler(request)

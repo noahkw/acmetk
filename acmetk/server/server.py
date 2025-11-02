@@ -221,11 +221,9 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         self,
         cfg: Config,
     ):
-        self._mgmt_cfg: AcmeManagementMixin.Config = cfg.mgmt
-        self._eab_cfg: AcmeEABMixin.Config = cfg.eab
-        self._metrics_cfg: PrometheusMetricsMixin.Config = cfg.metrics
         super().__init__(metrics=cfg.metrics, eab=cfg.eab, mgmt=cfg.mgmt)
 
+        self._c: AcmeServerBase.Config = cfg
 
         self._keysize: dict[str, dict[type, tuple[int, int]]] = {
             "csr": {
@@ -252,7 +250,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
             self.aiohttp_jinja2_middleware,
         ]
 
-        if self._metrics_cfg.enable:
+        if self._c.metrics.enable:
             from acmetk.server.metrics import prometheus_middleware_factory
 
             prometheus_middleware = prometheus_middleware_factory(
@@ -697,8 +695,8 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         if self._tos_url:
             directory["meta"]["termsOfService"] = self._tos_url
 
-        if self._eab_cfg.required is not None:
-            directory["meta"]["externalAccountRequired"] = self._eab_cfg.required
+        if self._c.eab.required is not None:
+            directory["meta"]["externalAccountRequired"] = self._c.eab.required
         return directory
 
     @routes.get("/directory", name="directory")
@@ -775,7 +773,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
                         title=f"The client must agree to the terms of service: {self._tos_url}.",
                     )
                 else:  # create new account
-                    if self._eab_cfg.required:
+                    if self._c.eab.required:
                         self.verify_eab(request, pub_key, reg)
 
                     self._validate_contact_info(reg)
@@ -831,7 +829,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
             jws, account = await self._verify_request(request, session, expunge_account=False)
             upd: messages.AccountUpdate = messages.AccountUpdate.json_loads(jws.payload)
 
-            if self._eab_cfg.required and upd.contact:
+            if self._c.eab.required and upd.contact:
                 raise acme.messages.Error.with_code(
                     "unauthorized",
                     detail="Updates to the contact field are not allowed since external account binding is required.",
@@ -1520,6 +1518,8 @@ class AcmeRelayBase(AcmeServerBase):
         The ACME client used to retrieve certificates.
         """
 
+    _c: Config
+
     def __init__(self, cfg: Config):
         super().__init__(cfg)
         self._client: AcmeClient = AcmeClient(cfg.client)
@@ -1648,6 +1648,8 @@ class AcmeBroker(AcmeRelayBase):
     class Config(AcmeRelayBase.Config):
         type: typing.Literal["broker"] = "broker"
 
+    _c: Config
+
     def __init__(self, cfg: Config):
         super().__init__(cfg)
 
@@ -1710,6 +1712,8 @@ class AcmeProxy(AcmeRelayBase):
 
     class Config(AcmeRelayBase.Config):
         type: typing.Literal["proxy"] = "proxy"
+
+    _c: Config
 
     def __init__(self, cfg: Config):
         super().__init__(cfg)
