@@ -65,6 +65,7 @@ class RFC2136Client(DNS01ChallengeHelper, ChallengeSolver):
         self.resolver.keyring = self.keyring
         self.resolver.keyname = cfg.keyid
         self.resolver.keyalgorithm = cfg.alg
+        self.__c: RFC2136Client.Config = cfg
 
     async def _run_query(self, msg):
         await dns.asyncquery.tcp(q=msg, where=self.resolver.nameservers[0])
@@ -112,7 +113,7 @@ class RFC2136Client(DNS01ChallengeHelper, ChallengeSolver):
 
         # Poll the DNS until the correct record is available
         try:
-            await asyncio.wait_for(self._query_until_completed(name, text), self.POLLING_TIMEOUT)
+            await asyncio.wait_for(self._query_until_completed(name, text), self.__c.polling_timeout)
         except asyncio.TimeoutError:
             raise CouldNotCompleteChallenge(
                 challenge,

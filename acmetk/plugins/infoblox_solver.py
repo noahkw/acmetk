@@ -59,6 +59,7 @@ class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
         }
         self._conn = None
         self._views = cfg.views
+        self.__c: InfobloxClient.Config = cfg
 
     async def _connect(self):
         """Connects to the InfoBlox API.
@@ -149,7 +150,7 @@ class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
 
         # Poll the DNS until the correct record is available
         try:
-            await asyncio.wait_for(self._query_until_completed(name, text), self.POLLING_TIMEOUT)
+            await asyncio.wait_for(self._query_until_completed(name, text), self.__c.polling_timeout)
         except asyncio.TimeoutError:
             raise CouldNotCompleteChallenge(
                 challenge,

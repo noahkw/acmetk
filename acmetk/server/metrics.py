@@ -99,10 +99,9 @@ class PrometheusMetricsMixin:
         """allow accessing /metrics from these networks"""
         disable_compression: bool = False
 
-    _metrics_cfg: Config
-
     def __init__(self, metrics: Config, **kwargs):
         super().__init__(**kwargs)
+        self.__c: PrometheusMetricsMixin.Config = metrics
         if not self.__c.enable:
             return
 
@@ -110,14 +109,14 @@ class PrometheusMetricsMixin:
         from prometheus_client.aiohttp import make_aiohttp_handler
 
         self._metrics_registry = CollectorRegistry()
-        self._metrics_handler = make_aiohttp_handler(self._metrics_registry, self._metrics_cfg.disable_compression)
+        self._metrics_handler = make_aiohttp_handler(self._metrics_registry, self.__c.disable_compression)
 
     async def metrics(self, request: web.Request) -> web.StreamResponse:
-        if self._metrics_cfg.enable is False:
+        if self.__c.enable is False:
             raise web.HTTPNotFound
 
         remote: ipaddress.IPv4Address | ipaddress.IPv6Address = request["actual_ip"]
-        for i in filter(lambda x: x.version == remote.version, self._metrics_cfg.allow_from):
+        for i in filter(lambda x: x.version == remote.version, self.__c.allow_from):
             if remote in i:
                 break
         else:
