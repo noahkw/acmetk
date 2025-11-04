@@ -1,4 +1,5 @@
 import ipaddress
+import typing
 
 from aiohttp import web
 from pydantic import Field
@@ -11,6 +12,8 @@ from aiohttp.web_middlewares import middleware
 from aiohttp.web_request import Request
 from aiohttp.web_response import Response
 
+if typing.TYPE_CHECKING:
+    import acmetk.server
 
 try:
     import prometheus_client
@@ -99,12 +102,16 @@ class PrometheusMetricsMixin:
         """allow accessing /metrics from these networks"""
         disable_compression: bool = False
 
-    def __init__(self, metrics: Config, **kwargs):
-        super().__init__(**kwargs)
-        self.__c: PrometheusMetricsMixin.Config = metrics
+    def __init__(self, cfg: typing.Union[Config, "acmetk.server.AcmeCA.Config"]):
+        super().__init__(cfg=cfg)
+
+        # Use self._extract_mixin_config to extract metrics config
+        self.__c: PrometheusMetricsMixin.Config = self._extract_mixin_config(
+            cfg, "metrics", PrometheusMetricsMixin.Config
+        )
+
         if not self.__c.enable:
             return
-
         from prometheus_client import CollectorRegistry
         from prometheus_client.aiohttp import make_aiohttp_handler
 

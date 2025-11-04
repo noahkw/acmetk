@@ -15,6 +15,8 @@ import typing
 import uuid
 from email.utils import parseaddr
 
+from typing import TypeVar, Union
+
 import acme.jws
 import acme.messages
 import aiohttp_jinja2
@@ -40,9 +42,9 @@ import acmetk.util
 from acmetk.server.metrics import PrometheusMetricsMixin
 from acmetk.util import CertID
 from acmetk import models
+from acmetk.models import messages
 from acmetk.client import CouldNotCompleteChallenge, AcmeClientException, AcmeClient
 from acmetk.database import Database
-from acmetk.models import messages
 from acmetk.server import ChallengeValidator
 from acmetk.server.base import ServiceBase
 from acmetk.server.external_account_binding import AcmeEABMixin
@@ -50,6 +52,8 @@ from acmetk.server.management import AcmeManagementMixin
 from acmetk.server.routes import routes
 from acmetk.version import __version__
 from acmetk.plugin_base import PluginRegistry
+
+ConfigMixinTypeT = TypeVar("ConfigMixinTypeT")
 
 if typing.TYPE_CHECKING:
     import aiohttp
@@ -217,11 +221,40 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         prometheus metrics export at /metrics
         """
 
-    def __init__(
-        self,
-        cfg: Config,
-    ):
-        super().__init__(metrics=cfg.metrics, eab=cfg.eab, mgmt=cfg.mgmt)
+    @staticmethod
+    def _extract_mixin_config(
+        cfg: Union["AcmeServerBase.Config", ConfigMixinTypeT],
+        config_attr: str,
+        config_type: type[ConfigMixinTypeT],
+    ) -> ConfigMixinTypeT:
+        """Extract a mixin's config from the main config object.
+
+        :param cfg: Either an AcmeServerBase.Config object with the specified attribute,
+                    or a mixin Config object directly (cannot be None)
+        :param config_attr: Name of the config attribute (e.g., 'metrics', 'eab', 'mgmt')
+        :param config_type: Expected config type (e.g., PrometheusMetricsMixin.Config)
+        :return: Mixin config instance of type ConfigMixinTypeT
+        :raises ValueError: If cfg type is invalid
+
+        Example:
+            >>> metrics_cfg = AcmeServerBase._extract_mixin_config(cfg, 'metrics', PrometheusMetricsMixin.Config)
+            >>> eab_cfg = AcmeServerBase._extract_mixin_config(cfg, 'eab', AcmeEABMixin.Config)
+        """
+        # Try to extract the attribute from the config object
+        if hasattr(cfg, config_attr):
+            return getattr(cfg, config_attr)
+        # Check if cfg is already the correct type
+        elif isinstance(cfg, config_type):
+            return cfg
+        else:
+            raise ValueError(
+                f"Invalid config type: {type(cfg)}. "
+                f"Expected object with '{config_attr}' attribute or instance of {config_type.__name__}"
+            )
+
+    def __init__(self, cfg: Config):
+        # Pass the full config to all parent classes via cooperative inheritance
+        super().__init__(cfg=cfg)
 
         self._c: AcmeServerBase.Config = cfg
 
@@ -1446,7 +1479,7 @@ class AcmeCA(AcmeServerBase):
         """
 
     def __init__(self, cfg: Config):
-        super().__init__(cfg)
+        super().__init__(cfg=cfg)
 
         with open(cfg.cert, "rb") as pem:
             self._cert = x509.load_pem_x509_certificate(pem.read())
@@ -1521,7 +1554,7 @@ class AcmeRelayBase(AcmeServerBase):
     _c: Config
 
     def __init__(self, cfg: Config):
-        super().__init__(cfg)
+        super().__init__(cfg=cfg)
         self._client: AcmeClient = AcmeClient(cfg.client)
 
     async def on_run(self, app: web.Application):
@@ -1651,7 +1684,7 @@ class AcmeBroker(AcmeRelayBase):
     _c: Config
 
     def __init__(self, cfg: Config):
-        super().__init__(cfg)
+        super().__init__(cfg=cfg)
 
     async def handle_order_finalize(self, request: web.Request, account_id: str, order_id: str):
         """Method that handles the actual finalization of an order.
@@ -1716,7 +1749,7 @@ class AcmeProxy(AcmeRelayBase):
     _c: Config
 
     def __init__(self, cfg: Config):
-        super().__init__(cfg)
+        super().__init__(cfg=cfg)
 
     # @routes.post("/new-order", name="new-order")
     async def new_order(self, request: web.Request) -> web.Response:
