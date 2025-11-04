@@ -18,6 +18,9 @@ from pydantic import Field
 from acmetk.server.routes import routes
 from acmetk.util import url_for, forwarded_url
 
+if typing.TYPE_CHECKING:
+    import acmetk.server
+
 
 class ExternalAccountBinding:
     """Represents an external account binding.
@@ -181,9 +184,11 @@ class AcmeEABMixin:
 
     __c: Config
 
-    def __init__(self, eab: Config, **kwargs):
-        super().__init__(**kwargs)
-        self.__c: AcmeEABMixin.Config = eab
+    def __init__(self, cfg: typing.Union[Config, "acmetk.server.AcmeCA.Config"]):
+        super().__init__(cfg=cfg)
+
+        # Use self._extract_mixin_config to extract eab config
+        self.__c: AcmeEABMixin.Config = self._extract_mixin_config(cfg, "eab", AcmeEABMixin.Config)
         self._eab_store = ExternalAccountBindingStore()
 
     def verify_eab(

@@ -1,4 +1,5 @@
 import collections
+import typing
 
 import aiohttp_jinja2
 import cryptography
@@ -30,6 +31,9 @@ from acmetk.server.routes import routes
 from acmetk.util import PerformanceMeasurementSystem, names_of
 from .pagination import paginate
 
+if typing.TYPE_CHECKING:
+    import acmetk.server
+
 
 @jinja2.pass_context
 def _url_for(context: jinja2.runtime.Context, __route_name, **parts):
@@ -53,9 +57,11 @@ class AcmeManagementMixin(ServiceBase):
         group: str = Field(default_factory=lambda: AcmeManagementMixin.MGMT_GROUP)
         """Group name that the authenticated user must belong to"""
 
-    def __init__(self, mgmt: "Config", **kwargs):
-        super().__init__(**kwargs)
-        self.__c: AcmeManagementMixin.Config = mgmt
+    def __init__(self, cfg: typing.Union[Config, "acmetk.server.AcmeCA.Config"]):
+        super().__init__(cfg=cfg)
+
+        # Use self._extract_mixin_config to extract mgmt config
+        self.__c: AcmeManagementMixin.Config = self._extract_mixin_config(cfg, "mgmt", AcmeManagementMixin.Config)
 
     async def on_run(self, app: aiohttp.web.Application):
         aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader("./tpl/"))
