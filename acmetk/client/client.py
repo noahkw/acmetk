@@ -7,15 +7,19 @@ import dataclasses
 import acme.messages
 import josepy
 from acme import jws
-from aiohttp import ClientSession, ClientResponseError
+from aiohttp import ClientSession, ClientResponseError, ClientResponse
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
 from pydantic import Field
+from typing import Any, TypeVar
+from collections.abc import Awaitable, Callable
+
 from pydantic_settings import BaseSettings
 
 import acmetk.util
 from acmetk.client.challenge_solver import DummySolver, ChallengeSolver
 from acmetk.client.exceptions import PollingException, CouldNotCompleteChallenge
+
 from acmetk.models import messages, ChallengeType
 from acmetk.version import __version__
 from acmetk.plugin_base import PluginRegistry
@@ -31,6 +35,8 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 NONCE_RETRIES = 5
+
+PollingResultT = TypeVar("PollingResultT")
 
 ChallengeSolverRegistry = PluginRegistry.get_registry(ChallengeSolver)
 
@@ -601,17 +607,20 @@ class AcmeClient:
 
         return resp.status == 200
 
-    async def key_change(self, private_key):
+    async def key_change(self, private_key: str) -> None:
+        """Change the account's private key.
+
+        :param private_key: Path of the new private key to use for the ACME account.
+        """
         key, alg = self._open_key(private_key)
         key_change = messages.KeyChange(account=self._account["kid"], oldKey=self._private_key.public_key())
         signed_key_change = messages.SignedKeyChange.from_data(key_change, key, alg, url=self._directory["keyChange"])
-        resp, data = await self._signed_request(signed_key_change, self._directory["keyChange"])
-        #        data["kid"] = resp.headers["Location"]
-        #        self._account = messages.Account.from_json(data)
+        await self._signed_request(signed_key_change, self._directory["keyChange"])
         self._private_key = key
         self._alg = alg
 
     async def renewalinfo_get(self, aci: str) -> tuple[messages.RenewalInfo, int]:
+        """Retrieve renewal information for a given ACME Identifier (ACI)."""
         url = f"{self._directory['renewalInfo']}/{aci}"
         r = await self._session.get(url)
         data = await r.read()
@@ -620,7 +629,7 @@ class AcmeClient:
     def register_challenge_solver(
         self,
         challenge_solver: ChallengeSolver,
-    ):
+    ) -> None:
         """Registers a challenge solver with the client.
 
         The challenge solver is used to complete authorizations' challenges whose types it supports.
@@ -637,22 +646,34 @@ class AcmeClient:
 
     async def _poll_until(
         self,
-        coro,
-        *args,
-        predicate=None,
-        negative_predicate=None,
-        delay=3.0,
-        max_tries=5,
-        **kwargs,
-    ):
-        tries = max_tries
-        result = await coro(*args, **kwargs)
+        coro: Callable[..., Awaitable[PollingResultT]],
+        *args: Any,
+        predicate: Callable[[PollingResultT], bool] | None = None,
+        negative_predicate: Callable[[PollingResultT], bool] | None = None,
+        delay: float = 3.0,
+        max_tries: int = 5,
+        **kwargs: Any,
+    ) -> PollingResultT:
+        """Poll an async coroutine until a predicate is satisfied or max tries reached.
+
+        :param coro: The async coroutine to poll
+        :param args: Positional arguments to pass to the coroutine
+        :param predicate: Function that returns True when polling should stop (success condition)
+        :param negative_predicate: Function that returns True when polling should fail immediately
+        :param delay: Delay in seconds between polling attempts
+        :param max_tries: Maximum number of polling attempts
+        :param kwargs: Keyword arguments to pass to the coroutine
+        :return: The result from the coroutine when predicate is satisfied
+        :raises PollingException: If max_tries is exceeded or negative_predicate returns True
+        """
+        tries: int = max_tries
+        result: PollingResultT = await coro(*args, **kwargs)
         while tries > 0:
             logger.debug("Polling %s%s, tries remaining: %d", coro.__name__, args, tries - 1)
-            if predicate(result):
+            if predicate and predicate(result):
                 break
 
-            if negative_predicate(result):
+            if negative_predicate and negative_predicate(result):
                 raise PollingException(
                     result,
                     f"Polling unsuccessful: {coro.__name__}{args}, {negative_predicate.__name__} became True",
@@ -666,35 +687,58 @@ class AcmeClient:
 
         return result
 
-    async def _get_nonce(self):
-        async def fetch_nonce():
+    async def _get_nonce(self) -> str:
+        """Retrieve a nonce for ACME requests.
+
+        :return: A nonce string from the ACME server
+        """
+
+        async def fetch_nonce() -> str | None:
             try:
                 async with self._session.head(self._directory["newNonce"], ssl=self._ssl_context) as resp:
                     logger.debug("Storing new nonce %s", resp.headers["Replay-Nonce"])
                     return resp.headers["Replay-Nonce"]
             except Exception as e:
                 logger.exception(e)
+                return None
 
         try:
             return self._nonces.pop()
         except KeyError:
-            return await self._poll_until(fetch_nonce, predicate=lambda x: x, delay=5.0)
+            return await self._poll_until(fetch_nonce, predicate=lambda x: x is not None, delay=5.0)
 
-    def _wrap_in_jws(self, obj: josepy.JSONDeSerializable | None, nonce, url, post_as_get):
+    def _wrap_in_jws(self, obj: josepy.JSONDeSerializable | None, nonce: str, url: str, post_as_get: bool) -> str:
+        """Wrap request data in a JWS.
+
+        :param obj: The data to wrap (can be None for GET requests)
+        :param nonce: The nonce to use
+        :param url: The URL of the request
+        :param post_as_get: Whether to send data as a GET request
+        :return: The JWS as a string
+        """
         if post_as_get:
             jobj = obj.json_dumps(indent=2).encode() if obj else b""
         else:
             jobj = b"{}"
-        kwargs = {"nonce": acme.jose.b64decode(nonce), "url": url}
+        kwargs: dict[str, str | bytes] = {"nonce": acme.jose.b64decode(nonce), "url": url}
         if self._account is not None:
             kwargs["kid"] = self._account["kid"]
         return jws.JWS.sign(jobj, key=self._private_key, alg=self._alg, **kwargs).json_dumps(indent=2)
 
-    async def _signed_request(self, obj: josepy.JSONDeSerializable | None, url, post_as_get=True):
-        tries = self.INVALID_NONCE_RETRIES
+    async def _signed_request(
+        self, obj: josepy.JSONDeSerializable | None, url: str, post_as_get: bool = True
+    ) -> tuple[ClientResponse, Any]:
+        """Make a signed request to the ACME server.
+
+        :param obj: The data to send (can be None for GET requests)
+        :param url: The URL of the request
+        :param post_as_get: Whether to send data as a GET request
+        :return: A tuple containing the ClientResponse and the response data
+        """
+        tries: int = self.INVALID_NONCE_RETRIES
         while tries > 0:
             try:
-                payload = self._wrap_in_jws(obj, await self._get_nonce(), url, post_as_get)
+                payload: str = self._wrap_in_jws(obj, await self._get_nonce(), url, post_as_get)
                 return await self._make_request(payload, url)
             except acme.messages.Error as e:
                 if e.code == "badNonce" and tries > 1:
@@ -702,7 +746,13 @@ class AcmeClient:
                     continue
                 raise e
 
-    async def _make_request(self, payload, url):
+    async def _make_request(self, payload: str, url: str) -> tuple[ClientResponse, Any]:
+        """Make a request to the ACME server.
+
+        :param payload: The data to send
+        :param url: The URL of the request
+        :return: A tuple containing the ClientResponse and the response data
+        """
         async with self._session.post(
             url,
             data=payload,
@@ -713,13 +763,13 @@ class AcmeClient:
                 self._nonces.add(resp.headers["Replay-Nonce"])
 
             if 200 <= resp.status < 300 and resp.content_type == "application/json":
-                data = await resp.json()
+                data: Any = await resp.json()
             elif resp.content_type == "application/problem+json":
                 raise acme.messages.Error.from_json(await resp.json())
             elif resp.status < 200 or resp.status >= 300:
                 raise ClientResponseError(resp.request_info, resp.history, status=resp.status)
             else:
-                data = await resp.text()
+                data: Any = await resp.text()
 
             logger.debug(data)
             return resp, data
