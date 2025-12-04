@@ -38,7 +38,7 @@ class ExternalAccountBinding:
         """The key identifier provided by the external binding mechanism."""
         self.url: str = url
         """The *newAccount* URL which is the same as in the encapsulating JWS."""
-        self.hmac_key: str = secrets.token_urlsafe(16)
+        self.hmac_key: str = secrets.token_urlsafe(32)
         """The key that is used to symmetrically sign the JWS."""
         self.when: datetime.datetime = datetime.datetime.now()
         """The time when the EAB request was created."""
