@@ -34,7 +34,7 @@ def pytest_generate_tests(metafunc):
 @pytest.fixture(scope="session")
 def service_config():
     return AcmeCA.Config(
-        challenge_validators=["dummy"], db="postgresql://none/none", metrics=PrometheusMetricsMixin.Config(enable=False)
+        challenge_validators=["dummy"], db="postgresql://none/none", metrics=PrometheusMetricsMixin.Config(enable=True)
     )
 
 
