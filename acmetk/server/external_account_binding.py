@@ -254,7 +254,7 @@ class AcmeEABMixin:
         if kid not in reg.contact + reg.emails:
             if len(reg.contact) == 0:
                 # compatibility glue
-                reg.contact = (kid,)
+                object.__setattr__(reg, "contact", (kid,))
             else:
                 raise acme.messages.Error.with_code(
                     "malformed", detail="The contact field must contain the email address from the EAB kid"
