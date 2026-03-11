@@ -800,7 +800,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
             else:
                 if reg.only_return_existing:
                     raise acme.messages.Error.with_code("accountDoesNotExist")
-                elif not reg.terms_of_service_agreed:
+                elif self._tos_url and not reg.terms_of_service_agreed:
                     raise acme.messages.Error(
                         typ="urn:ietf:params:acme:error:termsOfServiceNotAgreed",
                         title=f"The client must agree to the terms of service: {self._tos_url}.",
