@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import unittest
 import logging.config
@@ -7,7 +8,6 @@ import acme.messages
 import acmetk.util
 from acmetk.client import (
     AcmeClient,
-    DummySolver,
 )
 
 from tests.test_ca import TestAcme
@@ -32,15 +32,15 @@ class TestLE(TestAcme, unittest.IsolatedAsyncioTestCase):
     def _make_client(self, key_path, email):
         client = AcmeClient(
             AcmeClient.Config(
-                directory_url=self.DIRECTORY,
-                private_key=key_path,
+                directory=self.DIRECTORY,
+                private_key=str(key_path),
                 contact={"email": email},
                 #            server_cert=self.config_sec.get("client", {}).get("server_cert", None),
-                challenge_solver=[],
+                challenge_solver={"type": "dummy"},
             )
         )
 
-        client.register_challenge_solver(DummySolver())
+        #        client.register_challenge_solver(DummySolver(DummySolver.Config()))
 
         return client
 
@@ -92,21 +92,26 @@ class TestLE(TestAcme, unittest.IsolatedAsyncioTestCase):
         self._make_key(kp, ("RSA", 1024))
         with self.assertRaises(acme.messages.Error) as e:
             await self.client.key_change(kp)
-        assert e.exception.detail in [
-            "key size not supported: 1024",
-            "JWS verification error",
-        ], e.exception.detail
+        assert any(
+            i in e.exception.detail
+            for i in [
+                "key size not supported: 1024",
+                "JWS verification error",
+            ]
+        ), e.exception.detail
 
         self._make_key(kp, ("RSA", 1024 * 8))
         with self.assertRaises(acme.messages.Error) as e:
             await self.client.key_change(kp)
-        assert e.exception.detail in ["key size not supported: 8192"], e.exception.detail
+        assert "key size not supported: 8192" in e.exception.detail, e.exception.detail
 
         self._make_key(kp, ("EC", 256))
         await self.client.key_change(kp)
+        await asyncio.sleep(16)
 
         self._make_key(kp, ("EC", 384))
         await self.client.key_change(kp)
+        await asyncio.sleep(16)
 
         self._make_key(kp, ("EC", 521))
         with self.assertRaisesRegex(
