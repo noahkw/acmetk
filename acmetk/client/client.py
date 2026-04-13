@@ -7,6 +7,7 @@ import dataclasses
 import acme.messages
 import josepy
 from acme import jws
+from acme.challenges import UnrecognizedChallenge
 from aiohttp import ClientSession, ClientResponseError, ClientResponse
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 
@@ -441,20 +442,30 @@ class AcmeClient:
         """
         authorizations = [await self.authorization_get(authorization_url) for authorization_url in order.authorizations]
 
-        challenge_types = {
-            ChallengeType(challenge.chall.typ)
-            for authorization in authorizations
-            for challenge in authorization.challenges
-        }
-        possible_types = self._challenge_solvers.keys() & challenge_types
+        challenge_types: set[ChallengeType] = set()
+        for authorization in authorizations:
+            for challenge in authorization.challenges:
+                t: str
+                if isinstance(challenge.chall, UnrecognizedChallenge):
+                    t = challenge.jobj["type"]
+                    logger.info("Challenge type %s is not recognized", t)
+                else:
+                    t = challenge.chall.typ
+
+                try:
+                    challenge_types.add(ChallengeType(t))
+                except ValueError as e:
+                    logger.info("%s", str(e))
+
+        possible_types: set[ChallengeType] = self._challenge_solvers.keys() & challenge_types
 
         if len(possible_types) == 0:
             raise ValueError(
                 f"The server offered the following challenge types but there is no solver "
-                f"that is able to complete them: {', '.join(possible_types)}"
+                f"that is able to complete them: {', '.join(challenge_types)}"
             )
 
-        chosen_challenge_type = possible_types.pop()
+        chosen_challenge_type: ChallengeType = possible_types.pop()
         solver = self._challenge_solvers[chosen_challenge_type]
         logger.debug(
             "Chosen challenge type: %s, solver: %s",
@@ -466,9 +477,8 @@ class AcmeClient:
 
         for authorization in authorizations:
             for challenge in authorization.challenges:
-                if ChallengeType(challenge.chall.typ) == chosen_challenge_type:
+                if challenge.chall.typ == chosen_challenge_type.value:
                     challenges_to_complete.append((authorization.identifier, challenge))
-
                     break
 
         try:
@@ -749,6 +759,9 @@ class AcmeClient:
     async def _make_request(self, payload: str, url: str) -> tuple[ClientResponse, Any]:
         """Make a request to the ACME server.
 
+        :rtype: tuple[ClientResponse, Any]
+        :raise: acme.messages.Error
+        :raise: aiohttp.ClientResponseError
         :param payload: The data to send
         :param url: The URL of the request
         :return: A tuple containing the ClientResponse and the response data
