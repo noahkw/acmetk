@@ -23,8 +23,6 @@ from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
-from .models.challenge import ChallengeType
-
 logger = logging.getLogger(__name__)
 if typing.TYPE_CHECKING:
     import cryptography
@@ -38,8 +36,7 @@ class DNS01ChallengeHelper:
     Provides the methods to query the TXT records and wait for the propagation to succeed
     """
 
-    # from acmetk.models.challenge import ChallengeType
-    SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01])
+    SUPPORTED_CHALLENGES = frozenset()
     """The types of challenges that the solver supports."""
 
     POLLING_DELAY = 1.0
@@ -67,6 +64,12 @@ class DNS01ChallengeHelper:
 
     def __init__(self, helper: Config, **kwargs):
         super().__init__(**kwargs)
+
+        if not DNS01ChallengeHelper.SUPPORTED_CHALLENGES:
+            from acmetk.models.challenge import ChallengeType
+
+            DNS01ChallengeHelper.SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01])
+
         self.__c: DNS01ChallengeHelper.Config = helper
         self._loop = asyncio.get_event_loop()
         self._resolvers = []
