@@ -22,6 +22,9 @@ from cryptography.x509 import NameOID
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
+
+from .models.challenge import ChallengeType
+
 logger = logging.getLogger(__name__)
 if typing.TYPE_CHECKING:
     import cryptography
@@ -36,7 +39,7 @@ class DNS01ChallengeHelper:
     """
 
     # from acmetk.models.challenge import ChallengeType
-    SUPPORTED_CHALLENGES = frozenset(["dns-01"])
+    SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01])
     """The types of challenges that the solver supports."""
 
     POLLING_DELAY = 1.0
