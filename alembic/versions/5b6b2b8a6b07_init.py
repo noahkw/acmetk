@@ -90,6 +90,7 @@ def upgrade():
         sa.ForeignKeyConstraint(
             ["account_kid"],
             ["accounts.kid"],
+            name="orders_account_kid_fkey",
         ),
         sa.PrimaryKeyConstraint("order_id"),
     )
