@@ -1,6 +1,5 @@
 import datetime
 import json
-import secrets
 import typing
 import urllib.parse
 
@@ -9,12 +8,14 @@ import acme.messages
 import aiohttp.web
 import aiohttp_jinja2
 import josepy
+import sqlalchemy
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
+from acmetk.models.eab import EABCredential
 from acmetk.server.routes import routes
 from acmetk.util import url_for, forwarded_url
 
@@ -22,50 +23,98 @@ if typing.TYPE_CHECKING:
     import acmetk.server
 
 
-class ExternalAccountBinding:
-    """Represents an external account binding.
+# Note: this module used to expose an in-memory `ExternalAccountBindingStore` keyed
+# off pending dict[mail]. That model lost every outstanding EAB on broker restart
+# and offered no path for Ansible to mint EAB credentials server-side. EAB pairs
+# now persist in postgres via `EABCredential`. The legacy `/eab` HTTP endpoint is
+# preserved as a thin wrapper for the self-service / mTLS flow.
 
-    `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_
+
+class ExternalAccountBindingStore:
+    """Database-backed store for EAB credentials.
+
+    Mints new credential rows on `create()`, looks them up on `verify()`.
+    Caller wires in the acmetk `Database` instance so we can open async sessions.
     """
+
+    def __init__(self, db: "acmetk.database.Database"):
+        self._db = db
+
+    async def create(
+        self,
+        kid: str,
+        lifetime: datetime.timedelta,
+    ) -> tuple[str, str]:
+        """Mints (or refreshes) an EAB credential for the given kid.
+
+        If a non-expired credential already exists for this kid, return it as-is.
+        Otherwise insert a fresh one. Returns (kid, hmac_key).
+        """
+        async with self._db.session() as session:
+            existing = await session.get(EABCredential, kid)
+            if existing is not None and not existing.expired():
+                return existing.kid, existing.hmac_key
+
+            if existing is not None:
+                # Replace stale credential with a fresh pair
+                await session.delete(existing)
+                await session.flush()
+
+            cred = EABCredential.mint(kid, lifetime)
+            session.add(cred)
+            await session.commit()
+            return cred.kid, cred.hmac_key
+
+    async def verify(
+        self,
+        kid: str,
+        jws: acme.jws.JWS,
+    ) -> bool:
+        """Look up the credential by kid, verify the JWS signature, check expiry."""
+        async with self._db.session() as session:
+            cred = await session.get(EABCredential, kid)
+            if cred is None:
+                return False
+            if cred.expired():
+                return False
+
+            key = josepy.jwk.JWKOct(key=josepy.b64.b64decode(cred.hmac_key))
+            ok = jws.verify(key)
+            if ok and cred.consumed_at is None:
+                cred.consumed_at = datetime.datetime.now(datetime.timezone.utc)
+                await session.commit()
+            return ok
+
+
+class ExternalAccountBinding:
+    """JWS-level helper used by clients building EAB requests. Kept around in
+    case downstream code or tests construct one directly; the server-side store is now
+    the SQLAlchemy model `EABCredential`."""
 
     def __init__(
         self,
         email: str,
         url: str,
         lifetime: datetime.timedelta,
+        hmac_key: typing.Optional[str] = None,
     ):
+        import secrets
         self.kid: str = email
-        """The key identifier provided by the external binding mechanism."""
         self.url: str = url
-        """The *newAccount* URL which is the same as in the encapsulating JWS."""
-        self.hmac_key: str = secrets.token_urlsafe(32)
-        """The key that is used to symmetrically sign the JWS."""
+        self.hmac_key: str = hmac_key or secrets.token_urlsafe(32)
         self.when: datetime.datetime = datetime.datetime.now()
-        """The time when the EAB request was created."""
         self.lifetime: datetime.timedelta = lifetime
 
-    def verify(
-        self,
-        jws: acme.jws.JWS,
-    ) -> bool:
-        """Checks the given signature against the EAB's.
-
-        :param jws: The EAB request JWS to be verified.
-        :return: True iff the given signature and the EAB's are equal.
-        """
+    def verify(self, jws: acme.jws.JWS) -> bool:
         key = josepy.jwk.JWKOct(key=josepy.b64.b64decode(self.hmac_key))
         return jws.verify(key)
 
     def expired(self) -> bool:
-        """Returns whether the EAB has expired.
-
-        :return: True iff the EAB has expired.
-        """
         return datetime.datetime.now() - self.when > self.lifetime
 
     def _eab(self, key_json) -> acme.jws.JWS:
         decoded_hmac_key = josepy.b64.b64decode(self.hmac_key)
-        eab = acme.jws.JWS.sign(
+        return acme.jws.JWS.sign(
             key_json,
             josepy.jwk.JWKOct(key=decoded_hmac_key),
             josepy.jwa.HS256,
@@ -74,96 +123,55 @@ class ExternalAccountBinding:
             self.kid,
         )
 
-        return eab
-
-    def signature(
-        self,
-        key_json: str,
-    ) -> str:
-        """Returns the EAB's signature.
-
-        :param key_json: The ACME account key that the external account is to be bound to.
-        """
+    def signature(self, key_json: str) -> str:
         return josepy.b64.b64encode(self._eab(key_json).signature.signature).decode()
 
 
-class ExternalAccountBindingStore:
-    """Stores pending :class:`ExternalAccountBinding` requests and offers methods for creation and verification."""
+def _email_from_request(
+    request: aiohttp.web.Request, eab_type: str, header: str
+) -> str:
+    """Extract the contact email from a self-service `/eab` request, either via a
+    plain header or by parsing an x509 client cert (mTLS flow). Raises ValueError if
+    we cannot determine a unique email."""
+    value = request.headers.get(header)
+    if value is None:
+        raise ValueError(f"{header} header missing")
 
-    def __init__(self):
-        self._pending = dict()
+    if eab_type == "plain":
+        return value
 
-    def create(
-        self, request: aiohttp.web.Request, type: str, header: str, lifetime: datetime.timedelta
-    ) -> tuple[str, str]:
-        """Creates an :class:`ExternalAccountBinding` request and stores it internally for verification at a later
-        point in time.
-
-        :param request: The request that contains the PEM-encoded x509 client certificate in the *X-SSL-CERT* header.
-        :return: The resulting pending EAB's :attr:`~ExternalAccountBinding.kid` and
-            :attr:`~ExternalAccountBinding.hmac_key`.
-        """
-        mail: str
-        if (value := request.headers.get(header)) is None:
-            raise ValueError(f"{header} header missing")
-
-        if type == "plain":
-            mail = value
-        elif type == "x509":
-            # The client certificate in the PEM format (urlencoded) for an established SSL connection (1.13.5);
-            cert = x509.load_pem_x509_certificate(urllib.parse.unquote(value).encode())
-
-            mails: set[str] = set()
-            nl: list[x509.NameAttribute]
-            if nl := cert.subject.get_attributes_for_oid(x509.NameOID.EMAIL_ADDRESS):
-                mails |= set(map(lambda x: x.value, nl))
-
+    if eab_type == "x509":
+        cert = x509.load_pem_x509_certificate(urllib.parse.unquote(value).encode())
+        mails: set[str] = set()
+        nl = cert.subject.get_attributes_for_oid(x509.NameOID.EMAIL_ADDRESS)
+        if nl:
+            mails |= set(a.value for a in nl)
+        try:
             ext = cert.extensions.get_extension_for_oid(x509.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
             san: x509.SubjectAlternativeName = ext.value
             mails |= set(san.get_values_for_type(x509.RFC822Name))
+        except x509.ExtensionNotFound:
+            pass
 
-            if len(mails) != 1:
-                raise ValueError(f"{len(mails)} mail addresses in cert, expecting 1 ({mails})")
+        if len(mails) != 1:
+            raise ValueError(f"{len(mails)} mail addresses in cert, expecting 1 ({mails})")
+        return mails.pop()
 
-            mail = mails.pop()
-
-        if (pending_eab := self._pending.get(mail)) is None or pending_eab.expired():
-            pending_eab = self._pending[mail] = ExternalAccountBinding(mail, url_for(request, "new-account"), lifetime)
-
-        return pending_eab.kid, pending_eab.hmac_key
-
-    def verify(
-        self,
-        kid: str,
-        jws: acme.jws.JWS,
-    ) -> bool:
-        """Verifies an external account binding given its ACME account key, kid and signature.
-
-        :param kid: The EAB's kid.
-        :param jws: The EAB request JWS.
-        :return: True iff verification was successful.
-        """
-        if not (pending := self._pending.get(kid, None)):
-            return False
-
-        if pending.expired():
-            return False
-
-        return pending.verify(jws)
+    raise ValueError(f"unknown eab type: {eab_type!r}")
 
 
 class AcmeEABMixin:
-    """Mixin for an :class:`~acmetk.server.AcmeServerBase` implementation that provides external account
-    binding creation and verification.
+    """Mixin for an AcmeServerBase that wires up EAB credential persistence + the
+    legacy self-service `/eab` endpoint.
 
-    `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_
+    EAB pairs are now persisted in postgres (`eab_credentials` table). For
+    Ansible-driven enrolment, mint credentials out-of-band via the CLI:
 
-    An external account binding request is created when the user visits the /eab route.
-    The EAB mechanism used here is email verification using an SSL client certificate.
-    A reverse proxy should be configured to include a set of root certificates that the user's browser
-    can establish a chain of trust to.
-    The reverse proxy then forwards the PEM and URL-encoded client certificate in the *X-SSL-CERT* header after
-    verifying it.
+        docker exec acmetk-app python -m acmetk eab mint <connection-string> --email <kid>
+
+    The `/eab` HTTP endpoint is preserved for the self-service / mTLS flow but is
+    no longer the only path — and credentials minted via either path survive a
+    broker restart.
     """
 
     SUPPORTED_EAB_JWS_ALGORITHMS: tuple[type]
@@ -174,44 +182,30 @@ class AcmeEABMixin:
         required: bool = False
         type: typing.Literal["x509", "plain"] = "plain"
         header: str = "x-auth-request-email"
-        """
-        examples:
-          for x509: ssl-client-cert
-          for plain: x-auth-request-email
-        """
         expires_after: datetime.timedelta = Field(default_factory=lambda: AcmeEABMixin.EXPIRE_DEFAULT)
-        """Timedelta in seconds after which an external account binding request is considered expired."""
 
     __c: Config
 
-    def __init__(self, cfg: typing.Union[Config, "acmetk.server.AcmeCA.Config"]):
+    def __init__(self, cfg):
         super().__init__(cfg=cfg)
-
-        # Use self._extract_mixin_config to extract eab config
         self.__c: AcmeEABMixin.Config = self._extract_mixin_config(cfg, "eab", AcmeEABMixin.Config)
-        self._eab_store = ExternalAccountBindingStore()
+        # self._db is initialised by AcmeServerBase.__init__ AFTER super().__init__()
+        # returns, so we defer store construction to first use.
+        self.__store: typing.Optional[ExternalAccountBindingStore] = None
 
-    def verify_eab(
+    @property
+    def _eab_store(self) -> ExternalAccountBindingStore:
+        if self.__store is None:
+            self.__store = ExternalAccountBindingStore(self._db)
+        return self.__store
+
+    async def verify_eab(
         self,
         request: aiohttp.web.Request,
         pub_key: RSAPublicKey | EllipticCurvePublicKey,
         reg: acme.messages.Registration,
     ) -> None:
-        """Verifies an ACME Registration request whose payload contains an external account binding JWS.
-
-        :param request: The request
-        :param pub_key: The public key that is contained in the outer JWS, i.e. the ACME account key.
-        :param reg: The registration message.
-        :raises:
-
-            * :class:`acme.messages.Error` if any of the following are true:
-
-                * The request does not contain a valid JWS
-                * The request JWS does not contain an *externalAccountBinding* field
-                * The EAB JWS was signed with an unsupported algorithm (:attr:`SUPPORTED_EAB_JWS_ALGORITHMS`)
-                * The EAB JWS' payload does not contain the same public key as the encapsulating JWS
-                * The EAB JWS' signature is invalid
-        """
+        """Verifies an ACME Registration request whose payload contains an EAB JWS."""
         if not reg.external_account_binding:
             raise acme.messages.Error.with_code("externalAccountRequired", detail=f"Visit {url_for(request, 'eab')}")
 
@@ -251,28 +245,29 @@ class AcmeEABMixin:
         if kid is None or not kid:
             raise acme.messages.Error.with_code("malformed", detail="The kid is empty.")
 
-        if kid not in reg.contact + reg.emails:
+        # Normalize acme contact entries: clients send mailto:user@host URIs in
+        # reg.contact per RFC 8555 7.3, but our EAB kid is the bare email address.
+        def _norm(c: str) -> str:
+            return c[len("mailto:"):] if c.startswith("mailto:") else c
+
+        normalized_contact = tuple(_norm(c) for c in reg.contact + reg.emails)
+        if kid not in normalized_contact:
             if len(reg.contact) == 0:
-                # compatibility glue
-                object.__setattr__(reg, "contact", (kid,))
+                object.__setattr__(reg, "contact", (f"mailto:{kid}",))
             else:
                 raise acme.messages.Error.with_code(
-                    "malformed", detail="The contact field must contain the email address from the EAB kid"
+                    "malformed",
+                    detail=f"The contact field must contain the email address from the EAB kid ({kid}); got {list(reg.contact)}",
                 )
 
-        if not self._eab_store.verify(kid, jws):
+        if not await self._eab_store.verify(kid, jws):
             raise acme.messages.Error.with_code("unauthorized", detail="The external account binding is invalid.")
 
     @routes.get("/eab", name="eab")
     @aiohttp_jinja2.template("eab.jinja2")
     async def eab(self, request: aiohttp.web.Request) -> aiohttp.web.Response:
-        """Handler that displays the user's external account binding credentials, i.e. their *kid* and *hmac_key*
-        after their client certificate has been verified and forwarded by the reverse proxy.
-        """
-
-        # from unittest.mock import Mock
-        # request = Mock(headers={"X-SSL-CERT": urllib.parse.quote(self.data)}, url=request.url)
-
+        """Self-service EAB issuance via mTLS / plain-header flow. Identity proven by
+        the reverse-proxy-validated client cert (or by a trusted upstream header)."""
         if request.headers.get(self.__c.header) is None:
             response = aiohttp_jinja2.render_template("eab.jinja2", request, {})
             response.set_status(403)
@@ -281,5 +276,10 @@ class AcmeEABMixin:
             )
             return response
 
-        kid, hmac_key = self._eab_store.create(request, self.__c.type, self.__c.header, self.__c.expires_after)
-        return {"kid": kid, "hmac_key": hmac_key}
+        try:
+            kid = _email_from_request(request, self.__c.type, self.__c.header)
+        except ValueError as e:
+            raise aiohttp.web.HTTPBadRequest(text=str(e))
+
+        kid_out, hmac_key = await self._eab_store.create(kid, self.__c.expires_after)
+        return {"kid": kid_out, "hmac_key": hmac_key}

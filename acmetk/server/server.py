@@ -807,7 +807,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
                     )
                 else:  # create new account
                     if self._c.eab.required:
-                        self.verify_eab(request, pub_key, reg)
+                        await self.verify_eab(request, pub_key, reg)
 
                     self._validate_contact_info(reg)
 
