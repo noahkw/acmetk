@@ -222,5 +222,49 @@ def drop(connection_string: str, password: str):
         click.echo("Aborting...")
 
 
+@main.group()
+def eab():
+    """EAB credential management — pre-mint server-side for Ansible-driven enrolment."""
+    pass
+
+
+@eab.command("mint")
+@click.argument("connection-string", type=click.STRING)
+@click.option("--password", type=click.STRING, prompt=True, hide_input=True)
+@click.option("--email", "kid", type=click.STRING, required=True,
+              help="The kid (typically the host contact email, e.g. host@goldenhelix.com).")
+@click.option("--lifetime-hours", type=click.INT, default=24*365,
+              help="How long the EAB pair stays valid (default: 1 year).")
+def eab_mint(connection_string: str, password: str, kid: str, lifetime_hours: int):
+    """Mint a fresh EAB pair (kid + hmac_key) and persist it to the broker DB.
+
+    Prints the kid and hmac_key in a single line: KID HMAC_KEY — easy to capture from Ansible.
+    """
+    import datetime
+    from acmetk.models.eab import EABCredential
+
+    db = Database(connection_string.format(password))
+    cred = EABCredential.mint(kid, datetime.timedelta(hours=lifetime_hours))
+
+    # Capture attribute values now (plain Python attrs from cls.mint())
+    # so we do not access them after session.commit() expires the instance.
+    out_kid, out_hmac = cred.kid, cred.hmac_key
+
+    async def _go():
+        async with db.session() as session:
+            existing = await session.get(EABCredential, kid)
+            if existing is not None:
+                await session.delete(existing)
+                await session.flush()
+            session.add(cred)
+            await session.commit()
+        return out_kid, out_hmac
+
+    loop = asyncio.get_event_loop()
+    out_kid, out_hmac = loop.run_until_complete(_go())
+    # Output format: KID HMAC_KEY on stdout (single line, no logging chatter).
+    click.echo(f"{out_kid} {out_hmac}")
+
+
 if __name__ == "__main__":
     main()
