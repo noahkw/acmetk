@@ -214,10 +214,11 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
         cfg = await self._config_for(name)
 
         try:
-            #            provider.domain = await self._find_domain_id(provider, name)
+            # Lexicon Client.__enter__ authenticates the provider; delete_record
+            # works without us poking provider.zone/.domain ourselves (and on some
+            # lexicon versions those attributes do not exist as fields on Provider,
+            # which broke cleanup on every successful issuance).
             with lexicon.client.Client(cfg) as ops:
-                assert ops.provider.zone is not None, ops.provider.zone
-                assert ops.provider.domain
                 await self.delete_txt_record(ops, name, text)
         except Exception as e:
-            logger.exception(e)
+            logger.exception("cleanup_challenge failed for %s: %s", name, e)
