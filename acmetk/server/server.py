@@ -68,7 +68,7 @@ async def handle_get(request: web.Request) -> web.Response:
 
 
 class AcmeResponse(web.Response):
-    def __init__(self, nonce, directory_url, *args, links=None, **kwargs):
+    def __init__(self, nonce: str, directory_url: str, *args, links: list[str] | None = None, **kwargs):
         super().__init__(*args, **kwargs)
         if links is None:
             links = []
@@ -97,6 +97,11 @@ async def on_shutdown(app: web.Application):
 async def on_cleanup(app: web.Application):
     obj: AcmeServerBase = app[AcmeServerBase.ServerKey]
     await obj.on_cleanup(app)
+
+
+class ConfigRetryAfter(BaseSettings):
+    authz: int = 3
+    order: int = 7
 
 
 class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, ServiceBase, abc.ABC):
@@ -220,6 +225,8 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         """
         prometheus metrics export at /metrics
         """
+
+        retryafter: ConfigRetryAfter = Field(default_factory=lambda: ConfigRetryAfter())
 
     @staticmethod
     def _extract_mixin_config(
@@ -974,6 +981,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
 
         :return: The authorization object.
         """
+        headers = dict()
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             authz_id = request.match_info["id"]
@@ -988,10 +996,15 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
             except ValueError as e:
                 raise acme.messages.Error.with_code("malformed", detail=e.args[0])
 
+            if authorization.status == models.AuthorizationStatus.PENDING:
+                for challenge in authorization.challenges:
+                    if challenge.status == models.ChallengeStatus.PENDING:
+                        headers["Retry-After"] = str(self._c.retryafter.authz)
+
             serialized = authorization.serialize(request)
             await session.commit()
 
-        return self._response(request, serialized)
+        return self._response(request, serialized, headers=headers)
 
     @routes.post("/challenge/{id}", name="challenge")
     async def challenge(self, request: web.Request) -> web.Response:
@@ -1069,13 +1082,23 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
             jws, account = await self._verify_request(request, session, post_as_get=True)
             order_id = request.match_info["id"]
 
-            order = await self._db.get_order(session, account.account_id, order_id)
+            order: models.order.Order = await self._db.get_order(session, account.account_id, order_id)
             if not order:
                 raise web.HTTPNotFound
 
             await order.validate()
+            headers = dict()
+            if order.status == models.OrderStatus.PROCESSING:
+                """
+                7.4.  Applying for Certificate Issuance
+                …
+                   o  "processing": The certificate is being issued.  Send a POST-as-GET
+                      request after the time given in the Retry-After header field of
+                      the response, if any.
+                """
+                headers["Retry-After"] = str(self._c.retryafter.order)
 
-            return self._response(request, order.serialize(request))
+            return self._response(request, order.serialize(request), headers=headers)
 
     @routes.post("/orders/{id}", name="orders")
     async def orders(self, request: web.Request) -> web.Response:

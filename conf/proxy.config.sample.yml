@@ -21,6 +21,9 @@ service:
   allow_wildcard: true
   eab:
     required: false
+  retryafter:
+    authz: 3
+    order: 7
   client:
     directory: 'https://acme-v02.api.letsencrypt.org/directory' # Let's Encrypt directory
     private_key: '/etc/acme_server/proxy_client_account.key'

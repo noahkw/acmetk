@@ -45,11 +45,11 @@ ChallengeSolverRegistry = PluginRegistry.get_registry(ChallengeSolver)
 STATUS_EXPIRED = acme.messages.Status("expired")
 
 
-def is_valid(obj):
+def is_valid(obj: acme.messages.Authorization | messages.Order):
     return obj.status == acme.messages.STATUS_VALID
 
 
-def is_invalid(obj):
+def is_invalid(obj: acme.messages.Authorization | messages.Order):
     return obj.status in [acme.messages.STATUS_INVALID, STATUS_EXPIRED]
 
 
@@ -375,6 +375,7 @@ class AcmeClient:
             except acme.messages.Error as e:
                 # Make sure that the order is in state READY before moving on.
                 if e.code == "orderNotReady":
+                    # the Retry-After header is not accessible here
                     await asyncio.sleep(self.FINALIZE_DELAY)
                 else:
                     raise e
