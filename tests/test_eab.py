@@ -69,12 +69,11 @@ class TestEAB(unittest.IsolatedAsyncioTestCase):
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         pub_key = key.public_key()
 
-        async with self._db.session() as session:
-            cred = await self.eab_store.create(session, kid, url, datetime.timedelta(hours=1))
+        cred = await self.eab_store.create(kid, url, datetime.timedelta(hours=1))
 
-            key_json = json.dumps(josepy.jwk.JWKRSA(key=pub_key).to_partial_json()).encode()
-            v = cred._eab(key_json)
-            assert await self.eab_store.verify(kid, v)
+        key_json = json.dumps(josepy.jwk.JWKRSA(key=pub_key).to_partial_json()).encode()
+        v = cred._eab(key_json)
+        assert await self.eab_store.verify(kid, v)
 
 
 class TestCertbotCA_EAB(TestCertBotCA):
@@ -98,8 +97,7 @@ class TestCertbotCA_EAB(TestCertBotCA):
 
         kid = _email_from_request(request, self.ca._c.eab.type, self.ca._c.eab.header)
 
-        async with self.ca._db.session() as session:
-            cred = await self.ca._eab_store.create(session, kid, str(request.url), datetime.timedelta(3600))
+        cred = await self.ca._eab_store.create(kid, str(request.url), datetime.timedelta(3600))
 
         self.log.debug("kid: %s, hmac_key: %s", cred.kid, cred.hmac_key)
         await self._run(f"register --agree-tos  -m {cred.kid} --eab-kid {cred.kid} --eab-hmac-key={cred.hmac_key}")
@@ -172,8 +170,7 @@ class TestOurClientCA_EAB_CERT(TestOurClientCA_EAB, TestOurClientCA):
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
         kid = _email_from_request(request, self.ca._c.eab.type, self.ca._c.eab.header)
-        async with self.ca._db.session() as session:
-            creds = await self.ca._eab_store.create(session, kid, str(request.url), datetime.timedelta(seconds=3600))
+        creds = await self.ca._eab_store.create(kid, str(request.url), datetime.timedelta(seconds=3600))
         self.client.eab_credentials = self.eab_credentials = (creds.kid, creds.hmac_key)
         self.log.debug("kid: %s, hmac_key: %s", self.eab_credentials[0], self.eab_credentials[1])
 
@@ -188,7 +185,6 @@ class TestOurClientCA_EAB_EMAIL(TestOurClientCA_EAB, TestOurClientCA):
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
         kid = _email_from_request(request, self.ca._c.eab.type, self.ca._c.eab.header)
-        async with self.ca._db.session() as session:
-            creds = await self.ca._eab_store.create(session, kid, str(request.url), datetime.timedelta(seconds=3600))
+        creds = await self.ca._eab_store.create(kid, str(request.url), datetime.timedelta(seconds=3600))
         self.client.eab_credentials = self.eab_credentials = (creds.kid, creds.hmac_key)
         self.log.debug("kid: %s, hmac_key: %s", self.eab_credentials[0], self.eab_credentials[1])
