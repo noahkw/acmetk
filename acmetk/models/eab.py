@@ -14,9 +14,11 @@ from .base import Base
 
 
 class EABCredential(Base):
-    """An External Account Binding credential pair (kid + hmac_key).
+    """Represents an external account binding.
 
-    Pre-minted by an admin (e.g. Ansible during host provisioning) or by the legacy
+    `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_
+
+    Can be pre-minted by an admin (e.g. Ansible during host provisioning) or by the
     self-service `/eab` endpoint. Persisted to postgres so a broker restart does not
     invalidate outstanding EAB enrolments.
     """
