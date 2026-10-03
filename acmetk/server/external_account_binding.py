@@ -47,18 +47,6 @@ class ExternalAccountBinding:
         """The time when the EAB request was created."""
         self.lifetime: datetime.timedelta = lifetime
 
-    def verify(
-        self,
-        jws: acme.jws.JWS,
-    ) -> bool:
-        """Checks the given signature against the EAB's.
-
-        :param jws: The EAB request JWS to be verified.
-        :return: True iff the given signature and the EAB's are equal.
-        """
-        key = josepy.jwk.JWKOct(key=josepy.b64.b64decode(self.hmac_key))
-        return jws.verify(key)
-
     def expired(self) -> bool:
         """Returns whether the EAB has expired.
 
@@ -95,30 +83,26 @@ class ExternalAccountBindingStore:
     def __init__(self, db: "acmetk.database.Database"):
         self._db = db
 
-    async def create(
-        self,
-        kid: str,
-        lifetime: datetime.timedelta,
-    ) -> tuple[str, str]:
+    async def create(self, session, kid: str, url: str, lifetime: datetime.timedelta) -> EABCredential:
         """Mints (or refreshes) an EAB credential for the given kid.
 
         If a non-expired credential already exists for this kid, return it as-is.
-        Otherwise insert a fresh one. Returns (kid, hmac_key).
+        Otherwise insert a fresh one. Returns the :class:`~acmetk.models.eab.EABCredential`.
+        :param url:
         """
-        async with self._db.session() as session:
-            existing = await session.get(EABCredential, kid)
-            if existing is not None and not existing.expired():
-                return existing.kid, existing.hmac_key
+        existing = await self._db.get_eab(session, kid)
+        if existing is not None and not existing.expired():
+            return existing
 
-            if existing is not None:
-                # Replace stale credential with a fresh pair
-                await session.delete(existing)
-                await session.flush()
+        if existing is not None:
+            # Replace stale credential with a fresh pair
+            await session.delete(existing)
+            await session.flush()
 
-            cred = EABCredential.mint(kid, lifetime)
-            session.add(cred)
-            await session.commit()
-            return cred.kid, cred.hmac_key
+        cred = EABCredential.create(kid, url, lifetime)
+        session.add(cred)
+        await session.commit()
+        return await self._db.get_eab(session, kid)
 
     async def verify(
         self,
@@ -132,15 +116,13 @@ class ExternalAccountBindingStore:
         :return: True iff verification was successful.
         """
         async with self._db.session() as session:
-            cred = await session.get(EABCredential, kid)
+            cred = await self._db.get_eab(session, kid)
             if cred is None:
                 return False
             if cred.expired():
                 return False
 
-            key = josepy.jwk.JWKOct(key=josepy.b64.b64decode(cred.hmac_key))
-            ok = jws.verify(key)
-            if ok and cred.consumed_at is None:
+            if ok := cred.verify(jws) and cred.consumed_at is None:
                 cred.consumed_at = datetime.datetime.now(datetime.timezone.utc)
                 await session.commit()
             return ok
@@ -326,5 +308,6 @@ class AcmeEABMixin:
         except ValueError as e:
             raise aiohttp.web.HTTPBadRequest(text=str(e))
 
-        kid_out, hmac_key = await self._eab_store.create(kid, self.__c.expires_after)
-        return {"kid": kid_out, "hmac_key": hmac_key}
+        async with self._db.session() as session:
+            cred = await self._eab_store.create(session, kid, "", "")
+            return {"kid": cred.kid, "hmac_key": cred.hmac_key}

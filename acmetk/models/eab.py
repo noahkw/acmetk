@@ -3,6 +3,11 @@
 import datetime
 import secrets
 
+import acme.jws
+import josepy
+import josepy.b64
+import josepy.jwk
+import josepy.jwa
 from sqlalchemy import Column, String, DateTime
 
 from .base import Base
@@ -18,10 +23,12 @@ class EABCredential(Base):
 
     __tablename__ = "eab_credentials"
 
-    kid = Column(String, primary_key=True)
+    kid = Column(String(64), primary_key=True)
     """Key identifier — typically the host's contact email (e.g. host@goldenhelix.com)."""
 
-    hmac_key = Column(String, nullable=False)
+    url = Column(String(128))
+
+    hmac_key = Column(String(64), nullable=False)
     """URL-safe base64 HMAC key shared with the client. Used to sign the EAB JWS at /new-account."""
 
     created_at = Column(DateTime(timezone=True), nullable=False)
@@ -36,11 +43,14 @@ class EABCredential(Base):
     some other clients re-register the same account on each renewal in some configurations."""
 
     @classmethod
-    def mint(cls, kid: str, lifetime: datetime.timedelta) -> "EABCredential":
-        """Create a fresh credential with a random HMAC key. Caller must add() + commit()."""
+    def create(cls, kid: str, url: str, lifetime: datetime.timedelta) -> "EABCredential":
+        """Create a fresh credential with a random HMAC key. Caller must add() + commit().
+        :param url:
+        """
         now = datetime.datetime.now(datetime.timezone.utc)
         return cls(
             kid=kid,
+            url=url,
             hmac_key=secrets.token_urlsafe(32),
             created_at=now,
             expires_at=now + lifetime,
@@ -48,3 +58,33 @@ class EABCredential(Base):
 
     def expired(self) -> bool:
         return datetime.datetime.now(datetime.timezone.utc) >= self.expires_at
+
+    def _eab(self, key_json) -> acme.jws.JWS:
+        decoded_hmac_key = josepy.b64.b64decode(self.hmac_key)
+        return acme.jws.JWS.sign(
+            key_json,
+            josepy.jwk.JWKOct(key=decoded_hmac_key),
+            josepy.jwa.HS256,
+            None,
+            self.url,
+            self.kid,
+        )
+
+    def signature(self, key_json: str) -> str:
+        """Returns the EAB's signature.
+
+        :param key_json: The ACME account key that the external account is to be bound to.
+        """
+        return josepy.b64.b64encode(self._eab(key_json).signature.signature).decode()
+
+    def verify(
+        self,
+        jws: acme.jws.JWS,
+    ) -> bool:
+        """Checks the given signature against the EAB's.
+
+        :param jws: The EAB request JWS to be verified.
+        :return: True iff the given signature and the EAB's are equal.
+        """
+        key = josepy.jwk.JWKOct(key=josepy.b64.b64decode(self.hmac_key))
+        return jws.verify(key)
