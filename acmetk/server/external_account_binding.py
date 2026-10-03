@@ -22,57 +22,6 @@ if typing.TYPE_CHECKING:
     import acmetk.server
 
 
-class ExternalAccountBinding:
-    """Represents an external account binding.
-
-    `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_
-    """
-
-    def __init__(
-        self,
-        email: str,
-        url: str,
-        lifetime: datetime.timedelta,
-        hmac_key: str | None = None,
-    ):
-        import secrets
-
-        self.kid: str = email
-        """The key identifier provided by the external binding mechanism."""
-        self.url: str = url
-        """The *newAccount* URL which is the same as in the encapsulating JWS."""
-        self.hmac_key: str = secrets.token_urlsafe(32)
-        """The key that is used to symmetrically sign the JWS."""
-        self.when: datetime.datetime = datetime.datetime.now()
-        """The time when the EAB request was created."""
-        self.lifetime: datetime.timedelta = lifetime
-
-    def expired(self) -> bool:
-        """Returns whether the EAB has expired.
-
-        :return: True iff the EAB has expired.
-        """
-        return datetime.datetime.now() - self.when > self.lifetime
-
-    def _eab(self, key_json) -> acme.jws.JWS:
-        decoded_hmac_key = josepy.b64.b64decode(self.hmac_key)
-        return acme.jws.JWS.sign(
-            key_json,
-            josepy.jwk.JWKOct(key=decoded_hmac_key),
-            josepy.jwa.HS256,
-            None,
-            self.url,
-            self.kid,
-        )
-
-    def signature(self, key_json: str) -> str:
-        """Returns the EAB's signature.
-
-        :param key_json: The ACME account key that the external account is to be bound to.
-        """
-        return josepy.b64.b64encode(self._eab(key_json).signature.signature).decode()
-
-
 class ExternalAccountBindingStore:
     """Database-backed store for EAB credentials.
 
