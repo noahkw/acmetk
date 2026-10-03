@@ -72,10 +72,7 @@ class ExternalAccountBindingStore:
             if cred.expired():
                 return False
 
-            if ok := cred.verify(jws) and cred.consumed_at is None:
-                cred.consumed_at = datetime.datetime.now(datetime.timezone.utc)
-                await session.commit()
-            return ok
+            return cred.verify(jws)
 
 
 def _email_from_request(request: aiohttp.web.Request, eab_type: typing.Literal["x509", "plain"], header: str) -> str:

@@ -39,11 +39,6 @@ class EABCredential(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
     """When this credential expires. After this point, /new-account will reject the EAB."""
 
-    consumed_at = Column(DateTime(timezone=True), nullable=True)
-    """Set when the credential has been used by a successful /new-account registration.
-    Currently informational only — the broker does not reject re-use, since acme.sh and
-    some other clients re-register the same account on each renewal in some configurations."""
-
     @classmethod
     def create(cls, kid: str, url: str, lifetime: datetime.timedelta) -> "EABCredential":
         """Create a fresh credential with a random HMAC key. Caller must add() + commit().
