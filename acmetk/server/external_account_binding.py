@@ -32,26 +32,27 @@ class ExternalAccountBindingStore:
     def __init__(self, db: "acmetk.database.Database"):
         self._db = db
 
-    async def create(self, session, kid: str, url: str, lifetime: datetime.timedelta) -> EABCredential:
+    async def create(self, kid: str, url: str, lifetime: datetime.timedelta) -> EABCredential:
         """Mints (or refreshes) an EAB credential for the given kid.
 
         If a non-expired credential already exists for this kid, return it as-is.
         Otherwise insert a fresh one. Returns the :class:`~acmetk.models.eab.EABCredential`.
         :param url:
         """
-        existing = await self._db.get_eab(session, kid)
-        if existing is not None and not existing.expired():
-            return existing
+        async with self._db.session() as session:
+            existing = await self._db.get_eab(session, kid)
+            if existing is not None and not existing.expired():
+                return existing
 
-        if existing is not None:
-            # Replace stale credential with a fresh pair
-            await session.delete(existing)
-            await session.flush()
+            if existing is not None:
+                # Replace stale credential with a fresh pair
+                await session.delete(existing)
+                await session.flush()
 
-        cred = EABCredential.create(kid, url, lifetime)
-        session.add(cred)
-        await session.commit()
-        return await self._db.get_eab(session, kid)
+            cred = EABCredential.create(kid, url, lifetime)
+            session.add(cred)
+            await session.commit()
+            return await self._db.get_eab(session, kid)
 
     async def verify(
         self,
@@ -257,6 +258,5 @@ class AcmeEABMixin:
         except ValueError as e:
             raise aiohttp.web.HTTPBadRequest(text=str(e))
 
-        async with self._db.session() as session:
-            cred = await self._eab_store.create(session, kid, "", "")
-            return {"kid": cred.kid, "hmac_key": cred.hmac_key}
+        cred = await self._eab_store.create(kid, "", "")
+        return {"kid": cred.kid, "hmac_key": cred.hmac_key}
