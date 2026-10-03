@@ -16,6 +16,7 @@ from acmetk.models import (
     Authorization,
     Challenge,
     Certificate,
+    EABCredential,
 )
 from acmetk.models.base import Base
 
@@ -305,4 +306,10 @@ class Database:
             # certificate_id is not a valid UUID
             raise web.HTTPNotFound
 
+        return result[0] if result else None
+
+    @staticmethod
+    async def get_eab(session: AsyncSession, kid):
+        statement = select(EABCredential).filter(kid == kid)
+        result = (await session.execute(statement)).first()
         return result[0] if result else None

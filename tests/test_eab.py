@@ -15,9 +15,7 @@ from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 
-from acmetk.server.external_account_binding import (
-    ExternalAccountBindingStore,
-)
+from acmetk.server.external_account_binding import ExternalAccountBindingStore, _email_from_request
 from tests.test_ca import TestCertBotCA, TestOurClientCA
 
 
@@ -53,27 +51,30 @@ def generate_x509_client_cert(email):
     return urllib.parse.quote(data)
 
 
-class TestEAB(unittest.TestCase):
+class TestEAB(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         super().setUp()
-        self.eab_store = ExternalAccountBindingStore()
+        import yaml
+        from pathlib import Path
+        from acmetk.database import Database
 
-    def test_create(self):
-        URL = yarl.URL("http://localhost/eab")
+        self._config = yaml.safe_load(Path("tests/conf/debug.yml").read_text())
+        self._db = Database(self._config["tests"]["LocalCA"]["services"]["ca"]["db"])
+        self.eab_store = ExternalAccountBindingStore(self._db)
 
-        request = Mock(
-            headers={"x-user-email": generate_x509_client_cert("test@test.test")},
-            url=URL,
-            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
-        )
+    async def test_create(self):
+        kid = f"test+{int(datetime.datetime.now().timestamp())}@test.test"
+        url = "https://x.org/test"
+
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
         pub_key = key.public_key()
 
-        self.eab_store.create(request, "x509", "x-user-email", datetime.timedelta(hours=1))
+        async with self._db.session() as session:
+            cred = await self.eab_store.create(session, kid, url, datetime.timedelta(hours=1))
 
-        key_json = json.dumps(josepy.jwk.JWKRSA(key=pub_key).to_partial_json()).encode()
-        signature = list(self.eab_store._pending.values())[0].signature(key_json)
-        print(signature)
+            key_json = json.dumps(josepy.jwk.JWKRSA(key=pub_key).to_partial_json()).encode()
+            v = cred._eab(key_json)
+            assert await self.eab_store.verify(kid, v)
 
 
 class TestCertbotCA_EAB(TestCertBotCA):
@@ -89,18 +90,19 @@ class TestCertbotCA_EAB(TestCertBotCA):
         self.ca._c.eab.type = "plain"
 
     async def test_register(self):
-        URL = yarl.URL("http://localhost:8000/eab")
         request = Mock(
             headers={self.ca._c.eab.header: self.contact},
-            url=URL,
+            url=yarl.URL("http://localhost:8000/eab"),
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
-        kid, hmac_key = self.ca._eab_store.create(
-            request, self.ca._c.eab.type, self.ca._c.eab.header, self.ca._c.eab.expires_after
-        )
 
-        self.log.debug("kid: %s, hmac_key: %s", kid, hmac_key)
-        await self._run(f"register --agree-tos  -m {kid} --eab-kid {kid} --eab-hmac-key={hmac_key}")
+        kid = _email_from_request(request, self.ca._c.eab.type, self.ca._c.eab.header)
+
+        async with self.ca._db.session() as session:
+            cred = await self.ca._eab_store.create(session, kid, str(request.url), datetime.timedelta(3600))
+
+        self.log.debug("kid: %s, hmac_key: %s", cred.kid, cred.hmac_key)
+        await self._run(f"register --agree-tos  -m {cred.kid} --eab-kid {cred.kid} --eab-hmac-key={cred.hmac_key}")
 
     async def test_run(self):
         pass
@@ -140,7 +142,12 @@ class TestOurClientCA_EAB:
     async def test_expired(self):
         self.client.eab_credentials = self.eab_credentials
         # Change the EAB's created timestamp to expire it
-        list(self.ca._eab_store._pending.values())[0].when -= datetime.timedelta(hours=3, minutes=1)
+
+        async with self.ca._db.session() as session:
+            cred = await self.ca._db.get_eab(session, self.eab_credentials[0])
+            cred.expires_at = cred.created_at - datetime.timedelta(3600)
+            session.add(cred)
+            await session.commit()
 
         with self.assertRaisesRegex(acme.messages.Error, "urn:ietf:params:acme:error:unauthorized"):
             await self.client.start()
@@ -164,9 +171,10 @@ class TestOurClientCA_EAB_CERT(TestOurClientCA_EAB, TestOurClientCA):
             url=yarl.URL("http://localhost:8000/eab"),
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
-        self.client.eab_credentials = self.eab_credentials = self.ca._eab_store.create(
-            request, self.ca._c.eab.type, self.ca._c.eab.header, self.ca._c.eab.expires_after
-        )
+        kid = _email_from_request(request, self.ca._c.eab.type, self.ca._c.eab.header)
+        async with self.ca._db.session() as session:
+            creds = await self.ca._eab_store.create(session, kid, str(request.url), datetime.timedelta(seconds=3600))
+        self.client.eab_credentials = self.eab_credentials = (creds.kid, creds.hmac_key)
         self.log.debug("kid: %s, hmac_key: %s", self.eab_credentials[0], self.eab_credentials[1])
 
 
@@ -179,7 +187,8 @@ class TestOurClientCA_EAB_EMAIL(TestOurClientCA_EAB, TestOurClientCA):
             url=yarl.URL("http://localhost:8000/eab"),
             app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
         )
-        self.client.eab_credentials = self.eab_credentials = self.ca._eab_store.create(
-            request, self.ca._c.eab.type, self.ca._c.eab.header, self.ca._c.eab.expires_after
-        )
+        kid = _email_from_request(request, self.ca._c.eab.type, self.ca._c.eab.header)
+        async with self.ca._db.session() as session:
+            creds = await self.ca._eab_store.create(session, kid, str(request.url), datetime.timedelta(seconds=3600))
+        self.client.eab_credentials = self.eab_credentials = (creds.kid, creds.hmac_key)
         self.log.debug("kid: %s, hmac_key: %s", self.eab_credentials[0], self.eab_credentials[1])
