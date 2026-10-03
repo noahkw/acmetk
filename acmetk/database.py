@@ -16,7 +16,7 @@ from acmetk.models import (
     Authorization,
     Challenge,
     Certificate,
-    EABCredential,
+    ExternalAccountBinding,
 )
 from acmetk.models.base import Base
 
@@ -310,6 +310,6 @@ class Database:
 
     @staticmethod
     async def get_eab(session: AsyncSession, kid):
-        statement = select(EABCredential).filter(kid == kid)
+        statement = select(ExternalAccountBinding).filter(kid == kid)
         result = (await session.execute(statement)).first()
         return result[0] if result else None

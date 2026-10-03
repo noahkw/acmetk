@@ -5,7 +5,7 @@ from .identifier import Identifier, IdentifierType
 from .order import Order, OrderStatus
 from .account import Account, AccountStatus
 from .base import Change
-from .eab import EABCredential
+from .eab import ExternalAccountBinding
 
 __all__ = [
     "Account",
@@ -22,5 +22,5 @@ __all__ = [
     "Order",
     "OrderStatus",
     "Change",
-    "EABCredential",
+    "ExternalAccountBinding",
 ]

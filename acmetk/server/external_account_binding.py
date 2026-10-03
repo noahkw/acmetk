@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from pydantic_settings import BaseSettings
 from pydantic import Field
 
-from acmetk.models.eab import EABCredential
+from acmetk.models.eab import ExternalAccountBinding
 from acmetk.server.routes import routes
 from acmetk.util import url_for, forwarded_url
 
@@ -32,7 +32,7 @@ class ExternalAccountBindingStore:
     def __init__(self, db: "acmetk.database.Database"):
         self._db = db
 
-    async def create(self, kid: str, url: str, lifetime: datetime.timedelta) -> EABCredential:
+    async def create(self, kid: str, url: str, lifetime: datetime.timedelta) -> ExternalAccountBinding:
         """Mints (or refreshes) an EAB credential for the given kid.
 
         If a non-expired credential already exists for this kid, return it as-is.
@@ -49,7 +49,7 @@ class ExternalAccountBindingStore:
                 await session.delete(existing)
                 await session.flush()
 
-            cred = EABCredential.create(kid, url, lifetime)
+            cred = ExternalAccountBinding.create(kid, url, lifetime)
             session.add(cred)
             await session.commit()
             return await self._db.get_eab(session, kid)

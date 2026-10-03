@@ -22,23 +22,22 @@ depends_on = None
 
 def upgrade():
     op.create_table(
-        "eab_credentials",
+        "externalaccountbindings",
         sa.Column("kid", sa.String(64), nullable=False),
         sa.Column("url", sa.String(128), nullable=False),
         sa.Column("hmac_key", sa.String(64), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("consumed_at", sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint("kid"),
     )
     op.create_index(
-        op.f("ix_eab_credentials_expires_at"),
-        "eab_credentials",
+        op.f("ix_externalaccountbindings_expires_at"),
+        "externalaccountbindings",
         ["expires_at"],
         unique=False,
     )
 
 
 def downgrade():
-    op.drop_index(op.f("ix_eab_credentials_expires_at"), table_name="eab_credentials")
-    op.drop_table("eab_credentials")
+    op.drop_index(op.f("ix_externalaccountbindings_expires_at"), table_name="externalaccountbindings")
+    op.drop_table("externalaccountbindings")

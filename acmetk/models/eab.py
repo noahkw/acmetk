@@ -13,7 +13,7 @@ from sqlalchemy import Column, String, DateTime
 from .base import Base
 
 
-class EABCredential(Base):
+class ExternalAccountBinding(Base):
     """Represents an external account binding.
 
     `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_
@@ -23,7 +23,7 @@ class EABCredential(Base):
     invalidate outstanding EAB enrolments.
     """
 
-    __tablename__ = "eab_credentials"
+    __tablename__ = "externalaccountbindings"
 
     kid = Column(String(64), primary_key=True)
     """Key identifier — typically the host's contact email (e.g. host@goldenhelix.com)."""
@@ -40,7 +40,7 @@ class EABCredential(Base):
     """When this credential expires. After this point, /new-account will reject the EAB."""
 
     @classmethod
-    def create(cls, kid: str, url: str, lifetime: datetime.timedelta) -> "EABCredential":
+    def create(cls, kid: str, url: str, lifetime: datetime.timedelta) -> "ExternalAccountBinding":
         """Create a fresh credential with a random HMAC key. Caller must add() + commit().
         :param url:
         """
