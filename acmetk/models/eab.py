@@ -1,14 +1,11 @@
-"""EAB credential persistence — pre-minted by admin (Ansible), looked up at registration time."""
-
 import datetime
-import secrets
 
 import acme.jws
 import josepy
 import josepy.b64
 import josepy.jwk
 import josepy.jwa
-from sqlalchemy import Column, String, DateTime
+from sqlalchemy import Column, String, DateTime, Interval
 
 from .base import Base
 
@@ -18,9 +15,6 @@ class ExternalAccountBinding(Base):
 
     `7.3.4. External Account Binding <https://tools.ietf.org/html/rfc8555#section-7.3.4>`_
 
-    Can be pre-minted by an admin (e.g. Ansible during host provisioning) or by the
-    self-service `/eab` endpoint. Persisted to postgres so a broker restart does not
-    invalidate outstanding EAB enrolments.
     """
 
     __tablename__ = "externalaccountbindings"
@@ -34,27 +28,13 @@ class ExternalAccountBinding(Base):
     """URL-safe base64 HMAC key shared with the client. Used to sign the EAB JWS at /new-account."""
 
     created_at = Column(DateTime(timezone=True), nullable=False)
-    """When this credential was minted."""
+    """When this credential was created."""
 
-    expires_at = Column(DateTime(timezone=True), nullable=False)
-    """When this credential expires. After this point, /new-account will reject the EAB."""
-
-    @classmethod
-    def create(cls, kid: str, url: str, lifetime: datetime.timedelta) -> "ExternalAccountBinding":
-        """Create a fresh credential with a random HMAC key. Caller must add() + commit().
-        :param url:
-        """
-        now = datetime.datetime.now(datetime.timezone.utc)
-        return cls(
-            kid=kid,
-            url=url,
-            hmac_key=secrets.token_urlsafe(32),
-            created_at=now,
-            expires_at=now + lifetime,
-        )
+    lifetime = Column(Interval(), nullable=False)
+    """Lifetime of this credential"""
 
     def expired(self) -> bool:
-        return datetime.datetime.now(datetime.timezone.utc) >= self.expires_at
+        return datetime.datetime.now(datetime.timezone.utc) >= (self.created_at + self.lifetime)
 
     def _eab(self, key_json) -> acme.jws.JWS:
         decoded_hmac_key = josepy.b64.b64decode(self.hmac_key)

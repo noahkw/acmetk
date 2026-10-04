@@ -27,7 +27,7 @@ def upgrade():
         sa.Column("url", sa.String(128), nullable=False),
         sa.Column("hmac_key", sa.String(64), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("lifetime", sa.Interval(), nullable=False),
         sa.PrimaryKeyConstraint("kid"),
     )
     op.create_index(
