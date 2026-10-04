@@ -2,6 +2,7 @@ import datetime
 import json
 import typing
 import urllib.parse
+import secrets
 
 import acme.jws
 import acme.messages
@@ -49,7 +50,14 @@ class ExternalAccountBindingStore:
                 await session.delete(existing)
                 await session.flush()
 
-            cred = ExternalAccountBinding.create(kid, url, lifetime)
+            cred = ExternalAccountBinding(
+                kid=kid,
+                url=url,
+                hmac_key=secrets.token_urlsafe(32),
+                created_at=datetime.datetime.now(datetime.timezone.utc),
+                lifetime=lifetime,
+            )
+
             session.add(cred)
             await session.commit()
             return await self._db.get_eab(session, kid)
@@ -255,5 +263,5 @@ class AcmeEABMixin:
         except ValueError as e:
             raise aiohttp.web.HTTPBadRequest(text=str(e))
 
-        cred = await self._eab_store.create(kid, "", "")
+        cred = await self._eab_store.create(kid, url_for(request, "new-account"), self.__c.expires_after)
         return {"kid": cred.kid, "hmac_key": cred.hmac_key}

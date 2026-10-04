@@ -61,7 +61,8 @@ tests = [
     "trustme",
     "coverage",
     "pytest",
-    "pytest-asyncio"
+    "pytest-asyncio",
+    "html5lib"
 ]
 
 [tool.pdm]

@@ -2,20 +2,20 @@ import datetime
 import json
 import urllib.parse
 import unittest
-from unittest.mock import Mock
+import html5lib
 
 import josepy
-import yarl
 
 import acme.messages
 
+import aiohttp
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives import serialization
 
-from acmetk.server.external_account_binding import ExternalAccountBindingStore, _email_from_request
+from acmetk.server.external_account_binding import ExternalAccountBindingStore
 from tests.test_ca import TestCertBotCA, TestOurClientCA
 
 
@@ -76,6 +76,19 @@ class TestEAB(unittest.IsolatedAsyncioTestCase):
         assert await self.eab_store.verify(kid, v)
 
 
+async def get_eab(header, value) -> tuple[str, str]:
+    async with aiohttp.ClientSession() as session:
+        v = await session.get("http://localhost:8000/eab", headers={header: value})
+        data = await v.content.read()
+
+    document = html5lib.parse(data, treebuilder="etree", namespaceHTMLElements=False)
+
+    kid = document.find("./body/p/input[@id='kid']").attrib["value"]
+    hmac_key = document.find("./body/p/input[@id='hmac_key']").attrib["value"]
+
+    return kid, hmac_key
+
+
 class TestCertbotCA_EAB(TestCertBotCA):
     @property
     def config_sec(self):
@@ -86,21 +99,12 @@ class TestCertbotCA_EAB(TestCertBotCA):
 
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
-        self.ca._c.eab.type = "plain"
+        self.eab_credentials = await get_eab(self.ca._c.eab.header, self.contact)
 
     async def test_register(self):
-        request = Mock(
-            headers={self.ca._c.eab.header: self.contact},
-            url=yarl.URL("http://localhost:8000/eab"),
-            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
-        )
-
-        kid = _email_from_request(request, self.ca._c.eab.type, self.ca._c.eab.header)
-
-        cred = await self.ca._eab_store.create(kid, str(request.url), datetime.timedelta(3600))
-
-        self.log.debug("kid: %s, hmac_key: %s", cred.kid, cred.hmac_key)
-        await self._run(f"register --agree-tos  -m {cred.kid} --eab-kid {cred.kid} --eab-hmac-key={cred.hmac_key}")
+        kid, hmac_key = self.eab_credentials
+        self.log.debug("kid: %s, hmac_key: %s", kid, hmac_key)
+        await self._run(f"register --agree-tos  -m {kid} --eab-kid {kid} --eab-hmac-key={hmac_key}")
 
     async def test_run(self):
         pass
@@ -138,12 +142,11 @@ class TestOurClientCA_EAB:
         await self.client.start()
 
     async def test_expired(self):
-        self.client.eab_credentials = self.eab_credentials
         # Change the EAB's created timestamp to expire it
 
         async with self.ca._db.session() as session:
-            cred = await self.ca._db.get_eab(session, self.eab_credentials[0])
-            cred.expires_at = cred.created_at - datetime.timedelta(3600)
+            cred = await self.ca._db.get_eab(session, self.client.eab_credentials.kid)
+            cred.lifetime = datetime.timedelta(seconds=0)
             session.add(cred)
             await session.commit()
 
@@ -164,27 +167,16 @@ class TestOurClientCA_EAB_CERT(TestOurClientCA_EAB, TestOurClientCA):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
         self.ca._c.eab.type = "x509"
-        request = Mock(
-            headers={self.ca._c.eab.header: generate_x509_client_cert(self.client._contact["email"])},
-            url=yarl.URL("http://localhost:8000/eab"),
-            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
+        self.eab_credentials = self.client.eab_credentials = await get_eab(
+            self.ca._c.eab.header, generate_x509_client_cert(self.client._contact["email"])
         )
-        kid = _email_from_request(request, self.ca._c.eab.type, self.ca._c.eab.header)
-        creds = await self.ca._eab_store.create(kid, str(request.url), datetime.timedelta(seconds=3600))
-        self.client.eab_credentials = self.eab_credentials = (creds.kid, creds.hmac_key)
-        self.log.debug("kid: %s, hmac_key: %s", self.eab_credentials[0], self.eab_credentials[1])
 
 
 class TestOurClientCA_EAB_EMAIL(TestOurClientCA_EAB, TestOurClientCA):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
         self.ca._c.eab.type = "plain"
-        request = Mock(
-            headers={self.ca._c.eab.header: self.client._contact["email"]},
-            url=yarl.URL("http://localhost:8000/eab"),
-            app=Mock(router={"new-account": Mock(url_for=lambda: "new-account")}),
-        )
-        kid = _email_from_request(request, self.ca._c.eab.type, self.ca._c.eab.header)
-        creds = await self.ca._eab_store.create(kid, str(request.url), datetime.timedelta(seconds=3600))
-        self.client.eab_credentials = self.eab_credentials = (creds.kid, creds.hmac_key)
-        self.log.debug("kid: %s, hmac_key: %s", self.eab_credentials[0], self.eab_credentials[1])
+        self.eab_credentials = self.client.eab_credentials = await get_eab(self.ca._c.eab.header, self.contact)
+
+    async def test_run(self):
+        await super().test_run()
