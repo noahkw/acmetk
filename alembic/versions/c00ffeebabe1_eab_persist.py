@@ -30,14 +30,7 @@ def upgrade():
         sa.Column("lifetime", sa.Interval(), nullable=False),
         sa.PrimaryKeyConstraint("kid"),
     )
-    op.create_index(
-        op.f("ix_externalaccountbindings_expires_at"),
-        "externalaccountbindings",
-        ["expires_at"],
-        unique=False,
-    )
 
 
 def downgrade():
-    op.drop_index(op.f("ix_externalaccountbindings_expires_at"), table_name="externalaccountbindings")
     op.drop_table("externalaccountbindings")
