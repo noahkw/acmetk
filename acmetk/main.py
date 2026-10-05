@@ -224,46 +224,61 @@ def drop(connection_string: str, password: str):
 
 @main.group()
 def eab():
-    """EAB credential management — pre-mint server-side for Ansible-driven enrolment."""
+    """EAB credential management — pre-provision server-side for devops enrolment."""
     pass
 
 
-@eab.command("mint")
+@eab.command("provision")
 @click.argument("connection-string", type=click.STRING)
-@click.option("--password", type=click.STRING, prompt=True, hide_input=True)
-@click.option("--email", "kid", type=click.STRING, required=True,
-              help="The kid (typically the host contact email, e.g. host@goldenhelix.com).")
-@click.option("--lifetime-hours", type=click.INT, default=24*365,
-              help="How long the EAB pair stays valid (default: 1 year).")
-def eab_mint(connection_string: str, password: str, kid: str, lifetime_hours: int):
-    """Mint a fresh EAB pair (kid + hmac_key) and persist it to the broker DB.
+@click.option(
+    "--email",
+    "kid",
+    type=click.STRING,
+    required=True,
+    help="The kid (typically the host contact email, e.g. admin@example.org).",
+)
+@click.option(
+    "--url",
+    "url",
+    type=click.STRING,
+    required=True,
+    help="The services /new-account URL. e.g. https://acme.example.org/new-account",
+)
+@click.option(
+    "--lifetime-hours", type=click.INT, default=24 * 365, help="How long the EAB pair stays valid (default: 1 year)."
+)
+def eab_provision(connection_string: str, kid: str, url: str, lifetime_hours: int):
+    """Provision a fresh EAB pair (kid + hmac_key) and persist it to the broker DB.
 
     Prints the kid and hmac_key in a single line: KID HMAC_KEY — easy to capture from Ansible.
     """
     import datetime
-    from acmetk.models.eab import EABCredential
+    import secrets
+    from acmetk.models.eab import ExternalAccountBinding
 
-    db = Database(connection_string.format(password))
-    cred = EABCredential.mint(kid, datetime.timedelta(hours=lifetime_hours))
-
-    # Capture attribute values now (plain Python attrs from cls.mint())
-    # so we do not access them after session.commit() expires the instance.
-    out_kid, out_hmac = cred.kid, cred.hmac_key
+    db = Database(connection_string)
+    hmac_key = secrets.token_urlsafe(32)
+    cred = ExternalAccountBinding(
+        kid=kid,
+        url=url,
+        hmac_key=hmac_key,
+        created_at=datetime.datetime.now(),
+        lifetime=datetime.timedelta(hours=lifetime_hours),
+    )
 
     async def _go():
         async with db.session() as session:
-            existing = await session.get(EABCredential, kid)
+            existing = await db.get_eab(session, kid)
             if existing is not None:
                 await session.delete(existing)
                 await session.flush()
             session.add(cred)
             await session.commit()
-        return out_kid, out_hmac
 
     loop = asyncio.get_event_loop()
-    out_kid, out_hmac = loop.run_until_complete(_go())
-    # Output format: KID HMAC_KEY on stdout (single line, no logging chatter).
-    click.echo(f"{out_kid} {out_hmac}")
+    loop.run_until_complete(_go())
+
+    click.echo(f"{kid} {hmac_key}")
 
 
 if __name__ == "__main__":
