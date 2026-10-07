@@ -310,6 +310,6 @@ class Database:
 
     @staticmethod
     async def get_eab(session: AsyncSession, kid):
-        statement = select(ExternalAccountBinding).filter(kid == kid)
+        statement = select(ExternalAccountBinding).filter(ExternalAccountBinding.kid == kid)
         result = (await session.execute(statement)).first()
         return result[0] if result else None
