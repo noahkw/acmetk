@@ -75,6 +75,20 @@ class TestEAB(unittest.IsolatedAsyncioTestCase):
         v = cred._eab(key_json)
         assert await self.eab_store.verify(kid, v)
 
+    async def test_create_multiple(self):
+        ts = int(datetime.datetime.now().timestamp())
+        kids = [f"test+{ts}-{i}@test.test" for i in range(2)]
+        url = "https://x.org/test"
+
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        key_json = json.dumps(josepy.jwk.JWKRSA(key=key.public_key()).to_partial_json()).encode()
+
+        creds = [await self.eab_store.create(kid, url, datetime.timedelta(hours=1)) for kid in kids]
+
+        for kid, cred in zip(kids, creds):
+            assert cred.kid == kid
+            assert await self.eab_store.verify(kid, cred._eab(key_json))
+
 
 async def get_eab(header, value) -> tuple[str, str]:
     async with aiohttp.ClientSession() as session:
