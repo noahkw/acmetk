@@ -216,7 +216,6 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
         try:
             #            provider.domain = await self._find_domain_id(provider, name)
             with lexicon.client.Client(cfg) as ops:
-                assert ops.provider.zone is not None, ops.provider.zone
                 assert ops.provider.domain
                 await self.delete_txt_record(ops, name, text)
         except Exception as e:
