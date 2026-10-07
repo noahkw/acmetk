@@ -753,6 +753,8 @@ class AcmeClient:
                 return await self._make_request(payload, url)
             except acme.messages.Error as e:
                 if e.code == "badNonce" and tries > 1:
+                    # the other cached nonces are likely stale as well
+                    self._nonces.clear()
                     tries -= 1
                     continue
                 raise e
