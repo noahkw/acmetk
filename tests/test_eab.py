@@ -36,8 +36,8 @@ def generate_x509_client_cert(email):
         .issuer_name(issuer)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.datetime.utcnow())
-        .not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=2))
+        .not_valid_before(datetime.datetime.now(tz=datetime.UTC))
+        .not_valid_after(datetime.datetime.now(tz=datetime.UTC) + datetime.timedelta(days=2))
         .add_extension(
             x509.SubjectAlternativeName([x509.RFC822Name(email)]),
             critical=False,
@@ -62,7 +62,7 @@ class TestEAB(unittest.IsolatedAsyncioTestCase):
         self.eab_store = ExternalAccountBindingStore(self._db)
 
     async def test_create(self):
-        kid = f"test+{int(datetime.datetime.now().timestamp())}@test.test"
+        kid = f"test+{int(datetime.datetime.now(tz=datetime.UTC).timestamp())}@test.test"
         url = "https://x.org/test"
 
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -75,7 +75,7 @@ class TestEAB(unittest.IsolatedAsyncioTestCase):
         assert await self.eab_store.verify(kid, v)
 
     async def test_create_multiple(self):
-        ts = int(datetime.datetime.now().timestamp())
+        ts = int(datetime.datetime.now(tz=datetime.UTC).timestamp())
         kids = [f"test+{ts}-{i}@test.test" for i in range(2)]
         url = "https://x.org/test"
 
