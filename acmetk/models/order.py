@@ -1,37 +1,37 @@
 import enum
 import typing
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
+import aiohttp.web
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from sqlalchemy import (
     Column,
-    Enum,
     DateTime,
-    String,
+    Enum,
     ForeignKey,
-    LargeBinary,
-    TypeDecorator,
     Integer,
+    LargeBinary,
+    String,
+    TypeDecorator,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-import aiohttp.web
-
-from .authorization import AuthorizationStatus, Authorization
-from .base import Serializer, Entity, AcmeErrorType
+from ..util import names_of, url_for
+from .authorization import Authorization, AuthorizationStatus
+from .base import AcmeErrorType, Entity, Serializer
 from .challenge import Challenge
 from .identifier import Identifier
-from ..util import url_for, names_of
-
 
 if typing.TYPE_CHECKING:
-    import acmetk
     import cryptography
-    from .account import Account
+
+    import acmetk
     from acmetk.models import messages
+
+    from .account import Account
 
 
 class CSRType(TypeDecorator):
@@ -183,7 +183,7 @@ class Order(Entity, Serializer):
         if self.status != OrderStatus.PENDING:
             return self.status
 
-        if datetime.now(timezone.utc) > self.expires:
+        if datetime.now(UTC) > self.expires:
             self.status = OrderStatus.INVALID
             return self.status
 
@@ -258,7 +258,7 @@ class Order(Entity, Serializer):
             identifier.authorization.challenges = Challenge.create_types(identifier.type, challenge_types)
 
         order = Order(
-            expires=datetime.now(timezone.utc) + timedelta(days=7),
+            expires=datetime.now(UTC) + timedelta(days=7),
             status=OrderStatus.PENDING,
             account=account,
             identifiers=identifiers,

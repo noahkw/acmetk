@@ -4,7 +4,7 @@ import aiohttp.web_runner
 from yarl import URL
 
 import acmetk.util
-from acmetk import AcmeCA, AcmeBroker, AcmeProxy
+from acmetk import AcmeBroker, AcmeCA, AcmeProxy
 from acmetk.server import AcmeRelayBase, AcmeServerBase
 from acmetk.server.metrics import PrometheusMetricsMixin
 

@@ -1,5 +1,5 @@
-from acmetk.server.challenge_validator import ChallengeValidator
 from acmetk.plugin_base import PluginRegistry
+from acmetk.server.challenge_validator import ChallengeValidator
 
 """This module contains a template challenge validator plugin that is automatically loaded by the main CLI script.
 """

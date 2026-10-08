@@ -1,16 +1,14 @@
 import ipaddress
 import typing
+from collections.abc import Awaitable, Callable
 
 from aiohttp import web
-from pydantic import Field
-from pydantic_settings import BaseSettings
-
-from collections.abc import Callable, Awaitable
-
 from aiohttp.web_exceptions import HTTPException
 from aiohttp.web_middlewares import middleware
 from aiohttp.web_request import Request
 from aiohttp.web_response import Response
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 if typing.TYPE_CHECKING:
     import acmetk.server

@@ -3,9 +3,9 @@ import datetime
 import acme.jws
 import josepy
 import josepy.b64
-import josepy.jwk
 import josepy.jwa
-from sqlalchemy import Column, String, DateTime, Interval
+import josepy.jwk
+from sqlalchemy import Column, DateTime, Interval, String
 
 from .base import Base
 
@@ -34,7 +34,7 @@ class ExternalAccountBinding(Base):
     """Lifetime of this credential"""
 
     def expired(self) -> bool:
-        return datetime.datetime.now(datetime.timezone.utc) >= (self.created_at + self.lifetime)
+        return datetime.datetime.now(datetime.UTC) >= (self.created_at + self.lifetime)
 
     def _eab(self, key_json) -> acme.jws.JWS:
         decoded_hmac_key = josepy.b64.b64decode(self.hmac_key)

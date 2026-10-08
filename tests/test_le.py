@@ -1,7 +1,7 @@
 import asyncio
 import logging
-import unittest
 import logging.config
+import unittest
 
 import acme.messages
 
@@ -9,7 +9,6 @@ import acmetk.util
 from acmetk.client import (
     AcmeClient,
 )
-
 from tests.test_ca import TestAcme
 
 log = logging.getLogger("acmetk.test_le")

@@ -14,14 +14,14 @@ from acmetk.client import ChallengeSolver
 from acmetk.database import Database
 from acmetk.plugin_base import PluginRegistry
 from acmetk.server import (
-    AcmeServerBase,
-    AcmeRelayBase,
+    AcmeBroker,
     AcmeCA,
     AcmeProxy,
-    AcmeBroker,
+    AcmeRelayBase,
+    AcmeServerBase,
     ChallengeValidator,
 )
-from acmetk.util import generate_root_cert, generate_rsa_key, generate_ec_key
+from acmetk.util import generate_ec_key, generate_root_cert, generate_rsa_key
 
 logger = logging.getLogger(__name__)
 
@@ -100,9 +100,10 @@ def generate_account_key(account_key_file, key_type):
 
 
 def alembic_run(config: AcmeServerBase.Config) -> None:
-    from alembic.config import Config as alembic_Config
-    from alembic import command
     import yarl
+    from alembic.config import Config as alembic_Config
+
+    from alembic import command
 
     cfg = alembic_Config((base := Path(__file__).parent.parent) / "alembic.ini")
     cfg.set_main_option("script_location", str(base / "alembic"))
@@ -177,7 +178,6 @@ async def run_app(service_cls: type[AcmeServerBase | AcmeRelayBase], config: Acm
 @main.group()
 def db():
     """Commands to interact with the database."""
-    pass
 
 
 @db.command()
@@ -225,7 +225,6 @@ def drop(connection_string: str, password: str):
 @main.group()
 def eab():
     """EAB credential management — pre-provision server-side for devops enrolment."""
-    pass
 
 
 @eab.command("provision")
@@ -254,6 +253,7 @@ def eab_provision(connection_string: str, kid: str, url: str, lifetime_hours: in
     """
     import datetime
     import secrets
+
     from acmetk.models.eab import ExternalAccountBinding
 
     db = Database(connection_string)

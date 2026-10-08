@@ -5,17 +5,16 @@ import acme.messages
 import asyncpg
 from sqlalchemy import (
     Column,
-    Integer,
-    String,
-    ForeignKey,
     DateTime,
-    TypeDecorator,
+    ForeignKey,
+    Integer,
     MetaData,
+    String,
+    TypeDecorator,
 )
 from sqlalchemy.dialects.postgresql import INET, JSONB
-from sqlalchemy.orm import declarative_base
 from sqlalchemy.inspection import inspect
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import declarative_base, relationship
 
 if typing.TYPE_CHECKING:
     import aiohttp.web

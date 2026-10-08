@@ -1,14 +1,15 @@
+import acme.messages
 import pytest
 
-import acme.messages
-
 from acmetk.util import CertID
+
 from .clients import acmetkClient
 
 
 def test_RenewalInfo():
-    from acmetk.models.messages import RenewalInfo
     import datetime
+
+    from acmetk.models.messages import RenewalInfo
 
     data = {"suggestedWindow": dict(end="2025-03-01T08:53:18Z", start="2025-02-19T08:53:18Z")}
     ri = RenewalInfo.from_json(data)
@@ -55,5 +56,3 @@ async def test_ourclient_ari(tmp_path_factory, service):
     with pytest.raises(acme.messages.Error, match="urn:ietf:params:acme:error:serverInternal"):
         csr = acmetk.util.generate_csr("localhost.org", cert_key, client.tmpdir / "csr.pem", ["localhost.org"])
         await client.order(csr, replaces=CertID.from_cert(crt).identifier)
-
-    return

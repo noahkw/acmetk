@@ -7,18 +7,19 @@ import uuid
 import acme.messages
 import josepy
 from cryptography.hazmat.primitives import serialization
-from sqlalchemy import Column, Enum, String, types, JSON, Integer, ForeignKey
+from sqlalchemy import JSON, Column, Enum, ForeignKey, Integer, String, types
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from .base import Serializer, Entity
+from ..util import names_of, url_for
+from .base import Entity, Serializer
 from .order import OrderStatus
-from ..util import url_for, names_of
 
 if typing.TYPE_CHECKING:
-    import acmetk
-    import cryptography
     import aiohttp.web
+    import cryptography
+
+    import acmetk
 
 
 class AccountStatus(str, enum.Enum):

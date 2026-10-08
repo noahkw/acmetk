@@ -1,17 +1,16 @@
 import asyncio
-import logging
 import functools
+import logging
 import typing
 
 import acme.messages
 import josepy.jwk
-
 from pydantic import Field
 
-from acmetk.client.exceptions import CouldNotCompleteChallenge
 from acmetk.client.challenge_solver import ChallengeSolver
-from acmetk.util import DNS01ChallengeHelper
+from acmetk.client.exceptions import CouldNotCompleteChallenge
 from acmetk.plugin_base import PluginRegistry
+from acmetk.util import DNS01ChallengeHelper
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +150,7 @@ class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
         # Poll the DNS until the correct record is available
         try:
             await asyncio.wait_for(self._query_until_completed(name, text), self.__c.polling_timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise CouldNotCompleteChallenge(
                 challenge,
                 acme.messages.Error(

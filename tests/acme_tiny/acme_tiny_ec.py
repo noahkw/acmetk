@@ -14,9 +14,9 @@ import textwrap
 import time
 
 try:
-    from urllib.request import urlopen, Request  # Python 3
+    from urllib.request import Request, urlopen  # Python 3
 except ImportError:
-    from urllib2 import urlopen, Request  # Python 2
+    from urllib2 import Request, urlopen  # Python 2
 
 DEFAULT_CA = "https://acme-v02.api.letsencrypt.org"  # DEPRECATED! USE DEFAULT_DIRECTORY_URL INSTEAD
 DEFAULT_DIRECTORY_URL = "https://acme-v02.api.letsencrypt.org/directory"
@@ -285,8 +285,7 @@ def get_crt(
 def main(argv=None):
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent(
-            """\
+        description=textwrap.dedent("""\
             This script automates the process of getting a signed TLS certificate from Let's Encrypt using
             the ACME protocol. It will need to be run on your server and have access to your private
             account key, so PLEASE READ THROUGH IT! It's only ~200 lines, so it won't take long.
@@ -299,8 +298,7 @@ def main(argv=None):
             0 0 1 * * python /path/to/acme_tiny.py --account-key /path/to/account.key \
             --csr /path/to/domain.csr --acme-dir /usr/share/nginx/html/.well-known/acme-challenge/ > \
             /path/to/signed_chain.crt 2>> /var/log/acme_tiny.log
-            """
-        ),
+            """),
     )
     parser.add_argument(
         "--account-key",

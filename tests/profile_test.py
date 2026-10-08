@@ -1,10 +1,11 @@
-from yarl import URL
 import pytest
 import pytest_asyncio
+from yarl import URL
 
-from acmetk.server import DummyValidator, AcmeCA
-from .services import CAService
+from acmetk.server import AcmeCA, DummyValidator
+
 from .clients import acmetkClient
+from .services import CAService
 
 
 @pytest_asyncio.fixture

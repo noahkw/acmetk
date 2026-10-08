@@ -1,19 +1,16 @@
 import datetime
 import json
-import urllib.parse
 import unittest
-import html5lib
-
-import josepy
+import urllib.parse
 
 import acme.messages
-
 import aiohttp
-from cryptography.hazmat.primitives.asymmetric import rsa
+import html5lib
+import josepy
 from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives import serialization
 
 from acmetk.server.external_account_binding import ExternalAccountBindingStore
 from tests.test_ca import TestCertBotCA, TestOurClientCA
@@ -54,8 +51,10 @@ def generate_x509_client_cert(email):
 class TestEAB(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         super().setUp()
-        import yaml
         from pathlib import Path
+
+        import yaml
+
         from acmetk.database import Database
 
         self._config = yaml.safe_load(Path("tests/conf/debug.yml").read_text())

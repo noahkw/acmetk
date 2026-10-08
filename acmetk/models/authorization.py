@@ -1,19 +1,20 @@
 import enum
-import uuid
-from datetime import datetime, timezone, timedelta
 import typing
+import uuid
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer, Boolean
+from sqlalchemy import Boolean, Column, DateTime, Enum, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from .base import Serializer, Entity
-from .challenge import ChallengeStatus
 from ..util import url_for
+from .base import Entity, Serializer
+from .challenge import ChallengeStatus
 
 if typing.TYPE_CHECKING:
-    import acmetk.models.messages
     from sqlalchemy.ext.asyncio import AsyncSession
+
+    import acmetk.models.messages
 
 
 class AuthorizationStatus(str, enum.Enum):
@@ -126,7 +127,7 @@ class Authorization(Entity, Serializer):
 
         :return: *True* iff the authorization has expired.
         """
-        return datetime.now(timezone.utc) > self.expires
+        return datetime.now(UTC) > self.expires
 
     def update(self, upd: "acmetk.models.messages.AuthorizationUpdate"):
         """Updates the authoziation's status.
@@ -200,7 +201,7 @@ class Authorization(Entity, Serializer):
         return cls(
             status=AuthorizationStatus.PENDING,
             wildcard=identifier.value.startswith("*"),
-            expires=datetime.now(timezone.utc) + timedelta(days=7),
+            expires=datetime.now(UTC) + timedelta(days=7),
         )
 
     @property

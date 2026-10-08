@@ -49,7 +49,6 @@ class ChallengeSolver(abc.ABC):
         :raises: :class:`~acmetk.client.exceptions.CouldNotCompleteChallenge`
             If the challenge completion attempt failed.
         """
-        pass
 
     @abc.abstractmethod
     async def cleanup_challenge(
@@ -72,7 +71,6 @@ class ChallengeSolver(abc.ABC):
         :param identifier: The identifier that is associated with the challenge.
         :param challenge: The challenge to clean up after.
         """
-        pass
 
 
 @PluginRegistry.register_plugin("dummy")

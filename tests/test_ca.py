@@ -4,10 +4,10 @@ import logging
 import logging.config
 import shlex
 import shutil
+import sys
 import unittest
 import unittest.mock
 from pathlib import Path
-import sys
 
 import acme.messages
 import yaml
@@ -190,22 +190,20 @@ class TestDehydrated:
                 r.mkdir()
 
         with open(str(self.path / "config"), "w") as f:
-            f.write(
-                f"""
+            f.write(f"""
 KEY_ALGO={self.key_algo}
 CA={self.DIRECTORY}
 CONTACT_EMAIL={self.contact}
 IP_VERSION=4
 CHALLENGETYPE="http-01"
-#DOMAINS_D={str(self.path / "domains_d")}
+#DOMAINS_D={self.path / "domains_d"!s}
 #BASEDIR=$SCRIPTDIR
 #DOMAINS_TXT="${{BASEDIR}}/domains.txt"
 #CERTDIR="${{BASEDIR}}/certs"
 #ALPNCERTDIR="${{BASEDIR}}/alpn-certs"
 #ACCOUNTDIR="${{BASEDIR}}/accounts"
-WELLKNOWN="{str(self.path / "wellknown")}"
-"""
-            )
+WELLKNOWN="{self.path / "wellknown"!s}"
+""")
 
     async def _run_dehydrated(self, _cmd):
         cmd = f"/tmp/dehydrated/dehydrated --config {self.path}/config {_cmd}"
@@ -345,10 +343,10 @@ class TestCertBot:
             f"--config-dir ./{self.path}/etc/letsencrypt "
             f"--server {self.DIRECTORY} " + cmd
         )
+        import certbot._internal.error_handler
+        import certbot._internal.log
         import certbot._internal.main as cbm
         import certbot.util
-        import certbot._internal.log
-        import certbot._internal.error_handler
 
         certbot.util.atexit_register = lambda func, *argv, **kwargs: log.info(
             f"patched certbot.util.atexit_register for {func}"
@@ -745,7 +743,6 @@ class TestCertBotWCCA(TestCertBot, TestCA, unittest.IsolatedAsyncioTestCase):
 
     async def test_subdomain_revocation(self):
         "avoid Requesting a certificate for dns.*.test.de"
-        pass
 
     async def test_run(self):
         self.assertTrue(self.ca._allow_wildcard)
@@ -822,9 +819,10 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
         self.assertEqual(r[True], 100)
 
     def _test_invalid_p521(self):
-        from acme import jws
-        import josepy
         import math
+
+        import josepy
+        from acme import jws
 
         self._make_key(
             kp := self.client_data.key_path.parent / "keychange-invalid-p521.key",

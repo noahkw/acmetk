@@ -1,14 +1,14 @@
+import importlib
 import logging
 import unittest
-import importlib
 from unittest import mock
+
 import acme.messages
+from lexicon.exceptions import AuthenticationError
 
 from acmetk import AcmeProxy
-from tests.test_broker import TestBrokerLocalCA, TestBrokerLE
-from tests.test_ca import TestAcmetiny, TestOurClient, TestOurClientStress, TestCertBot
-
-from lexicon.exceptions import AuthenticationError
+from tests.test_broker import TestBrokerLE, TestBrokerLocalCA
+from tests.test_ca import TestAcmetiny, TestCertBot, TestOurClient, TestOurClientStress
 
 log = logging.getLogger("acmetk.test_proxy")
 
@@ -47,7 +47,6 @@ class TestCertBotWCProxyLocalCA(TestCertBot, TestProxyLocalCA, unittest.Isolated
 
     async def test_subdomain_revocation(self):
         "avoid Requesting a certificate for dns.*.test.de"
-        pass
 
     async def test_bad_identifier(self):
         await super().test_bad_identifier()
@@ -143,20 +142,20 @@ class TestOurClientProxyLocalCALexicon(TestOurClient, TestProxyLocalCA, unittest
                 from types import ModuleType
 
                 module = ModuleType("lexicon.providers.fakeprovider")
-                setattr(module, "Provider", TestOurClientProxyLocalCALexicon.FakeProvider)
+                module.Provider = TestOurClientProxyLocalCALexicon.FakeProvider
                 return module
             return original_import(module_name)
 
         m = mock.patch(
             "acmetk.plugins.lexicon_solver.importlib.import_module",
-            **{"side_effect": return_import},
+            side_effect=return_import,
         )
         self.mocks.append(m)
         m.start()
 
         m = mock.patch(
             "acmetk.plugins.lexicon_solver.LexiconChallengeSolver.query_txt_record",
-            **{"return_value": TestOurClientProxyLocalCALexicon.FakeProvider.CONTENTS},
+            return_value=TestOurClientProxyLocalCALexicon.FakeProvider.CONTENTS,
         )
         self.mocks.append(m)
         m.start()

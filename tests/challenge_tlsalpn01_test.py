@@ -5,7 +5,6 @@ import logging
 import ssl
 import time
 
-from yarl import URL
 import acme.messages
 import josepy
 import pytest
@@ -20,15 +19,15 @@ from cryptography.hazmat.primitives.serialization import (
     PrivateFormat,
 )
 from cryptography.x509 import NameOID
+from yarl import URL
 
 import acmetk.util
 from acmetk.client.challenge_solver import ChallengeSolver, ChallengeType
-from acmetk.server.challenge_validator import TLSALPN01ChallengeValidator
 from acmetk.server import AcmeCA
+from acmetk.server.challenge_validator import TLSALPN01ChallengeValidator
 
-from .services import CAService
 from .clients import acmetkClient
-
+from .services import CAService
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -76,7 +75,7 @@ class Service:
             .issuer_name(issuer)
             .public_key(key.public_key())
             .serial_number(x509.random_serial_number())
-            .not_valid_before(now := datetime.datetime.now(datetime.timezone.utc))
+            .not_valid_before(now := datetime.datetime.now(datetime.UTC))
             .not_valid_after(now + datetime.timedelta(days=1))
             .add_extension(
                 x509.SubjectAlternativeName([x509.DNSName(name)]),
@@ -115,7 +114,6 @@ class Service:
             client.context = ctx
         except Exception as e:
             log.exception(e)
-        return
 
     async def run(self):
         self.runner = web.AppRunner(self.app)
