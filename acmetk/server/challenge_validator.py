@@ -164,7 +164,7 @@ class TLSALPN01ChallengeValidator(ChallengeValidator):
             ctx.verify_mode = ssl.CERT_NONE
             logger.debug("Connecting to %s:%d", identifier, self._port)
 
-            reader, writer = await asyncio.wait_for(asyncio.open_connection(identifier, self._port, ssl=ctx), 20)
+            _reader, writer = await asyncio.wait_for(asyncio.open_connection(identifier, self._port, ssl=ctx), 20)
 
             cert: x509.Certificate = x509.load_der_x509_certificate(
                 writer.get_extra_info("ssl_object").getpeercert(binary_form=True)
@@ -238,7 +238,7 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
 
         with contextlib.suppress(dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer):
             resp = await dns.asyncresolver.resolve(name, type_)
-            resolved_ips.extend([ipaddress.ip_address(record.address) for record in resp.rrset.items.keys()])
+            resolved_ips.extend([ipaddress.ip_address(record.address) for record in resp.rrset.items])
 
         return resolved_ips
 

@@ -161,7 +161,7 @@ def run(
     else:
         click.echo(f"Starting {app_class.__name__}")
 
-    runner, site = loop.run_until_complete(run_app(app_class, app_cfg))
+    runner, _site = loop.run_until_complete(run_app(app_class, app_cfg))
 
     try:
         loop.run_forever()

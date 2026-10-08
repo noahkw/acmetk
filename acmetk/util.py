@@ -90,7 +90,7 @@ class DNS01ChallengeHelper:
         with contextlib.suppress(dns.asyncresolver.NXDOMAIN, dns.asyncresolver.NoAnswer):
             resp = await resolver.resolve(name, "TXT")
 
-            for records in resp.rrset.items.keys():
+            for records in resp.rrset.items:
                 txt_records.extend([record.decode() for record in records.strings])
 
         return resolver.nameservers[0], set(txt_records)
@@ -130,8 +130,8 @@ def generate_csr(CN: str, private_key: rsa.RSAPrivateKey, path: Path, sans: list
     :param names: The requested names in the CSR.
     :return: The generated CSR.
     """
-    addresses = list()
-    names = list()
+    addresses = []
+    names = []
     for i in sans:
         try:
             addresses.append(ipaddress.ip_address(i))
@@ -479,7 +479,7 @@ class PerformanceMeasurementSystem:
 
     @property
     def sum(self):
-        return sum(map(lambda x: x.duration, self.measuring_points))
+        return sum(x.duration for x in self.measuring_points)
 
     @property
     def duration(self):

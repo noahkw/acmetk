@@ -11,7 +11,7 @@ def test_RenewalInfo():
 
     from acmetk.models.messages import RenewalInfo
 
-    data = {"suggestedWindow": dict(end="2025-03-01T08:53:18Z", start="2025-02-19T08:53:18Z")}
+    data = {"suggestedWindow": {"end": "2025-03-01T08:53:18Z", "start": "2025-02-19T08:53:18Z"}}
     ri = RenewalInfo.from_json(data)
     assert isinstance(ri.suggestedWindow.start, datetime.datetime)
 

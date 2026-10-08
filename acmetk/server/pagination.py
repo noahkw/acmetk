@@ -41,7 +41,7 @@ class Page:
         if self.has_next:
             self.next_page = page + 1
         self.total = total
-        self.pages = int(math.ceil(total / float(page_size)))
+        self.pages = math.ceil(total / float(page_size))
         self.current_page = page
 
 
@@ -83,6 +83,6 @@ async def paginate(session, request, query, by="limit", total=-1, pms=None) -> P
 
     except Exception as e:
         print(e)
-        raise e
+        raise
 
     return Page(items, page, page_size, total)

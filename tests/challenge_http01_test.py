@@ -29,7 +29,7 @@ class HTTP01Service:
                 web.get("/.well-known/acme-challenge/{token}", self.handle_acme_challenge),
             ]
         )
-        self.sessions: dict[str, bytes] = dict()
+        self.sessions: dict[str, bytes] = {}
 
     async def handle_acme_challenge(self, request):
         token = request.match_info["token"]
@@ -100,7 +100,7 @@ async def test_ourclient_http01(tmp_path_factory, unused_tcp_port_factory, http0
             token = challenge.chall.encode("token")
             del http01.sessions[token]
 
-    client.client._challenge_solvers = dict()
+    client.client._challenge_solvers = {}
     client.client.register_challenge_solver(HTTP01Solver(HTTP01Solver.Config()))
 
     await client.register()
@@ -131,7 +131,7 @@ async def test_ourclient_http01(tmp_path_factory, unused_tcp_port_factory, http0
             token = challenge.chall.encode("token")
             del http01.sessions[token]
 
-    client.client._challenge_solvers = dict()
+    client.client._challenge_solvers = {}
     client.client.register_challenge_solver(BadHTTP01Solver(HTTP01Solver.Config()))
 
     with pytest.raises(acmetk.client.exceptions.CouldNotCompleteChallenge):

@@ -4,7 +4,6 @@ import logging
 import logging.config
 import shlex
 import shutil
-import sys
 import unittest
 import unittest.mock
 from pathlib import Path
@@ -273,7 +272,7 @@ class Testacmesh:
             llog(r, log.info)
 
     async def test_run(self):
-        key, csr, path = self.client_data
+        _key, csr, _path = self.client_data
         await self._run(f"""--register-account --accountemail {self.contact}""")
         domains = " ".join([f"--domain {d}" for d in acmetk.util.names_of(csr)])
         await self._run(f"""--issue {domains} --webroot {self.path}/www/ --force""")
@@ -295,7 +294,7 @@ class TestCertBot:
         self._rmtree.extend(["etc"])
 
         self.domains = sorted(
-            map(lambda x: x.lower(), acmetk.util.names_of(self.client_data.csr)),
+            (x.lower() for x in acmetk.util.names_of(self.client_data.csr)),
             key=lambda s: s[::-1],
         )
 
@@ -311,16 +310,14 @@ class TestCertBot:
 
     def _manual_auth(self):
         authhook = "\t" + "\n\t".join(
-            map(
-                lambda s: f"CERTBOT_{s}=$CERTBOT_{s}",
-                [
-                    "DOMAIN",
-                    "VALIDATION",
-                    "TOKEN",
-                    "REMAINING_CHALLENGES",
-                    "ALL_DOMAINS",
-                ],
-            )
+            f"CERTBOT_{s}=$CERTBOT_{s}"
+            for s in [
+                "DOMAIN",
+                "VALIDATION",
+                "TOKEN",
+                "REMAINING_CHALLENGES",
+                "ALL_DOMAINS",
+            ]
         )
         return f'--manual --manual-auth-hook "echo \\"{authhook}\\"" --manual-cleanup-hook /bin/true '
 
@@ -377,8 +374,8 @@ class TestCertBot:
 
         await self._certonly()
 
-        await self._certonly("--expand", names=list(map(lambda s: f"dns.{s}", self.domains)))
-        await self._certonly("--expand", names=list(map(lambda s: f"http.{s}", self.domains)))
+        await self._certonly("--expand", names=[f"dns.{s}" for s in self.domains])
+        await self._certonly("--expand", names=[f"http.{s}" for s in self.domains])
 
         for j in ["", "dns.", "http."]:
             try:
@@ -461,7 +458,7 @@ class TestOurClient:
         super().setUp()
 
         self.domains = sorted(
-            map(lambda x: x.lower(), acmetk.util.names_of(self.client_data.csr)),
+            (x.lower() for x in acmetk.util.names_of(self.client_data.csr)),
             key=lambda s: s[::-1],
         )
 
@@ -498,7 +495,7 @@ class TestOurClient:
             await client.start()
 
         domains = sorted(
-            map(lambda x: x.lower(), acmetk.util.names_of(csr)),
+            (x.lower() for x in acmetk.util.names_of(csr)),
             key=lambda s: s[::-1],
         )
 
@@ -578,7 +575,7 @@ class TestOurClient:
         await client.start()
 
         domains = sorted(
-            map(lambda x: x.lower(), acmetk.util.names_of(csr)),
+            (x.lower() for x in acmetk.util.names_of(csr)),
             key=lambda s: s[::-1],
         )
 
@@ -600,8 +597,6 @@ class TestOurClient:
 
 class TestOurClientStress(TestOurClient):
     async def test_run_stress(self):
-        if sys.version_info < (3, 11):
-            return
         # TaskGroups are >= 3.11
         clients_csr = []  # (client, csr) tuples
         async with asyncio.TaskGroup() as tg:

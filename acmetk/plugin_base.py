@@ -10,10 +10,10 @@ class PluginRegistry:
     Plugins that are derived from a base class are stored in that base class's registry.
     """
 
-    _registry_map = dict()
+    _registry_map = {}
 
     def __init__(self):
-        self._subclasses = dict()
+        self._subclasses = {}
 
     @classmethod
     def load_plugins(cls, path: str) -> None:

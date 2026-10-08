@@ -627,7 +627,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
                     continue
 
                 # The contact URL contains an email address, validate it.
-                if self._mail_suffixes and not any([address.endswith(suffix) for suffix in self._mail_suffixes]):
+                if self._mail_suffixes and not any(address.endswith(suffix) for suffix in self._mail_suffixes):
                     raise acme.messages.Error.with_code(
                         "invalidContact",
                         detail=f"The contact email '{address}' is not supported.",
@@ -651,54 +651,34 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
             for k, identifiers in identifiers_.items():
                 if k == models.IdentifierType.DNS:
                     # wildcard
-                    if self._allow_wildcard is False and True in set(
-                        map(
-                            lambda identifier: identifier.value.startswith("*"),
-                            identifiers,
-                        )
-                    ):
+                    if self._allow_wildcard is False and True in {
+                        identifier.value.startswith("*") for identifier in identifiers
+                    }:
                         raise ValueError("The ACME server can not issue a wildcard certificate")
                     if wildcardonly:
                         return
 
                     # idna decoding xn-- …
                     try:
-                        list(
-                            map(
-                                lambda identifier: identifier.value.encode("ascii").decode("idna"),
-                                identifiers,
-                            )
-                        )
+                        [identifier.value.encode("ascii").decode("idna") for identifier in identifiers]
                     except UnicodeError:
                         raise ValueError("Domain name contains malformed punycode")
 
                     # not lowercase
-                    r = set(
-                        map(
-                            lambda identifier: identifier.value.lower() == identifier.value,
-                            identifiers,
-                        )
-                    )
+                    r = {identifier.value.lower() == identifier.value for identifier in identifiers}
                     if False in r:
                         raise ValueError("Domain name is not lowercase")
 
                     # regex
-                    r = set(
-                        map(
-                            lambda identifier: self.VALID_DOMAIN_RE.match(identifier.value.lstrip("*.")) is not None,
-                            identifiers,
-                        )
-                    )
+                    r = {
+                        self.VALID_DOMAIN_RE.match(identifier.value.lstrip("*.")) is not None
+                        for identifier in identifiers
+                    }
                     if False in r:
                         raise ValueError("Domain name contains an invalid character")
 
                     # ends with a letter
-                    r = set(
-                        map(
-                            lambda identifier: identifier.value[-1] in string.ascii_lowercase,
-                            identifiers,
-                        )
-                    )
+                    r = {identifier.value[-1] in string.ascii_lowercase for identifier in identifiers}
                     if False in r:
                         raise ValueError("Domain name does not end with a valid public suffix (TLD)")
                 elif k == "ip":
@@ -978,7 +958,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
 
         :return: The authorization object.
         """
-        headers = dict()
+        headers = {}
         async with self._session(request) as session:
             jws, account = await self._verify_request(request, session)
             authz_id = request.match_info["id"]
@@ -1016,7 +996,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
 
         validate_challenge = True
         async with self._session(request) as session:
-            jws, account = await self._verify_request(request, session)
+            _jws, account = await self._verify_request(request, session)
             challenge_id = request.match_info["id"]
 
             challenge = await self._db.get_challenge(session, account.account_id, challenge_id)
@@ -1076,7 +1056,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         :return: The order object.
         """
         async with self._session(request) as session:
-            jws, account = await self._verify_request(request, session, post_as_get=True)
+            _jws, account = await self._verify_request(request, session, post_as_get=True)
             order_id = request.match_info["id"]
 
             order: models.order.Order = await self._db.get_order(session, account.account_id, order_id)
@@ -1084,7 +1064,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
                 raise web.HTTPNotFound
 
             await order.validate()
-            headers = dict()
+            headers = {}
             if order.status == models.OrderStatus.PROCESSING:
                 """
                 7.4.  Applying for Certificate Issuance
@@ -1106,7 +1086,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         :return: An object with key *orders* that holds a chunk of the account's orders list.
         """
         async with self._session(request) as session:
-            jws, account = await self._verify_request(request, session, post_as_get=True)
+            _jws, account = await self._verify_request(request, session, post_as_get=True)
             try:
                 cursor = int(request.query.get("cursor", 0))
                 orders = await self._db.get_orders_list(session, account.account_id, self.ORDERS_LIST_CHUNK_LEN, cursor)
@@ -1415,7 +1395,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         """Attach the actual host IP to the request for re-use in the handler."""
         request["actual_ip"] = host_ip
 
-        if self._subnets and not any([host_ip in subnet for subnet in self._subnets]):
+        if self._subnets and not any(host_ip in subnet for subnet in self._subnets):
             return web.Response(
                 status=403,
                 text=f"{type(self).__name__}: This service is only available from within certain networks."
@@ -1542,7 +1522,7 @@ class AcmeCA(AcmeServerBase):
     # @routes.post("/certificate/{id}", name="certificate")
     async def certificate(self, request: web.Request) -> web.Response:
         async with self._session(request) as session:
-            jws, account = await self._verify_request(request, session, post_as_get=True)
+            _jws, account = await self._verify_request(request, session, post_as_get=True)
             certificate_id = request.match_info["id"]
 
             certificate = await self._db.get_certificate(session, account.account_id, certificate_id)
@@ -1612,7 +1592,7 @@ class AcmeRelayBase(AcmeServerBase):
         :return: The certificate's full chain in PEM format.
         """
         async with self._session(request) as session:
-            jws, account = await self._verify_request(request, session, post_as_get=True)
+            _jws, account = await self._verify_request(request, session, post_as_get=True)
             certificate_id = request.match_info["id"]
 
             certificate = await self._db.get_certificate(session, account.account_id, certificate_id)
@@ -1792,7 +1772,7 @@ class AcmeProxy(AcmeRelayBase):
             self._verify_order(obj, wildcardonly=True)
             identifiers = [{"type": identifier.typ, "value": identifier.value} for identifier in obj.identifiers]
 
-            location, order_ca = await self._client.order_create(
+            location, _order_ca = await self._client.order_create(
                 identifiers,
                 replaces=obj.replaces,
                 profile=obj.profile,

@@ -34,7 +34,7 @@ Base = declarative_base(metadata=meta)
 
 
 def __repr__(self):
-    attrs = [attr for attr in inspect(self).attrs.keys() if not issubclass(type(getattr(self, attr)), Base)]
+    attrs = [attr for attr in inspect(self).attrs if not issubclass(type(getattr(self, attr)), Base)]
     attrs_repr = [f"{attr}={getattr(self, attr)}" for attr in attrs]
     return f"<{type(self).__name__}=({','.join(attrs_repr)})>"
 
@@ -85,12 +85,12 @@ class AcmeErrorType(TypeDecorator):
 
 class Serializer:
     __serialize__ = []
-    __type_serializers__: dict[type, typing.Callable[[], None]] = dict()
+    __type_serializers__: dict[type, typing.Callable[[], None]] = {}
 
     def serialize(self, request: typing.Optional["aiohttp.web.Request"] = None):
         return {
             c: self._serialize_value(getattr(self, c))
-            for c in inspect(self).attrs.keys()
+            for c in inspect(self).attrs
             if c in self.__serialize__ and getattr(self, c) is not None
         }
 

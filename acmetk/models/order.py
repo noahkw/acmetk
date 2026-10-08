@@ -235,7 +235,7 @@ class Order(Entity, Serializer):
         account: "acmetk.models.account.Account",
         obj: "messages.NewOrder",
         challenge_types: typing.Iterable["acmetk.models.challenge.ChallengeType"],
-        proxied_url: str = None,
+        proxied_url: str | None = None,
     ) -> "Order":
         """A factory that constructs a new :class:`Order` from a message object.
 

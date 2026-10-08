@@ -51,13 +51,13 @@ class TestClient:
 
     def domains_of_csr(self, csr) -> list[str]:
         domains = sorted(
-            map(lambda x: x.lower(), acmetk.util.names_of(csr)),
+            (x.lower() for x in acmetk.util.names_of(csr)),
             key=lambda s: s[::-1],
         )
         return domains
 
     def identifiers_from_names(self, names):
-        identifiers = list()
+        identifiers = []
         for name in names:
             try:
                 ipaddress.ip_address(name)
@@ -152,16 +152,14 @@ class certbotClient(TestClient):
 
     async def _certonly(self, csr, *argv, preferred_challenges="dns"):
         authhook = "\t" + "\n\t".join(
-            map(
-                lambda s: f"CERTBOT_{s}=$CERTBOT_{s}",
-                [
-                    "DOMAIN",
-                    "VALIDATION",
-                    "TOKEN",
-                    "REMAINING_CHALLENGES",
-                    "ALL_DOMAINS",
-                ],
-            )
+            f"CERTBOT_{s}=$CERTBOT_{s}"
+            for s in [
+                "DOMAIN",
+                "VALIDATION",
+                "TOKEN",
+                "REMAINING_CHALLENGES",
+                "ALL_DOMAINS",
+            ]
         )
 
         domains = " --domain ".join(self.domains_of_csr(csr))
@@ -213,8 +211,8 @@ class certbotClient(TestClient):
 
         await self._certonly()
 
-        await self._certonly("--expand", names=list(map(lambda s: f"dns.{s}", self.domains)))
-        await self._certonly("--expand", names=list(map(lambda s: f"http.{s}", self.domains)))
+        await self._certonly("--expand", names=[f"dns.{s}" for s in self.domains])
+        await self._certonly("--expand", names=[f"http.{s}" for s in self.domains])
 
         for j in ["", "dns.", "http."]:
             try:
@@ -416,7 +414,7 @@ WELLKNOWN="{self.tmpdir / "wellknown"!s}"
         #            await asyncio.sleep(1)
         proc = await asyncio.create_subprocess_shell(cmd, stdout=asyncio.subprocess.PIPE)
 
-        stdout, stderr = await proc.communicate()
+        stdout, _stderr = await proc.communicate()
 
         for r in stdout.splitlines():
             self.log.info(r.decode().strip())

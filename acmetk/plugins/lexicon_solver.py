@@ -84,10 +84,10 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
                 continue
             except (LexiconError, HTTPError) as e0:
                 logger.warning("lexicon failed with %s", str(e0))
-                raise e0
+                raise
             except Exception as e1:
                 logger.warning("lexicon failed with %s", str(e1))
-                raise e1
+                raise
         raise ValueError(f"Unable to determine zone identifier for {domain} using zone names: {domain_name_guesses}")
 
     async def set_txt_record(
