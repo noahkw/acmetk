@@ -52,3 +52,12 @@ repos:
     hooks:
       - id: pyupgrade
         args: [--py310-plus]
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.12.17
+    hooks:
+      # Update the uv lockfile
+      - id: uv-lock
+      - id: uv-export
+        args: ["--no-dev", "--no-hashes", "--no-editable", "-o", "requirements.txt"]
