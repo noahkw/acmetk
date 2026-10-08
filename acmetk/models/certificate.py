@@ -3,21 +3,22 @@ import uuid
 
 import cryptography
 from sqlalchemy import (
+    CheckConstraint,
     Column,
     Enum,
     ForeignKey,
-    LargeBinary,
-    TypeDecorator,
     Integer,
-    Text,
-    CheckConstraint,
+    LargeBinary,
     String,
+    Text,
+    TypeDecorator,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 from acmetk.models.messages import RevocationReason
-from .base import Serializer, Entity
+
+from .base import Entity, Serializer
 
 
 class x509Certificate(TypeDecorator):

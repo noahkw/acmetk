@@ -1,35 +1,31 @@
 import asyncio
+import dataclasses
 import logging
 import ssl
 import typing
-import dataclasses
+from collections.abc import Awaitable, Callable
+from typing import Any, TypeVar
 
 import acme.messages
 import josepy
 from acme import jws
 from acme.challenges import UnrecognizedChallenge
-from aiohttp import ClientSession, ClientResponseError, ClientResponse
-from cryptography.hazmat.primitives.asymmetric import rsa, ec
-
+from aiohttp import ClientResponse, ClientResponseError, ClientSession
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from pydantic import Field
-from typing import Any, TypeVar
-from collections.abc import Awaitable, Callable
-
 from pydantic_settings import BaseSettings
 
 import acmetk.util
-from acmetk.client.challenge_solver import DummySolver, ChallengeSolver
-from acmetk.client.exceptions import PollingException, CouldNotCompleteChallenge
-
-from acmetk.models import messages, ChallengeType
-from acmetk.version import __version__
+from acmetk.client.challenge_solver import ChallengeSolver, DummySolver
+from acmetk.client.exceptions import CouldNotCompleteChallenge, PollingException
+from acmetk.models import ChallengeType, messages
 from acmetk.plugin_base import PluginRegistry
 
 # sphinx looses all docstrings for the file when looking up the solvers from the plugin registry dynamically
 from acmetk.plugins.infoblox_solver import InfobloxClient
-from acmetk.plugins.rfc2136_solver import RFC2136Client
 from acmetk.plugins.lexicon_solver import LexiconChallengeSolver
-
+from acmetk.plugins.rfc2136_solver import RFC2136Client
+from acmetk.version import __version__
 
 if typing.TYPE_CHECKING:
     import cryptography.x509

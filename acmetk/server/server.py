@@ -14,44 +14,41 @@ import types
 import typing
 import uuid
 from email.utils import parseaddr
-
 from typing import TypeVar, Union
 
 import acme.jws
 import acme.messages
 import aiohttp_jinja2
 import josepy
+import pydantic
 import yarl
 from aiohttp import web
 from aiohttp.helpers import sentinel
 from aiohttp.web_middlewares import middleware
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, ec
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
-
+from pydantic import Field
+from pydantic_settings import BaseSettings
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
-import pydantic
-from pydantic import Field
-from pydantic_settings import BaseSettings
-
 import acmetk.util
-from acmetk.server.metrics import PrometheusMetricsMixin
-from acmetk.util import CertID
 from acmetk import models
-from acmetk.models import messages
-from acmetk.client import CouldNotCompleteChallenge, AcmeClientException, AcmeClient
+from acmetk.client import AcmeClient, AcmeClientException, CouldNotCompleteChallenge
 from acmetk.database import Database
+from acmetk.models import messages
+from acmetk.plugin_base import PluginRegistry
 from acmetk.server import ChallengeValidator
 from acmetk.server.base import ServiceBase
 from acmetk.server.external_account_binding import AcmeEABMixin
 from acmetk.server.management import AcmeManagementMixin
+from acmetk.server.metrics import PrometheusMetricsMixin
 from acmetk.server.routes import routes
+from acmetk.util import CertID
 from acmetk.version import __version__
-from acmetk.plugin_base import PluginRegistry
 
 ConfigMixinTypeT = TypeVar("ConfigMixinTypeT")
 
@@ -331,7 +328,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
     def _match_keysize(self, public_key, what):
         for key_type, key_size in self._keysize[what].items():
             if isinstance(public_key, key_type):
-                (low, high) = key_size
+                low, high = key_size
                 break
         else:
             raise ValueError("This key type is not supported.")
@@ -1233,7 +1230,6 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         :raises: :class:`aiohttp.web.HTTPNotFound` If the certificate does not exist.
         :return: The certificate's full chain in PEM format.
         """
-        pass
 
     async def _handle_challenge_validate(self, request: web.Request, account_id, challenge_id) -> None:
         logger.debug("Validating challenge %s", challenge_id)
@@ -1350,7 +1346,7 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
             cert: x509.Certificate = c.cert
 
         tw = cert.not_valid_after_utc - cert.not_valid_before_utc
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         start = cert.not_valid_before_utc + (tw / 3)
         end = cert.not_valid_before_utc + (tw / 3) * 2
 
@@ -1388,7 +1384,6 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         :param account_id: The account's id
         :param order_id: The order's id
         """
-        pass
 
     @middleware
     async def host_ip_middleware(self, request: web.Request, handler):
@@ -1880,7 +1875,7 @@ class AcmeProxy(AcmeRelayBase):
                 Thus, we handle that case here and set the order's status to invalid
                 if the CA takes too long."""
                 await asyncio.wait_for(self._client.order_finalize(order_ca, csr), 120.0)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.info(f"finalize_order timeout for order {order.order_id}")
                 order.status = models.OrderStatus.INVALID
                 raise acme.messages.Error.with_code(

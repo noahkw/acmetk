@@ -6,7 +6,7 @@ import trustme
 
 from acmetk import AcmeCA
 from acmetk.server import RequestIPDNSChallengeValidator
-from tests.test_ca import TestAcmetiny, TestAcme, TestOurClient, TestCertBot
+from tests.test_ca import TestAcme, TestAcmetiny, TestCertBot, TestOurClient
 
 
 class TestDeployment(TestAcme):

@@ -3,7 +3,8 @@ import pytest_asyncio
 
 from acmetk.server import AcmeCA
 from acmetk.server.metrics import PrometheusMetricsMixin
-from .services import CAService, BrokerService, ProxyService
+
+from .services import BrokerService, CAService, ProxyService
 
 
 def pytest_generate_tests(metafunc):

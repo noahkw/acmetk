@@ -13,7 +13,6 @@ import acmetk.models.base
 import acmetk.models.order
 import acmetk.models.certificate
 
-
 # revision identifiers, used by Alembic.
 revision = "9a65b93bfa0a"
 down_revision = "24004ca7a5ea"

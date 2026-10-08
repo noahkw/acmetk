@@ -1,22 +1,22 @@
 import datetime
 import enum
+import logging
 import typing
 import uuid
-import logging
 
-
-from sqlalchemy import Column, Enum, DateTime, ForeignKey, Integer
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, Integer
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
 import acmetk.server.challenge_validator
-from .base import Serializer, Entity, AcmeErrorType
+
+from ..util import base64url, url_for
+from .base import AcmeErrorType, Entity, Serializer
 from .identifier import IdentifierType
-from ..util import url_for, base64url
 
 if typing.TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncSession
     from aiohttp.web import Request
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +170,7 @@ class Challenge(Entity, Serializer):
 
         if self.status in (ChallengeStatus.PENDING, ChallengeStatus.PROCESSING):
             self.status = ChallengeStatus.VALID
-            self.validated = datetime.datetime.now(datetime.timezone.utc)
+            self.validated = datetime.datetime.now(datetime.UTC)
 
         await self.authorization.validate(session)
         return self.status

@@ -1,5 +1,4 @@
 import aiohttp
-
 import pytest
 
 

@@ -1,13 +1,11 @@
 from pathlib import Path
-import yaml
 
 import pydantic
-
 import pytest
-
-from acmetk.main import Config
+import yaml
 
 import acmetk.plugins.rfc2136_solver
+from acmetk.main import Config
 from acmetk.plugin_base import PluginRegistry
 
 PluginRegistry.load_plugins(r"plugins")

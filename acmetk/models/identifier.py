@@ -1,11 +1,11 @@
 import enum
 
 import acme.messages
-from sqlalchemy import Column, Enum, Integer, ForeignKey, String
+from sqlalchemy import Column, Enum, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 
-from .base import Serializer, Entity
+from .base import Entity, Serializer
 
 
 class IdentifierType(str, enum.Enum):

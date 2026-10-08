@@ -9,12 +9,11 @@ from yarl import URL
 
 import acmetk.util
 from acmetk.client.challenge_solver import ChallengeSolver, ChallengeType
-from acmetk.server.challenge_validator import Http01ChallengeValidator
 from acmetk.server import AcmeCA
+from acmetk.server.challenge_validator import Http01ChallengeValidator
 
-from .services import CAService
 from .clients import acmetkClient
-
+from .services import CAService
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)

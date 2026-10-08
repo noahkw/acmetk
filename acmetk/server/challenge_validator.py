@@ -12,11 +12,11 @@ import typing
 
 import acme.messages
 import aiohttp.web
-from cryptography import x509
 import dns.asyncresolver
 import yarl
+from cryptography import x509
 
-from acmetk.models import ChallengeType, Challenge
+from acmetk.models import Challenge, ChallengeType
 from acmetk.plugin_base import PluginRegistry
 from acmetk.util import DNS01ChallengeHelper
 
@@ -61,7 +61,6 @@ class ChallengeValidator(abc.ABC):
         :param challenge: The challenge to be validated
         :raises: :class:`CouldNotValidateChallenge` If the validation failed
         """
-        pass
 
 
 @PluginRegistry.register_plugin("http01")
@@ -120,7 +119,7 @@ class Http01ChallengeValidator(ChallengeValidator):
             raise
         except Exception as e:
             logger.exception(e)
-            raise CouldNotValidateChallenge(detail=f"Validation of challenge {challenge.challenge_id} failed; {str(e)}")
+            raise CouldNotValidateChallenge(detail=f"Validation of challenge {challenge.challenge_id} failed; {e!s}")
 
 
 @PluginRegistry.register_plugin("tlsalpn01")

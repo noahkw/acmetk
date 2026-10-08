@@ -13,8 +13,9 @@ from acmetk.models.account import AccountStatus
 from acmetk.models.authorization import AuthorizationStatus
 
 if typing.TYPE_CHECKING:
-    import cryptography
     import datetime
+
+    import cryptography
 
 ERROR_CODES = {
     "alreadyReplaced": "The request specified a predecessor certificate that has already been marked as replaced ",
@@ -293,8 +294,8 @@ try:
     # https://github.com/certbot/certbot/issues/10274
 except ImportError:
     from acme.challenges import (
-        ChallengeResponse,
         Challenge,
+        ChallengeResponse,
         KeyAuthorizationChallenge,
         KeyAuthorizationChallengeResponse,
     )

@@ -4,8 +4,6 @@ import acme.messages
 class AcmeClientException(Exception):
     """General ACME client exception."""
 
-    pass
-
 
 class CouldNotCompleteChallenge(AcmeClientException):
     """Exception that is raised if completion of a specific challenge failed."""

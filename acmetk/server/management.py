@@ -1,34 +1,33 @@
 import collections
 import typing
 
+import aiohttp.web
 import aiohttp_jinja2
 import cryptography
+import jinja2
 import sqlalchemy
-import sqlalchemy.ext.asyncio
 import sqlalchemy.dialects.postgresql
+import sqlalchemy.ext.asyncio
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload, defer, defaultload
+from sqlalchemy.orm import defaultload, defer, selectinload
 from sqlalchemy.sql import text
-import jinja2
-
-import aiohttp.web
-
 
 from acmetk.models import (
-    Change,
     Account,
-    Order,
-    Identifier,
+    Authorization,
     Certificate,
     Challenge,
-    Authorization,
+    Change,
+    Identifier,
+    Order,
 )
 from acmetk.models.base import Entity
 from acmetk.server.base import ServiceBase
 from acmetk.server.routes import routes
 from acmetk.util import PerformanceMeasurementSystem, names_of
+
 from .pagination import paginate
 
 if typing.TYPE_CHECKING:

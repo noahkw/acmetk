@@ -3,20 +3,20 @@ import uuid
 
 import acme
 from aiohttp import web
-from sqlalchemy import select, event
+from sqlalchemy import event, select
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, selectinload, aliased, joinedload
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import aliased, joinedload, selectinload, sessionmaker
 
 from acmetk import models
 from acmetk.models import (
     Account,
+    Authorization,
+    Certificate,
+    Challenge,
+    ExternalAccountBinding,
     Identifier,
     Order,
-    Authorization,
-    Challenge,
-    Certificate,
-    ExternalAccountBinding,
 )
 from acmetk.models.base import Base
 
@@ -49,7 +49,7 @@ class versioned_sessionmaker(sessionmaker):
 def versioned_session(session):
     @event.listens_for(session.sync_session, "before_flush")
     def before_flush(session: AsyncSession, flush_context, instances) -> None:
-        now = datetime.datetime.now(datetime.timezone.utc)
+        now = datetime.datetime.now(datetime.UTC)
         for obj in session.dirty.union(session.new).union(session.deleted):
             if not hasattr(obj, "__diff__"):
                 return

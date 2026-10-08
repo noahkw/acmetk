@@ -3,9 +3,8 @@ import logging.config
 import unittest
 import uuid
 
-
-from acmetk.plugins.infoblox_solver import InfobloxClient
 from acmetk.main import load_config
+from acmetk.plugins.infoblox_solver import InfobloxClient
 
 log = logging.getLogger("acmetk.test_infoblox")
 
@@ -34,7 +33,7 @@ class TestInfobloxClient(unittest.IsolatedAsyncioTestCase):
                 self.infoblox_client._query_until_completed(test_name, text_value),
                 60.0 * 5,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.fail("Could not verify that the TXT record was set")
 
     async def test_delete_txt_record(self):
@@ -48,7 +47,7 @@ class TestInfobloxClient(unittest.IsolatedAsyncioTestCase):
                 self.infoblox_client._query_until_completed(test_name, text_value),
                 60.0 * 5,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.fail("Could not verify that the TXT record was set")
 
         await self.infoblox_client.delete_txt_record(test_name, text_value)

@@ -1,11 +1,11 @@
+from .challenge_solver import ChallengeSolver, DummySolver
 from .client import AcmeClient
-from .challenge_solver import DummySolver, ChallengeSolver
-from .exceptions import CouldNotCompleteChallenge, AcmeClientException
+from .exceptions import AcmeClientException, CouldNotCompleteChallenge
 
 __all__ = [
     "AcmeClient",
-    "DummySolver",
-    "CouldNotCompleteChallenge",
-    "ChallengeSolver",
     "AcmeClientException",
+    "ChallengeSolver",
+    "CouldNotCompleteChallenge",
+    "DummySolver",
 ]

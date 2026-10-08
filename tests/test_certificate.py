@@ -1,5 +1,6 @@
-from jinja2 import FileSystemLoader, Environment
 import cryptography
+from jinja2 import Environment, FileSystemLoader
+
 from acmetk.util import pem_split
 
 CERT_PEM = """-----BEGIN CERTIFICATE-----

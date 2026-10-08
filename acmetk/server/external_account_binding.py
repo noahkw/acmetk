@@ -1,8 +1,8 @@
 import datetime
 import json
+import secrets
 import typing
 import urllib.parse
-import secrets
 
 import acme.jws
 import acme.messages
@@ -12,12 +12,12 @@ import josepy
 from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric.ec import EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
-from pydantic_settings import BaseSettings
 from pydantic import Field
+from pydantic_settings import BaseSettings
 
 from acmetk.models.eab import ExternalAccountBinding
 from acmetk.server.routes import routes
-from acmetk.util import url_for, forwarded_url
+from acmetk.util import forwarded_url, url_for
 
 if typing.TYPE_CHECKING:
     import acmetk.server
@@ -54,7 +54,7 @@ class ExternalAccountBindingStore:
                 kid=kid,
                 url=url,
                 hmac_key=secrets.token_urlsafe(32),
-                created_at=datetime.datetime.now(datetime.timezone.utc),
+                created_at=datetime.datetime.now(datetime.UTC),
                 lifetime=lifetime,
             )
 

@@ -1,14 +1,14 @@
 import asyncio
 import ipaddress
 import logging.config
-import shlex
 import re
+import shlex
 from pathlib import Path
 
+import acme.messages
 import cryptography.hazmat.primitives.serialization
 import pytest
 
-import acme.messages
 import acmetk.util
 
 BAD_KEY_RE = (
@@ -123,8 +123,8 @@ class certbotClient(TestClient):
         self.loop = asyncio.get_running_loop()
 
     def _csr_key_args(self, csr):
-        import cryptography.hazmat.primitives.asymmetric.rsa
         import cryptography.hazmat.primitives.asymmetric.ec
+        import cryptography.hazmat.primitives.asymmetric.rsa
 
         if isinstance(
             (p := csr.public_key()),
@@ -180,10 +180,10 @@ class certbotClient(TestClient):
             f"--config-dir {self.tmpdir / 'etc' / 'letsencrypt'} "
             f"--server {self.DIRECTORY} " + cmd
         )
+        import certbot._internal.error_handler
+        import certbot._internal.log
         import certbot._internal.main as cbm
         import certbot.util
-        import certbot._internal.log
-        import certbot._internal.error_handler
 
         certbot.util.atexit_register = lambda func, *argv, **kwargs: self.log.info(
             f"patched certbot.util.atexit_register for {func}"
@@ -394,22 +394,20 @@ class dehydratedClient(TestClient):
         super().__init__(account_key, service, directory, tmpdir)
         (self.tmpdir / "wellknown").mkdir()
 
-        (self.tmpdir / "config").write_text(
-            f"""
+        (self.tmpdir / "config").write_text(f"""
 KEY_ALGO=rsa
 CA={self.DIRECTORY}
 CONTACT_EMAIL={self.contact}
 IP_VERSION=4
 CHALLENGETYPE="http-01"
-#DOMAINS_D={str(self.tmpdir / "domains_d")}
+#DOMAINS_D={self.tmpdir / "domains_d"!s}
 #BASEDIR=$SCRIPTDIR
 #DOMAINS_TXT="${{BASEDIR}}/domains.txt"
 #CERTDIR="${{BASEDIR}}/certs"
 #ALPNCERTDIR="${{BASEDIR}}/alpn-certs"
 #ACCOUNTDIR="${{BASEDIR}}/accounts"
-WELLKNOWN="{str(self.tmpdir / "wellknown")}"
-"""
-        )
+WELLKNOWN="{self.tmpdir / "wellknown"!s}"
+""")
 
     async def _run_dehydrated(self, _cmd):
         cmd = f"/tmp/dehydrated/dehydrated --config {self.tmpdir}/config {_cmd}"

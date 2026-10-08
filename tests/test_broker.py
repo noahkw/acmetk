@@ -5,14 +5,14 @@ import unittest
 from aiohttp import web
 
 import acmetk.util
-from acmetk import AcmeCA, AcmeBroker
+from acmetk import AcmeBroker, AcmeCA
 from acmetk.server import DummyValidator
 from tests.test_ca import (
-    TestCA,
     TestAcmetiny,
+    TestCA,
     TestCertBot,
-    TestOurClientStress,
     TestDehydrated,
+    TestOurClientStress,
 )
 
 log = logging.getLogger("acmetk.test_broker")

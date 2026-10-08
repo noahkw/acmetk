@@ -1,18 +1,17 @@
 import asyncio
 import logging
+import typing
 
 import acme.messages
 import dns.asyncresolver
 import dns.tsigkeyring
 import dns.update
 import josepy.jwk
-import typing
 
-
-from acmetk.client.exceptions import CouldNotCompleteChallenge
 from acmetk.client.challenge_solver import ChallengeSolver
-from acmetk.util import DNS01ChallengeHelper
+from acmetk.client.exceptions import CouldNotCompleteChallenge
 from acmetk.plugin_base import PluginRegistry
+from acmetk.util import DNS01ChallengeHelper
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +113,7 @@ class RFC2136Client(DNS01ChallengeHelper, ChallengeSolver):
         # Poll the DNS until the correct record is available
         try:
             await asyncio.wait_for(self._query_until_completed(name, text), self.__c.polling_timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise CouldNotCompleteChallenge(
                 challenge,
                 acme.messages.Error(

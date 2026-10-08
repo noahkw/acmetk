@@ -1,38 +1,33 @@
-import unittest
 import asyncio
-import re
+import json
 import logging
 import logging.config
-import warnings
+import re
 import sys
-import json
+import unittest
+import warnings
 
-from yarl import URL
 import aiohttp
 import aiohttp.web
-
 from sqlalchemy import select
 from sqlalchemy.orm import (
     selectin_polymorphic,
 )
+from yarl import URL
+
 from acmetk.models import (
     Account,
-    Order,
     Certificate,
     Identifier,
+    Order,
 )
-
 from acmetk.models.base import Entity
-from .test_broker import TestCertBotBrokerLocalCA
 
+from .test_broker import TestCertBotBrokerLocalCA
 
 log = logging.getLogger("acmetk.tests.test_mgmt")
 
 DEFAULT_NETWORK_TIMEOUT = 45
-
-if sys.version_info < (3, 11):
-    ExceptionGroup = Exception
-
 
 @unittest.skipUnless(sys.version_info >= (3, 11), "requires ExceptionGroup")
 class TestMGMT(TestCertBotBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
@@ -54,11 +49,10 @@ class TestMGMT(TestCertBotBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
         super().tearDown()
 
     async def get(self, url):
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as response:
-                self.assertEqual(response.status, 200)
-                response = await response.read()
-                return response
+        async with aiohttp.ClientSession() as session, session.get(url) as response:
+            self.assertEqual(response.status, 200)
+            response = await response.read()
+            return response
 
     async def test_dynamic(self):
         await self.test_run()
