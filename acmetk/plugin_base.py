@@ -1,4 +1,5 @@
 import logging
+import typing
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -10,7 +11,7 @@ class PluginRegistry:
     Plugins that are derived from a base class are stored in that base class's registry.
     """
 
-    _registry_map = {}
+    _registry_map: typing.ClassVar = {}
 
     def __init__(self):
         self._subclasses = {}

@@ -1,5 +1,6 @@
 import importlib
 import logging
+import typing
 import unittest
 from unittest import mock
 
@@ -70,7 +71,7 @@ class TestOurClientProxyLocalCALexicon(TestOurClient, TestProxyLocalCA, unittest
         and to have execution traces when lexicon client is invoked
         """
 
-        CONTENTS = set()
+        CONTENTS: typing.ClassVar = set()
 
         def _authenticate(self):
             print(f"Authenticate action {self.domain}")

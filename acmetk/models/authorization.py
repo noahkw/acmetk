@@ -35,7 +35,7 @@ class Authorization(Entity, Serializer):
 
     __tablename__ = "authorizations"
     __serialize__ = __diff__ = frozenset(["status", "expires", "wildcard"])
-    __mapper_args__ = {
+    __mapper_args__: typing.ClassVar = {
         "polymorphic_identity": "authorization",
     }
 

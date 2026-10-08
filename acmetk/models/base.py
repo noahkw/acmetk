@@ -49,7 +49,7 @@ class Entity(Base):
     identity = Column(String(50), index=True)
     changes = relationship("Change", backref="entity", lazy="noload")
 
-    __mapper_args__ = {"polymorphic_identity": "entity", "polymorphic_on": identity}
+    __mapper_args__: typing.ClassVar = {"polymorphic_identity": "entity", "polymorphic_on": identity}
 
 
 class Change(Base):
@@ -84,8 +84,8 @@ class AcmeErrorType(TypeDecorator):
 
 
 class Serializer:
-    __serialize__ = []
-    __type_serializers__: dict[type, typing.Callable[[], None]] = {}
+    __serialize__: typing.ClassVar = []
+    __type_serializers__: typing.ClassVar[dict[type, typing.Callable[[], None]]] = {}
 
     def serialize(self, request: typing.Optional["aiohttp.web.Request"] = None):
         return {

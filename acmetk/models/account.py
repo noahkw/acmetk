@@ -52,7 +52,7 @@ class Account(Entity, Serializer):
     __tablename__ = "accounts"
     __serialize__ = frozenset(["status", "contact"])
     __diff__ = frozenset(["status", "contact", "kid"])
-    __mapper_args__ = {
+    __mapper_args__: typing.ClassVar = {
         "polymorphic_identity": "account",
     }
 

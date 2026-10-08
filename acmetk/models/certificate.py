@@ -1,4 +1,5 @@
 import enum
+import typing
 import uuid
 
 import cryptography
@@ -73,7 +74,7 @@ class Certificate(Entity, Serializer):
     """
 
     __tablename__ = "certificates"
-    __mapper_args__ = {
+    __mapper_args__: typing.ClassVar = {
         "polymorphic_identity": "certificate",
     }
     __diff__ = frozenset(["status"])

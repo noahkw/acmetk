@@ -69,7 +69,7 @@ class Order(Entity, Serializer):
     __tablename__ = "orders"
     __serialize__ = frozenset(["status", "expires", "notBefore", "notAfter"])
     __diff__ = frozenset(["status", "expires", "notBefore", "notAfter", "proxied_url", "proxied_error"])
-    __mapper_args__ = {
+    __mapper_args__: typing.ClassVar = {
         "polymorphic_identity": "order",
     }
 
