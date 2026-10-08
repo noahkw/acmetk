@@ -78,6 +78,20 @@ packages = [
 [tool.setuptools.dynamic]
 version = {attr = "acmetk.version.__version__"}
 
+[tool.ruff.lint]
+fixable = ["ALL"]
+ignore = [
+    "E741", # ambiguous-variable-name
+    "F841", # unused-variable
+    "BLE001", # Do not catch blind exception: `Exception`
+    "B017", # Do not assert blind exception: `Exception`"
+#    "S110", # `try`-`except`-`pass` detected, consider logging the exception
+#    "TRY401", # Redundant exception object included in `logging.exception` call"
+]
+
+[tool.ruff.lint.per-file-ignores]
+"acmetk/__init__.py" = ["I001"]
+
 [tool.ruff.lint.pycodestyle]
 max-line-length = 120
 [tool.ruff]
