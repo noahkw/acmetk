@@ -32,7 +32,7 @@ class InfobloxClient(DNS01ChallengeHelper, ChallengeSolver):
     DNS TXT records in order to complete the ACME DNS-01 challenge type.
     """
 
-    DEFAULT_VIEWS = ["Extern"]
+    DEFAULT_VIEWS: typing.ClassVar = ["Extern"]
     """The views to use if none are specified during initialization."""
 
     class Config(DNS01ChallengeHelper.Config, ChallengeSolver.Config):

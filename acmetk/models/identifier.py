@@ -1,4 +1,5 @@
 import enum
+import typing
 
 import acme.messages
 from sqlalchemy import Column, Enum, ForeignKey, Integer, String
@@ -55,7 +56,7 @@ class Identifier(Entity, Serializer):
 
     __tablename__ = "identifiers"
     __serialize__ = __diff__ = frozenset(["type", "value"])
-    __mapper_args__ = {
+    __mapper_args__: typing.ClassVar = {
         "polymorphic_identity": "identifier",
     }
 

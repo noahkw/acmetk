@@ -88,7 +88,7 @@ except ImportError:
 
 
 class PrometheusMetricsMixin:
-    DEFAULT_NETWORKS = ["::1/128", "127.0.0.0/8"]
+    DEFAULT_NETWORKS: typing.ClassVar = ["::1/128", "127.0.0.0/8"]
     """default networks to allow access to /metrics from"""
 
     class Config(BaseSettings, extra="forbid"):
