@@ -17,7 +17,7 @@ dependencies = [
     "infoblox-client",
     "josepy",
     "psycopg2-binary",
-    "sqlalchemy",
+    "sqlalchemy[asyncio]",
     "pydantic-settings",
     "asyncache",
 ]
