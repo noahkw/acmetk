@@ -94,7 +94,7 @@ class AcmeManagementMixin(ServiceBase):
 
         pms = PerformanceMeasurementSystem(enable=request.query.get("pms", False))
         async with self._session(request) as session:
-            now = datetime.datetime.now()
+            now = datetime.datetime.now(tz=datetime.UTC)
             start_date = now - datetime.timedelta(days=28)
             q = (
                 select(

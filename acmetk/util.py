@@ -7,7 +7,7 @@ import ipaddress
 import logging
 import re
 import typing
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from time import perf_counter
 
@@ -262,8 +262,8 @@ def generate_cert_from_csr(
         .issuer_name(root_cert.issuer)
         .public_key(csr.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.utcnow() - timedelta(days=1))
-        .not_valid_after(datetime.utcnow() + timedelta(days=29))
+        .not_valid_before(datetime.now(tz=UTC) - timedelta(days=1))
+        .not_valid_after(datetime.now(tz=UTC) + timedelta(days=29))
         .add_extension(
             x509.SubjectAlternativeName([x509.DNSName(i) for i in names]),
             critical=False,
@@ -310,8 +310,8 @@ def generate_root_cert(
         .issuer_name(subject)
         .public_key(root_key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.utcnow())
-        .not_valid_after(datetime.utcnow() + timedelta(days=365 * 4))
+        .not_valid_before(datetime.now(tz=UTC))
+        .not_valid_after(datetime.now(tz=UTC) + timedelta(days=365 * 4))
         .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
     )
 
