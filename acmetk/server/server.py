@@ -1452,12 +1452,12 @@ class AcmeServerBase(PrometheusMetricsMixin, AcmeEABMixin, AcmeManagementMixin, 
         except web.HTTPException as error:
             raise error from None
         except Exception as unexpected_error:
-            logger.exception(unexpected_error)
+            logger.exception("handling the request failed")
             try:
                 data = await request.text()
                 logger.debug(data)
             except Exception as e:
-                logger.debug(f"body error '{e}'")
+                logger.exception("request.text() failed")
             raise web.HTTPInternalServerError(text=str(unexpected_error)) from None
         else:
             return response

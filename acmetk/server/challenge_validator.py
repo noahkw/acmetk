@@ -118,8 +118,9 @@ class Http01ChallengeValidator(ChallengeValidator):
         except CouldNotValidateChallenge:
             raise
         except Exception as e:
-            logger.exception(e)
-            raise CouldNotValidateChallenge(detail=f"Validation of challenge {challenge.challenge_id} failed; {e!s}")
+            raise CouldNotValidateChallenge(
+                detail=f"Validation of challenge {challenge.challenge_id} failed; {e!s}"
+            ) from e
 
 
 @PluginRegistry.register_plugin("tlsalpn01")
@@ -178,8 +179,9 @@ class TLSALPN01ChallengeValidator(ChallengeValidator):
             if value != expect:
                 raise ValueError((expect.hex(sep=":"), value.hex(sep=":")))
         except Exception as e:
-            logger.exception(e)
-            raise CouldNotValidateChallenge(detail=f"Validation of challenge {challenge.challenge_id} failed; {e}")
+            raise CouldNotValidateChallenge(
+                detail=f"Validation of challenge {challenge.challenge_id} failed; {e}"
+            ) from e
 
 
 @PluginRegistry.register_plugin("dns01")

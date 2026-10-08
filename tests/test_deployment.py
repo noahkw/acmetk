@@ -56,7 +56,7 @@ class TestDeployment(TestAcme):
         ssl._create_default_https_context = ssl._create_unverified_context
 
         # Disable resty-auto-ssl
-        with open("/usr/local/bin/resty-auto-ssl/dehydrated", "w") as f:
+        with open("/usr/local/bin/resty-auto-ssl/dehydrated", "w") as f:  # noqa: ASYNC230
             f.write("echo 1;")
 
         self.nginx_proc = await asyncio.create_subprocess_shell(

@@ -184,7 +184,7 @@ def db():
 def migrate():
     """Migrates the database."""
     click.echo("running migrations")
-    subprocess.run(["alembic", "upgrade", "head"])
+    subprocess.run(["alembic", "upgrade", "head"], check=False)
 
 
 @db.command()
@@ -262,7 +262,7 @@ def eab_provision(connection_string: str, kid: str, url: str, lifetime_hours: in
         kid=kid,
         url=url,
         hmac_key=hmac_key,
-        created_at=datetime.datetime.now(),
+        created_at=datetime.datetime.now(tz=datetime.UTC),
         lifetime=datetime.timedelta(hours=lifetime_hours),
     )
 
