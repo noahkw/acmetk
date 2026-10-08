@@ -71,7 +71,7 @@ jobs:
         python-version: ${{ matrix.python }}
 
     - name: Install deps
-      run: uv sync --extra dev
+      run: uv sync --dev
 
     - name: Install acme.sh ACME client
       run: |
