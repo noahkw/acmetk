@@ -54,8 +54,8 @@ metrics = [
 requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
-[tool.pdm.dev-dependencies]
-tests = [
+[dependency-groups]
+dev = [
     "acme-tiny",
     "certbot",
     "trustme",
@@ -64,15 +64,6 @@ tests = [
     "pytest-asyncio",
     "html5lib"
 ]
-
-[tool.pdm]
-plugins = [
-    "pdm-autoexport"
-]
-
-[[tool.pdm.autoexport]]
-filename = "requirements.txt"
-groups = ["default","lexicon","infoblox", "metrics"]
 
 [tool.setuptools]
 packages = [
