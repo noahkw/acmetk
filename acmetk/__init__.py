@@ -1,6 +1,7 @@
+from .server import AcmeCA, AcmeProxy, AcmeBroker
 from .client import AcmeClient
-from .plugin_base import PluginRegistry
-from .server import AcmeBroker, AcmeCA, AcmeProxy
 from .version import __version__
+from .plugin_base import PluginRegistry
 
-__all__ = ["AcmeBroker", "AcmeCA", "AcmeClient", "AcmeProxy", "PluginRegistry", "__version__"]
+__all__ = ["AcmeCA", "AcmeProxy", "AcmeBroker", "AcmeClient", "PluginRegistry"]
+__version__ = __version__
