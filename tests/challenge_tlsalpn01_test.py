@@ -113,7 +113,7 @@ class Service:
             cert.configure_cert(ctx)
             client.context = ctx
         except Exception as e:
-            log.exception(e)
+            log.exception("sni_cb failed")
 
     async def run(self):
         self.runner = web.AppRunner(self.app)

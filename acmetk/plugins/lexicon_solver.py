@@ -218,4 +218,4 @@ class LexiconChallengeSolver(DNS01ChallengeHelper, ChallengeSolver):
                 assert ops.provider.domain
                 await self.delete_txt_record(ops, name, text)
         except Exception as e:
-            logger.exception(e)
+            logger.exception("lexicon failed")

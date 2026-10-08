@@ -189,7 +189,7 @@ class AcmeClient:
                     384: josepy.jwa.ES384,
                 }[key.key._wrapped.key_size]
             else:
-                raise ValueError(f"Bad Private Key in file {private_key}")
+                raise TypeError(f"Bad Private Key in file {private_key}")
             return key, alg
 
     async def close(self):

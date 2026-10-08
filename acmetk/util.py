@@ -102,9 +102,9 @@ class DNS01ChallengeHelper:
         record_sets: dict[str, set[str]] = dict(result_set)
 
         missing = set()
-        for name, records in record_sets.items():
+        for xname, records in record_sets.items():
             if text not in records:
-                missing.add(name)
+                missing.add(xname)
 
         if missing:
             return False, missing

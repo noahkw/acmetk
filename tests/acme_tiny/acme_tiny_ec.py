@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright Daniel Roesler, under MIT license, see LICENSE at github.com/diafygi/acme-tiny
 import argparse
 import base64

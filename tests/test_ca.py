@@ -381,7 +381,7 @@ class TestCertBot:
             try:
                 await self._run(f"revoke --cert-path {self.path}/etc/letsencrypt/live/{j}{self.domains[0]}/cert.pem")
             except Exception as e:
-                log.exception(e)
+                log.exception("revoke failed")
 
     async def test_skey_revocation(self):
         await self._register()
@@ -823,7 +823,9 @@ class TestOurClientCA(TestOurClientStress, TestCA, unittest.IsolatedAsyncioTestC
             kp := self.client_data.key_path.parent / "keychange-invalid-p521.key",
             ("EC", 521),
         )
-        key = josepy.jwk.JWKEC.load(open(kp, "rb").read())
+
+        with open(kp, "rb") as f:
+            key = josepy.jwk.JWKEC.load(f.read())
 
         if math.ceil(key.key._wrapped.public_key().public_numbers().x.bit_length() / 8) != 66:
             print(key)

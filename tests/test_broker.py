@@ -168,7 +168,7 @@ class TestBrokerLE(TestBroker):
     async def asyncSetUp(self) -> None:
         await super().asyncSetUp()
 
-        with open("../infoblox") as f:
+        with open("../infoblox") as f:  # noqa: ASYNC230
             self._config["infoblox"]["password"] = f.read().strip()
 
 

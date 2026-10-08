@@ -96,7 +96,7 @@ class TestMGMT(TestCertBotBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
                                     try:
                                         v = getattr(e, f"{n}_id")
                                     except Exception as exc:
-                                        log.exception(exc)
+                                        log.exception("getattr failed")
                                         v = "1"
                                     u = base.with_path(r.canonical.format(**{n: v}))
                                     log.info(f"visit {psar} {u}")
