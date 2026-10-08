@@ -243,8 +243,8 @@ class certbotClient(TestClient):
     async def test_unregister(self):
         try:
             await self._run("unregister --agree-tos")
-        except Exception:
-            pass
+        except Exception as e:
+            self.log.exception("unregister failed")
         await self.test_register()
         await self._run("unregister --agree-tos")
 

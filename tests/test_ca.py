@@ -381,7 +381,7 @@ class TestCertBot:
             try:
                 await self._run(f"revoke --cert-path {self.path}/etc/letsencrypt/live/{j}{self.domains[0]}/cert.pem")
             except Exception as e:
-                log.exception("revoke failed")
+                self.log.exception("revoke failed")
 
     async def test_skey_revocation(self):
         await self._register()
@@ -406,8 +406,9 @@ class TestCertBot:
     async def test_unregister(self):
         try:
             await self._run("unregister --agree-tos")
-        except Exception:
-            pass
+        except Exception as e:
+            self.log.exception("unregister failed")
+
         await self.test_register()
         await self._run("unregister --agree-tos")
 
