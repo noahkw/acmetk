@@ -705,8 +705,8 @@ class AcmeClient:
                 async with self._session.head(self._directory["newNonce"], ssl=self._ssl_context) as resp:
                     logger.debug("Storing new nonce %s", resp.headers["Replay-Nonce"])
                     return resp.headers["Replay-Nonce"]
-            except Exception as e:
-                logger.exception(e)
+            except Exception:
+                logger.exception()
                 return None
 
         try:
