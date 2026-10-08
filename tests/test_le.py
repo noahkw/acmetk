@@ -24,7 +24,7 @@ class TestLE(TestAcme, unittest.IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         super().setUp()
         self.domains = sorted(
-            map(lambda x: x.lower(), acmetk.util.names_of(self.client_data.csr)),
+            (x.lower() for x in acmetk.util.names_of(self.client_data.csr)),
             key=lambda s: s[::-1],
         )
 
@@ -53,7 +53,7 @@ class TestLE(TestAcme, unittest.IsolatedAsyncioTestCase):
         await client.start()
 
         domains = sorted(
-            map(lambda x: x.lower(), acmetk.util.names_of(csr)),
+            (x.lower() for x in acmetk.util.names_of(csr)),
             key=lambda s: s[::-1],
         )
 

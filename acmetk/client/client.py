@@ -137,7 +137,7 @@ class AcmeClient:
         self._nonces = set()
         self._account = None
 
-        self._challenge_solvers = dict()
+        self._challenge_solvers = {}
         self.eab_credentials = (cfg.kid, cfg.hmac_key)
 
         solver_cfg = cfg.challenge_solver
@@ -230,10 +230,10 @@ class AcmeClient:
 
     async def account_register(
         self,
-        email: str = None,
-        phone: str = None,
-        kid: str = None,
-        hmac_key: str = None,
+        email: str | None = None,
+        phone: str | None = None,
+        kid: str | None = None,
+        hmac_key: str | None = None,
     ) -> None:
         """Registers an account with the CA.
 
@@ -323,7 +323,7 @@ class AcmeClient:
         :returns: The location, The new order.
         """
 
-        profiles = self._directory.meta.get("profiles", dict())
+        profiles = self._directory.meta.get("profiles", {})
         if profile is not None:
             if not profiles:
                 raise ValueError("Profiles are not supported {}".format(", ".join(profiles.keys())))
@@ -366,7 +366,7 @@ class AcmeClient:
 
         while True:
             try:
-                resp, order_obj = await self._signed_request(cert_req, order.finalize)
+                resp, _order_obj = await self._signed_request(cert_req, order.finalize)
                 break
             except acme.messages.Error as e:
                 # Make sure that the order is in state READY before moving on.
@@ -374,7 +374,7 @@ class AcmeClient:
                     # the Retry-After header is not accessible here
                     await asyncio.sleep(self.FINALIZE_DELAY)
                 else:
-                    raise e
+                    raise
 
         finalized = await self._poll_until(
             self.order_get,
@@ -393,7 +393,7 @@ class AcmeClient:
         :raises: :class:`aiohttp.ClientResponseError` If the order does not exist.
         :return: The fetched order.
         """
-        resp, order = await self._signed_request(None, order_url)
+        _resp, order = await self._signed_request(None, order_url)
         order["url"] = order_url
         return messages.Order.from_json(order)
 
@@ -425,7 +425,7 @@ class AcmeClient:
         :raises: :class:`aiohttp.ClientResponseError` If the authorization does not exist.
         :return: The fetched authorization.
         """
-        resp, authorization = await self._signed_request(None, authorization_url)
+        _resp, authorization = await self._signed_request(None, authorization_url)
         return acme.messages.Authorization.from_json(authorization)
 
     async def authorizations_complete(self, order: acme.messages.Order) -> None:
@@ -753,7 +753,7 @@ class AcmeClient:
                     self._nonces.clear()
                     tries -= 1
                     continue
-                raise e
+                raise
 
     async def _make_request(self, payload: str, url: str) -> tuple[ClientResponse, Any]:
         """Make a request to the ACME server.

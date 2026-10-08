@@ -184,7 +184,7 @@ def get_crt(
         log.info(f"Verifying {domain}...")
 
         # find the http-01 challenge and write the challenge file
-        challenge = [c for c in authorization["challenges"] if c["type"] == "http-01"][0]
+        challenge = next(c for c in authorization["challenges"] if c["type"] == "http-01")
         token = re.sub(r"[^A-Za-z0-9_\-]", "_", challenge["token"])
         keyauthorization = f"{token}.{thumbprint}"
         wellknown_path = os.path.join(acme_dir, token)

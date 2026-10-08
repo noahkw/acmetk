@@ -95,7 +95,7 @@ class PrometheusMetricsMixin:
         enable: bool = False
         """enable /metrics"""
         allow_from: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = Field(
-            default_factory=lambda: list([ipaddress.ip_network(i) for i in PrometheusMetricsMixin.DEFAULT_NETWORKS])
+            default_factory=lambda: [ipaddress.ip_network(i) for i in PrometheusMetricsMixin.DEFAULT_NETWORKS]
         )
         """allow accessing /metrics from these networks"""
         disable_compression: bool = False

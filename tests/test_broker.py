@@ -76,7 +76,7 @@ class TestBrokerLocalCA(TestBroker):
         await ca._db._recreate()
 
         self.config_sec["services"]["broker"]["client"].update(
-            dict(private_key=str(self.brokerclient_account_key_path), challenge_solver={"type": "dummy"})
+            {"private_key": str(self.brokerclient_account_key_path), "challenge_solver": {"type": "dummy"}}
         )
 
         broker = await self._cls.create_app(self._cls.Config(**self.config_sec["services"]["broker"]))

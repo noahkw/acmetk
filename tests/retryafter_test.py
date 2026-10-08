@@ -27,7 +27,7 @@ async def test_ourclient_retryafter(tmp_path_factory, service):
     ord_ = await client.client.order_create(identifiers)
 
     for authorization_url in ord_.authorizations:
-        resp, authorization = await client.client._signed_request(None, authorization_url)
+        resp, _authorization = await client.client._signed_request(None, authorization_url)
         assert int(resp.headers["Retry-After"]) == 3
 
     await client.client.authorizations_complete(ord_)
@@ -36,8 +36,8 @@ async def test_ourclient_retryafter(tmp_path_factory, service):
 
     cert_req = messages.CertificateRequest(csr=csr)
 
-    resp, order_obj = await client.client._signed_request(cert_req, ord_.finalize)
+    resp, _order_obj = await client.client._signed_request(cert_req, ord_.finalize)
 
     order_url = resp.headers["Location"]
-    resp, order = await client.client._signed_request(None, order_url)
+    resp, _order = await client.client._signed_request(None, order_url)
     assert int(resp.headers["Retry-After"]) == 7

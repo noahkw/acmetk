@@ -29,6 +29,7 @@ log = logging.getLogger("acmetk.tests.test_mgmt")
 
 DEFAULT_NETWORK_TIMEOUT = 45
 
+
 @unittest.skipUnless(sys.version_info >= (3, 11), "requires ExceptionGroup")
 class TestMGMT(TestCertBotBrokerLocalCA, unittest.IsolatedAsyncioTestCase):
     # class TestMGMT(TestCA, unittest.IsolatedAsyncioTestCase):

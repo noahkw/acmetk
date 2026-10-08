@@ -44,7 +44,7 @@ class Service:
                 web.get("/", self._handler),
             ]
         )
-        self.sessions: dict[str, bytes] = dict()
+        self.sessions: dict[str, bytes] = {}
 
     def _dehydrated_alpn_cert(self, name: str, data: bytes) -> trustme.LeafCert:
         from pathlib import Path
@@ -185,7 +185,7 @@ async def test_ourclient_tlsalpn01(tmp_path_factory, unused_tcp_port_factory, al
         ):
             del alpn.sessions[identifier.value]
 
-    client.client._challenge_solvers = dict()
+    client.client._challenge_solvers = {}
     client.client.register_challenge_solver(TLSALPN01Solver(TLSALPN01Solver.Config()))
 
     await client.register()
@@ -214,7 +214,7 @@ async def test_ourclient_tlsalpn01(tmp_path_factory, unused_tcp_port_factory, al
         ):
             del alpn.sessions[identifier.value]
 
-    client.client._challenge_solvers = dict()
+    client.client._challenge_solvers = {}
     client.client.register_challenge_solver(BadTLSALPN01Solver(TLSALPN01Solver.Config()))
 
     with pytest.raises(acmetk.client.exceptions.CouldNotCompleteChallenge):

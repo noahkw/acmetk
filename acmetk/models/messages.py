@@ -186,11 +186,11 @@ class CreateOrder(josepy.JSONObjectWithFields):
     @classmethod
     def from_data(
         cls,
-        identifiers: list[dict[str, str]] | list[str] = None,
-        not_before: "datetime.datetime" = None,
-        not_after: "datetime.datetime" = None,
-        replaces: str = None,
-        profile: str = None,
+        identifiers: list[dict[str, str]] | list[str] | None = None,
+        not_before: "datetime.datetime | None" = None,
+        not_after: "datetime.datetime | None" = None,
+        replaces: str | None = None,
+        profile: str | None = None,
     ) -> "CreateOrder":
         """Class factory that takes care of parsing the list of *identifiers*.
 
@@ -207,7 +207,7 @@ class CreateOrder(josepy.JSONObjectWithFields):
         if type(identifiers[0]) is dict:
             kwargs["identifiers"] = identifiers
         elif type(identifiers[0]) is str:
-            kwargs["identifiers"] = [dict(type="dns", value=identifier) for identifier in identifiers]
+            kwargs["identifiers"] = [{"type": "dns", "value": identifier} for identifier in identifiers]
         else:
             raise ValueError(
                 "Could not decode identifiers list. Must be either List(str) or List(dict) where "

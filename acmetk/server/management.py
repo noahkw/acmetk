@@ -139,8 +139,8 @@ class AcmeManagementMixin(ServiceBase):
                     (
                         i,
                         s[i],
-                        sum(map(lambda x: x["total"], s[i].values())),
-                        sum(map(lambda x: x["unique"], s[i].values())),
+                        sum(x["total"] for x in s[i].values()),
+                        sum(x["unique"] for x in s[i].values()),
                     )
                 )
             return {"statistics": statistics, "pms": pms}
@@ -153,7 +153,7 @@ class AcmeManagementMixin(ServiceBase):
         :param request:
         :return:
         """
-        d = {k: request.headers.getall(k) for k in request.headers.keys()}
+        d = {k: request.headers.getall(k) for k in request.headers}
         return aiohttp.web.json_response(d)
 
     @routes.get("/mgmt/changes", name="mgmt-changes")
