@@ -68,18 +68,33 @@ class RFC2136Client(DNS01ChallengeHelper, ChallengeSolver):
         self.resolver.keyalgorithm = cfg.alg
         self.__c: RFC2136Client.Config = cfg
 
-    async def _run_query(self, msg: dns.update.Update):
+    @staticmethod
+    def _pretty(msg: dns.update.UpdateMessage) -> str:
+        r = []
+        zname = msg.zone[0].name.to_text(omit_final_dot=True)
+        for rrset in msg.index.values():
+            for rdata in rrset:
+                t = dns.rdatatype.to_text(rrset.rdtype)
+                if rrset.ttl == 0:
+                    details = f"-{t}@{rrset.name}.{zname}={rdata}"
+                else:
+                    details = f"+{t}@{rrset.name}.{zname}={rdata}"
+
+                r.append(details)
+        return ",".join(r)
+
+    async def _run_query(self, msg: dns.update.UpdateMessage):
         s: float = 0.0
         for i in range(5):
             r = await dns.asyncquery.tcp(q=msg, where=self.resolver.nameservers[0])
             if r.rcode() == dns.rcode.NOERROR:
                 return
             s += random.randint(10, 30) / 10
-            logger.info(f"{msg} failed {r} (#{i}) sleep {s}")
+            logger.info(f"{self._pretty(msg)} failed {r.rcode().name} (#{i}) sleep {s}")
             await asyncio.sleep(s)
-        raise ValueError(f"{msg} failed permanently")
+        raise ValueError(f"{self._pretty(msg)} failed permanently")
 
-    async def _update(self, name: str) -> tuple[dns.name.Name, dns.update.Update]:
+    async def _update(self, name: str) -> tuple[dns.name.Name, dns.update.UpdateMessage]:
         zone = await dns.asyncresolver.zone_for_name(name, resolver=self.resolver)
         name = dns.name.from_text(name).relativize(zone)
 

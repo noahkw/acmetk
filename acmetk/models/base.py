@@ -88,11 +88,7 @@ class Serializer:
     __type_serializers__: typing.ClassVar[dict[type, typing.Callable[[], None]]] = {}
 
     def serialize(self, request: typing.Optional["aiohttp.web.Request"] = None):
-        return {
-            c: self._serialize_value(v)
-            for c in self.__serialize__
-            if (v:=getattr(self, c)) is not None
-        }
+        return {c: self._serialize_value(v) for c in self.__serialize__ if (v := getattr(self, c)) is not None}
 
     def _serialize_value(self, value):
         if (type_ := type(value)) in self.__type_serializers__:
