@@ -1,9 +1,11 @@
 import asyncio
 import logging
+import random
 import typing
 
 import acme.messages
 import dns.asyncresolver
+import dns.message
 import dns.tsigkeyring
 import dns.update
 import josepy.jwk
@@ -66,10 +68,18 @@ class RFC2136Client(DNS01ChallengeHelper, ChallengeSolver):
         self.resolver.keyalgorithm = cfg.alg
         self.__c: RFC2136Client.Config = cfg
 
-    async def _run_query(self, msg):
-        await dns.asyncquery.tcp(q=msg, where=self.resolver.nameservers[0])
+    async def _run_query(self, msg: dns.update.Update):
+        s: float = 0.0
+        for i in range(5):
+            r = await dns.asyncquery.tcp(q=msg, where=self.resolver.nameservers[0])
+            if r.rcode() == dns.rcode.NOERROR:
+                return
+            s += random.randint(10, 30) / 10
+            logger.info(f"{msg} failed {r} (#{i}) sleep {s}")
+            await asyncio.sleep(s)
+        raise ValueError(f"{msg} failed permanently")
 
-    async def _update(self, name: str):
+    async def _update(self, name: str) -> tuple[dns.name.Name, dns.update.Update]:
         zone = await dns.asyncresolver.zone_for_name(name, resolver=self.resolver)
         name = dns.name.from_text(name).relativize(zone)
 
