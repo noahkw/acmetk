@@ -264,4 +264,9 @@ class AcmeEABMixin:
             raise aiohttp.web.HTTPBadRequest(text=str(e))
 
         cred = await self._eab_store.create(kid, url_for(request, "new-account"), self.__c.expires_after)
-        return {"kid": cred.kid, "hmac_key": cred.hmac_key}
+        return {
+            "kid": cred.kid,
+            "hmac_key": cred.hmac_key,
+            "directory": url_for(request, "directory"),
+            "domain": "www.example.org",
+        }

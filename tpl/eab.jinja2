@@ -1,24 +1,275 @@
-<html>
-<header>
-    <title>EAB</title>
-</header>
-<style>
-    input {
-        display: block;
-        padding: 0.2em;
-        margin: 1em 0.5em;
-    }
-</style>
+{% extends "template.jinja2" %}
 
-<body>
 {% block body %}
-    <h3>External Account Binding</h3>
-    <p>
-        <label for="kid">kid</label>
-        <input id="kid" type="text" value="{{ kid }}">
-        <label for="hmac_key">hmac_key</label>
-        <input id="hmac_key" type="text" value="{{ hmac_key }}">
-    </p>
+    <h1>External Account Binding</h1>
+    <h2>Credentials</h2>
+    <table>
+        <thead>
+        <th><label for="kid">kid</label></th>
+        <th><label for="hmac_key">hmac_key</label></th>
+        </thead>
+        <tr>
+            <td><input id="kid" type="text" value="{{ kid }}"></td>
+            <td><input size="{{ hmac_key | length }}" id="hmac_key" type="text" value="{{ hmac_key }}"></td>
+        </tr>
+    </table>
+    <h2>Configuration Examples</h2>
+
+    <ul>
+        <li><a href="#certbot">Certbot</a></li>
+        <li><a href="#acme-sh">acme.sh</a></li>
+        <li><a href="#dehydrated">Dehydrated</a></li>
+        <li><a href="#apache-mod-md">Apache / mod_md</a></li>
+        <li><a href="#nginx-nginx-acme">Nginx/nginx-acme</a></li>
+        <li><a href="#proxmox">Proxmox</a></li>
+        <li><a href="#proxmox-datacenter-manager-pdm">Proxmox datacenter manager - pdm</a></li>
+        <li><a href="#caddy">Caddy</a></li>
+        <li><a href="#traefik">Traefik</a></li>
+    </ul>
+
+
+    <h2 id="certbot">Certbot</h2>
+    <div id="box">
+
+        As documented <a href="https://certbot.eff.org/">here</a>.
+        <h3>Account registration</h3>
+
+        <pre>
+certbot register \
+--agree-tos \
+--server {{ directory }} \
+--email {{ kid }} \
+--eab-kid {{ kid }} --eab-hmac-key "{{ hmac_key }}"
+</pre>
+
+        <h3>Certificate order</h3>
+
+        Certbot is very flexible with challenge validation. The examples uses –-standalone which creates an http
+        webserver
+        on port 80 for http-01 validation. For nginx deployments, –-nginx is often used as well as the nginx-acme
+        modules is
+        currently not shipped with most distributions.
+        <pre>
+certbot certonly --server {{ directory }} --standalone -d {{ domain }}
+</pre>
+    </div>
+
+    <h2 id="acme-sh">acme.sh</h2>
+    <div id="box">
+        As documented <a href="https://github.com/acmesh-official/acme.sh">here</a>.
+        <h3>Account creation</h3>
+        <pre>
+acme.sh --register-account  --server {{ directory }} --email {{ kid }} --eab-kid {{ kid }}  --eab-hmac-key {{ hmac_key }}
+</pre>
+        <h3>Certificate order</h3>
+
+        Examples uses standalone webservice for http-01 validation (requires socat installed).
+        <pre>
+acme.sh --issue  --server {{ directory }} --standalone --domain {{ domain }}
+</pre>
+    </div>
+    <h2 id="dehydrated">Dehydrated</h2>
+    <div id="box">
+        As documented <a href="https://github.com/dehydrated-io/dehydrated">here</a>.
+
+        Create a configuration file config, adjust WELLKNOWN.
+
+        config
+        <pre>
+CHALLENGETYPE="http-01"
+PARAM_ACCEPT_TERMS=yes
+
+CA={{ directory }}
+CONTACT_EMAIL={{ kid }}
+EAB_KID={{ kid }}
+EAB_HMAC_KEY={{ hmac_key }}
+
+WELLKNOWN=/tmp/www/.well-known/acme-challenge
+</pre>
+
+        <h3>Account creation</h3>
+        <pre>
+dehydrated --config config --register
+</pre>
+
+        <h3>Certificate order</h3>
+
+        As dehydrated does not validate by itself, we'll use a python webserver to host a .well-known for http-01
+        validation.
+        <pre>
+mkdir -p /tmp/www/.well-known/acme-challenge
+python3 -m http.server -d /tmp/www 80 &
+dehydrated --config config --cron --domain {{ domain }}
+</pre>
+        Finally - cleaning up the webservice.
+        <pre>
+kill %1
+</pre>
+    </div>
+    <h2 id="apache-mod-md">Apache / mod_md</h2>
+    <div id="box">
+        Example Configuration as documented in <a href="https://httpd.apache.org/docs/2.4/mod/mod_md.html">mod_md</a>.
+        <pre>
+MDContactEmail {{ kid }}
+MDCertificateAgreement accepted
+
+MDomain {{ domain }}
+MDCAChallenges tls-alpn-01
+
+MDCertificateAuthority {{ directory }}
+MDExternalAccountBinding {{ kid }} {{ hmac_key }}
+Protocols http/1.1 acme-tls/1
+</pre>
+    </div>
+    <h2 id="nginx-nginx-acme">Nginx/nginx-acme</h2>
+    <div id="box">
+        Using nginx packages as described <a href="https://nginx.org/en/linux_packages.html">here</a>.
+
+        Install nginx and nginx-module-acme.
+
+        <pre>
+The nginx-acme for nginx have been installed.
+To enable these modules, add the following to /etc/nginx/nginx.conf
+and reload nginx:
+
+    load_module modules/ngx_http_acme_module.so;
+</pre>
+
+        Define the issuer as shown <a href="https://github.com/nginx/nginx-acme">here</a>.
+
+        <pre>
+acme_issuer acmetk {
+    uri         {{ directory }};
+    contact     {{ kid }};
+    external_account_key {{ kid }} data:{{ hmac_key }};
+    challenge tls-alpn-01;
+    state_path  /var/cache/nginx/acme-acmetk;
+    accept_terms_of_service;
+}
+
+acme_shared_zone zone=ngx_acme_shared:1M;
+</pre>
+
+        additionally add:
+        <pre>
+resolver 8.8.8.8:53;
+</pre>
+        in the http section.
+
+        And reference the defined issuer in the server configuration:
+        <pre>
+server {
+    listen 443 ssl;
+    server_name  {{ domain }};
+
+    acme_certificate acmetk;
+
+    ssl_certificate       $acme_certificate;
+    ssl_certificate_key   $acme_certificate_key;
+
+    # do not parse the certificate on each request
+    ssl_certificate_cache max=2;
+}
+</pre>
+    </div>
+    <h2 id="proxmox">Proxmox</h2>
+    <div id="box">
+        <a href="https://pve.proxmox.com/pve-docs/chapter-sysadmin.html#sysadmin_certificate_management">Certificate
+            Management</a> & <a href="https://pve.proxmox.com/pve-docs/pvenode.1.html">pvenode</a>
+        <pre>
+pvenode acme account register default {{ kid }} --directory {{ directory }}
+# it will ask for the EAB credentials
+</pre>
+        <pre>
+pvenode config set --acme domains={{ domain }}
+pvenode acme cert order
+</pre>
+    </div>
+    <h2 id="proxmox-datacenter-manager-pdm">Proxmox datacenter manager - pdm</h2>
+    <div id="box">
+        Create API token for root using name "api" - permit everything.
+
+        Connect device via ssh, create acme account.
+        <pre>
+ssh pdm
+TOKEN=…
+curl -H "Authorization: PDMAPIToken root@pam!api:$TOKEN" -d contact={{ kid }} -d directory={{ directory }} -d name=acmetk -d eab_kid={{ kid }} -d eab_hmac_key={{ hmac_key }} -d tos_url=y
+https://pdm:8443/api2/json/config/acme/account --insecure
+</pre>
+
+        Continue in webinterface to create order & restart device when cert is received.
+    </div>
+
+    <h2 id="caddy">Caddy</h2>
+    <div id="box">
+        As documented <a href="https://caddyserver.com/docs/caddyfile/directives/tls">here</a>.
+
+        Minimum version required is <a href="https://github.com/caddyserver/caddy/releases/tag/v2.9.0">v2.9.0</a>.
+
+        <h3>Configuration per domain</h3>
+        <pre>
+{{ domain }} {
+    tls {{ kid }} {
+        ca {{ directory }}
+        eab {{ kid }} {{ hmac_key }}
+    }
+    [...]
+}
+</pre>
+
+        <h3>Configuration global</h3>
+
+        /etc/caddy/Caddyfile
+        <pre>
+# globals
+{
+    email {{ kid }}
+    acme_ca {{ directory }}
+    acme_eab {
+        key_id  {{ kid }}
+        mac_key {{ hmac_key }}
+    }
+}
+</pre>
+        <h3>Cleanup</h3>
+
+        When changing the DIRECTORY to production, it's required to remove artifacts.
+        <pre>
+rm -rf /var/lib/caddy/.local/share/caddy/certificates/*-directory/
+</pre>
+    </div>
+    <h2 id="traefik">Traefik</h2>
+    <div id="box">
+        As documented
+        <a href="https://doc.traefik.io/traefik/reference/install-configuration/tls/certificate-resolvers/acme/">here</a>.
+
+        <h3>Configuration</h3>
+        <pre>
+certificatesResolvers:
+  acmetk:
+    acme:
+      caServer: {{ directory }}
+      email: {{ kid }}
+      tlsChallenge: true
+      eab:
+        kid: {{ kid }}
+        hmacEncoded: {{ hmac_key }}
+      storage: /letsencrypt/acme.json
+</pre>
+        Certificate resolver storage configuration (when using docker-compose)
+
+        A volume has to be mapped accordingly.
+        <pre>
+docker-compose.yaml
+services:
+  traefik:
+# …
+    volumes:
+# …
+      - ./letsencrypt:/letsencrypt:rw
+</pre>
+    </div>
 {% endblock %}
-</body>
-</html>
+
+{% block navigation %}
+{% endblock %}
