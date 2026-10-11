@@ -8,7 +8,7 @@ class AcmeClientException(Exception):
 class CouldNotCompleteChallenge(AcmeClientException):
     """Exception that is raised if completion of a specific challenge failed."""
 
-    def __init__(self, challenge, *args):
+    def __init__(self, challenge: acme.messages.ChallengeBody, *args):
         super().__init__(*args)
         self.challenge: acme.messages.ChallengeBody = challenge
         """The challenge whose completion was unsuccessful."""

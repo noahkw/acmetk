@@ -96,8 +96,8 @@ async def get_eab(header, value) -> tuple[str, str]:
 
     document = html5lib.parse(data, treebuilder="etree", namespaceHTMLElements=False)
 
-    kid = document.find("./body/p/input[@id='kid']").attrib["value"]
-    hmac_key = document.find("./body/p/input[@id='hmac_key']").attrib["value"]
+    kid = document.find(".//input[@id='kid']").attrib["value"]
+    hmac_key = document.find(".//input[@id='hmac_key']").attrib["value"]
 
     return kid, hmac_key
 
