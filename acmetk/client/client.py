@@ -7,6 +7,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
 
 import acme.messages
+import aiohttp
 import josepy
 from acme import jws
 from acme.challenges import UnrecognizedChallenge
@@ -488,17 +489,20 @@ class AcmeClient:
 
         # Realistically, polling for the authorizations to become valid should never fail since we have already
         # ensured that one challenge per authorization is valid.
-        await asyncio.gather(
-            *[
-                self._poll_until(
-                    self.authorization_get,
-                    authorization_url,
-                    predicate=is_valid,
-                    negative_predicate=is_invalid,
-                )
-                for authorization_url in order.authorizations
-            ]
-        )
+        try:
+            async with asyncio.TaskGroup() as tg:
+                for authorization_url in order.authorizations:
+                    tg.create_task(
+                        self._poll_until(
+                            self.authorization_get,
+                            authorization_url,
+                            predicate=is_valid,
+                            negative_predicate=is_invalid,
+                        )
+                    )
+        except* PollingException as e:
+            logger.exception("getting authorization failed")
+            raise CouldNotCompleteChallenge(e.obj)
 
     async def challenges_cleanup(
         self,
@@ -509,12 +513,20 @@ class AcmeClient:
 
         :param solver: The challenge solver to use.
         :param challenges: List of identifier, challenge tuples to clean up after."""
-        await asyncio.gather(
-            *[
-                solver.cleanup_challenge(self._private_key, identifier, challenge)
-                for identifier, challenge in challenges
-            ]
-        )
+        async with asyncio.TaskGroup() as tg:
+            for identifier, challenge in challenges:
+
+                async def shield(
+                    coro: Awaitable,
+                    identifier: acme.messages.Identifier = identifier,
+                    challenge: acme.messages.ChallengeBody = challenge,
+                ):
+                    try:
+                        return await coro
+                    except Exception:
+                        logger.exception(f"cleanup {solver.__class__.__name__} {identifier} {challenge} failed")
+
+                tg.create_task(shield(solver.cleanup_challenge(self._private_key, identifier, challenge)))
 
     async def challenges_complete(
         self,
@@ -528,51 +540,60 @@ class AcmeClient:
         :raises: :class:`CouldNotCompleteChallenge` If completion of one of the challenges failed.
         """
         # Complete the pending challenges
-        await asyncio.gather(
-            *[
-                solver.complete_challenge(self._private_key, identifier, challenge)
-                for (identifier, challenge) in challenges
-            ]
-        )
+        try:
+            async with asyncio.TaskGroup() as tg:
+                for identifier, challenge in challenges:
+                    tg.create_task(solver.complete_challenge(self._private_key, identifier, challenge))
+        except* CouldNotCompleteChallenge as eg:
+            raise eg.exceptions[0]
 
-        # Tell the server that we are ready for challenge validation
-        await asyncio.gather(*[self.challenge_validate(challenge.uri) for _, challenge in challenges])
+        try:
+            async with asyncio.TaskGroup() as tg:
+                for _, challenge in challenges:
+                    tg.create_task(self.challenge_validate(challenge))
+        except* CouldNotCompleteChallenge as eg:
+            raise eg.exceptions[0]
 
         # Poll until all challenges have become valid
         try:
-            await asyncio.gather(
-                *[
-                    self._poll_until(
-                        self.challenge_get,
-                        challenge.uri,
-                        predicate=is_valid,
-                        negative_predicate=is_invalid,
-                        delay=5.0,
-                        max_tries=50,
+            async with asyncio.TaskGroup() as tg:
+                for _, challenge in challenges:
+                    tg.create_task(
+                        self._poll_until(
+                            self.challenge_get,
+                            challenge,
+                            predicate=is_valid,
+                            negative_predicate=is_invalid,
+                            delay=5.0,
+                            max_tries=50,
+                        )
                     )
-                    for _, challenge in challenges
-                ]
-            )
-        except PollingException as e:
-            raise CouldNotCompleteChallenge(e.obj)
+        except* PollingException as eg:
+            raise CouldNotCompleteChallenge(eg.exceptions[0].obj)
 
-    async def challenge_get(self, challenge_url: str) -> acme.messages.ChallengeBody:
+    async def challenge_get(self, challenge: acme.messages.ChallengeBody) -> acme.messages.ChallengeBody:
         """Fetches a challenge given its URL.
 
-        :param challenge_url: The challenge's URL.
-        :raises: :class:`aiohttp.ClientResponseError` If the challenge does not exist.
+        :param challenge: The challenge.
+        :raises: :class:`CouldNotCompleteChallenge` If the challenge does not exist.
         :return: The fetched challenge.
         """
-        _, challenge_obj = await self._signed_request(None, challenge_url)
-        return acme.messages.ChallengeBody.from_json(challenge_obj)
+        try:
+            _, data = await self._signed_request(None, challenge.uri)
+        except aiohttp.ClientError:
+            raise CouldNotCompleteChallenge(challenge)
+        return acme.messages.ChallengeBody.from_json(data)
 
-    async def challenge_validate(self, challenge_url: str) -> None:
+    async def challenge_validate(self, challenge: acme.messages.ChallengeBody) -> None:
         """Initiates the given challenge's validation.
 
-        :param challenge_url: The challenge's URL.
-        :raises: :class:`aiohttp.ClientResponseError` If the challenge does not exist.
+        :param challenge: The challenge.
+        :raises: :class:`CouldNotCompleteChallenge` If the challenge does not exist.
         """
-        await self._signed_request(None, challenge_url, post_as_get=False)
+        try:
+            await self._signed_request(None, challenge.uri, post_as_get=False)
+        except Exception:
+            raise CouldNotCompleteChallenge(challenge)
 
     async def certificate_get(self, order: acme.messages.Order) -> str:
         """Downloads the given order's certificate.
