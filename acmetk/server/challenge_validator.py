@@ -305,7 +305,7 @@ class RequestIPDNSChallengeValidator(ChallengeValidator):
 class DummyValidator(ChallengeValidator):
     """Does not do any validation and reports every challenge as valid."""
 
-    SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01])
+    SUPPORTED_CHALLENGES = frozenset([ChallengeType.DNS_01, ChallengeType.HTTP_01, ChallengeType.TLS_ALPN_01])
     """The types of challenges that the validator supports."""
 
     async def validate_challenge(self, challenge: Challenge, **kwargs):
