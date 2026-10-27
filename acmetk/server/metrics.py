@@ -64,6 +64,12 @@ try:
                 status_code = response.status
             except acme.messages.Error as em:
                 status_code = acmetk.models.messages.get_status(em.code)
+                responses_metrics.labels(
+                    method=request.method,
+                    route_name=route_name,
+                    status_code=status_code,
+                ).inc()
+                raise em from None
             except Exception as e:
                 status_code = e.status if isinstance(e, HTTPException) else 500
 
