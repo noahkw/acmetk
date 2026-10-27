@@ -32,6 +32,7 @@ ERROR_CODE_STATUS = {
     "unauthorized": 401,
     "orderNotReady": 403,
     "accountDoesNotExist": 400,
+    "alreadyReplaced": 409,
 }
 """ACME error types mapped to HTTP status codes.
 
