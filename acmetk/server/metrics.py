@@ -2,6 +2,7 @@ import ipaddress
 import typing
 from collections.abc import Awaitable, Callable
 
+import acme.messages
 from aiohttp import web
 from aiohttp.web_exceptions import HTTPException
 from aiohttp.web_middlewares import middleware
@@ -10,8 +11,8 @@ from aiohttp.web_response import Response
 from pydantic import Field
 from pydantic_settings import BaseSettings
 
-if typing.TYPE_CHECKING:
-    import acmetk.server
+import acmetk.models.messages
+import acmetk.server
 
 try:
     import prometheus_client
@@ -61,6 +62,8 @@ try:
             try:
                 response = await handler(request)
                 status_code = response.status
+            except acme.messages.Error as em:
+                status_code = acmetk.models.messages.get_status(em.code)
             except Exception as e:
                 status_code = e.status if isinstance(e, HTTPException) else 500
 
